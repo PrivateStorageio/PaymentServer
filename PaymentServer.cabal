@@ -1,16 +1,16 @@
 name:                PaymentServer
 version:             0.1.0.0
--- synopsis:
+synopsis:            Coordinate entities for the purchase of PrivateStorage.io vouchers.
 -- description:
-homepage:            https://github.com/githubuser/PaymentServer#readme
-license:             BSD3
+homepage:            https://github.com/privatestorageio/PaymentServer#readme
+license:             Apache-2.0
 license-file:        LICENSE
-author:              Author name here
-maintainer:          example@example.com
-copyright:           2019 Author name here
+author:              Jean-Paul Calderone
+maintainer:          support@privatestorage.io
+copyright:           2019 Private Storage.io, LLC.
 category:            Web
 build-type:          Simple
-extra-source-files:  README.md
+extra-source-files:  README.rst
 cabal-version:       >=1.10
 
 library
@@ -46,4 +46,4 @@ test-suite PaymentServer-test
 
 source-repository head
   type:     git
-  location: https://github.com/githubuser/PaymentServer
+  location: https://github.com/privatestorageio/PaymentServer
