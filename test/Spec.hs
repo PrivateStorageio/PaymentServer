@@ -180,7 +180,7 @@ spec = with (return app) $ do
     it "responds to JSON non-Event body with 400 (Invalid Request)" $
       postJSON "/webhook" "{}" `shouldRespondWith` 400
 
-  -- describe "success behavior of POST /webhook" $ do
-  --   it "responds to JSON-encoded Event body with 200 (OK)" $
-  --     forAll chargeSucceededEvents $ \event ->
-  --       postJSON "/webhook" (encode event) `shouldRespondWith` 200
+  describe "success behavior of POST /webhook" $ do
+    it "responds to JSON-encoded Event body with 200 (OK)" $
+      forAll chargeSucceededEvents $ \event ->
+        postJSON "/webhook" (encode event) `shouldRespondWith` 200
