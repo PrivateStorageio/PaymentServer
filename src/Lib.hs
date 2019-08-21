@@ -12,15 +12,8 @@ import Network.Wai
 import Network.Wai.Handler.Warp
 import Servant
 
-data User = User
-  { userId        :: Int
-  , userFirstName :: String
-  , userLastName  :: String
-  } deriving (Eq, Show)
-
-$(deriveJSON defaultOptions ''User)
-
-type API = "users" :> Get '[JSON] [User]
+type API =
+  "webhook" :> Post '[JSON] ()
 
 startApp :: IO ()
 startApp = run 8080 app
@@ -32,9 +25,4 @@ api :: Proxy API
 api = Proxy
 
 server :: Server API
-server = return users
-
-users :: [User]
-users = [ User 1 "Isaac" "Newton"
-        , User 2 "Albert" "Einstein"
-        ]
+server = return ()
