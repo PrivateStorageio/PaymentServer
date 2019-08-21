@@ -62,3 +62,10 @@ packages:
 #
 # Allow a newer minor version of GHC than the snapshot specifies
 # compiler-check: newer-minor
+
+
+# https://docs.haskellstack.org/en/stable/nix_integration/#additions-to-your-stackyaml
+nix:
+  enable: true
+  packages:
+    - "zlib"
