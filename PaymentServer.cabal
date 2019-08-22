@@ -59,9 +59,6 @@ test-suite PaymentServer-test
                      , tasty-th
                      , tasty-discover
                      , tasty-hspec
-                     , tasty-hedgehog
-                     , tasty-quickcheck
-                     , hedgehog
                      , servant-server
                      , containers
                      , unordered-containers
