@@ -25,11 +25,12 @@ import Test.Hspec.Wai
   , liftIO
   )
 import Test.Hspec.Wai.QuickCheck
-  ( -- Get Test.QuickCheck.Property.Testable instance for WaiExpectation
-    property
+  ( property
   )
 import Test.QuickCheck
-  ( generate
+  ( Property
+  , generate
+  , forAll
   )
 import Util.WAI
   ( postJSON
@@ -61,7 +62,7 @@ spec_webhook = with (return app) $
 
 spec_webhook' :: Spec
 spec_webhook' = with (return app) $
-  describe "success behavior of POST /webhook" $ do
+  describe "success behavior of POST /webhook" $
     it "responds to a JSON Event body with 200 (OK)" $ do
       event <- liftIO aChargeEvent
       postJSON "/webhook" event `shouldRespondWith` 200

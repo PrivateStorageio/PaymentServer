@@ -50,24 +50,24 @@ import Test.QuickCheck.Instances.Text
 instance Arbitrary Charge where
   arbitrary = Charge
     <$> arbitrary         --   chargeId :: ChargeId
-    <*> (return "charge") --   chargeObject :: Text
+    <*> return "charge"   --   chargeObject :: Text
     <*> arbitrary         --   chargeCreated :: UTCTime
     <*> arbitrary         --   chargeLiveMode :: Bool
     <*> arbitrary         --   chargePaid :: Bool
     <*> arbitrary         --   chargeAmount :: Amount
-    <*> (return UnknownCurrency) --   chargeCurrency :: Currency
-    <*> (return False)    --   chargeRefunded :: Bool
-    <*> (return Nothing)  --   chargeCreditCard :: Maybe Card
+    <*> return UnknownCurrency --   chargeCurrency :: Currency
+    <*> return False      --   chargeRefunded :: Bool
+    <*> return Nothing    --   chargeCreditCard :: Maybe Card
     <*> arbitrary         --   chargeCaptured :: Bool
-    <*> (return mempty)   --   chargeRefunds :: StripeList Refund
-    <*> (return Nothing)  --   chargeBalanceTransaction :: Maybe (Expandable TransactionId)
-    <*> (return Nothing)  --   chargeFailureMessage :: Maybe Text
-    <*> (return Nothing)  --   chargeFailureCode :: Maybe Text
-    <*> (return 0)        --   chargeAmountRefunded :: Int
+    <*> return mempty     --   chargeRefunds :: StripeList Refund
+    <*> return Nothing    --   chargeBalanceTransaction :: Maybe (Expandable TransactionId)
+    <*> return Nothing    --   chargeFailureMessage :: Maybe Text
+    <*> return Nothing    --   chargeFailureCode :: Maybe Text
+    <*> return 0          --   chargeAmountRefunded :: Int
     <*> arbitrary         --   chargeCustomerId :: Maybe (Expandable CustomerId)
-    <*> (return Nothing)  --   chargeInvoice :: Maybe (Expandable InvoiceId)
+    <*> return Nothing    --   chargeInvoice :: Maybe (Expandable InvoiceId)
     <*> arbitrary         --   chargeDescription :: Maybe Description
-    <*> (return Nothing)  --   chargeDispute :: Maybe Dispute
+    <*> return Nothing    --   chargeDispute :: Maybe Dispute
     <*> arbitrary         --   chargeMetaData :: MetaData
     <*> arbitrary         --   chargeStatementDescription :: Maybe StatementDescription
     <*> arbitrary         --   chargeReceiptEmail :: Maybe Text
@@ -123,10 +123,10 @@ chargeSucceededEvents =
   <$> arbitrary -- eventId
   <*> arbitrary -- eventCreated
   <*> arbitrary -- eventLiveMode
-  <*> (return ChargeSucceededEvent) -- eventType
+  <*> return ChargeSucceededEvent -- eventType
   <*> (ChargeEvent
        <$> arbitrary -- the charge
       ) -- eventData
-  <*> (return "event") -- eventObject
+  <*> return "event" -- eventObject
   <*> arbitrary -- eventPendingWebHooks
   <*> arbitrary -- eventRequest
