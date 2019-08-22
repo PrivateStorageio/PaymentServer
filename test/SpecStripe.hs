@@ -62,7 +62,7 @@ aChargeEvent :: IO LazyBS.ByteString
 aChargeEvent = encode <$> generate chargeSucceededEvents
 
 spec_webhook :: Spec
-spec_webhook = with (return app) $
+spec_webhook = with (return app) $ do
   -- I would like to make these property tests but I can't figure out how to
   -- use QuickCheck (or Hedgehog) to write property tests for web code.
 
@@ -73,8 +73,6 @@ spec_webhook = with (return app) $
     it "responds to JSON non-Event body with 400 (Invalid Request)" $
       postJSON "/webhook" "{}" `shouldRespondWith` 400
 
-spec_webhook' :: Spec
-spec_webhook' = with (return app) $
   describe "success behavior of POST /webhook" $
     it "responds to a JSON Event body with 200 (OK)" $ do
       event <- liftIO aChargeEvent
