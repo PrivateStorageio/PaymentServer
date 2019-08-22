@@ -79,4 +79,5 @@ spec_webhook = with (return app) $ do
       postJSON "/webhook" event `shouldRespondWith` 200 { matchBody = MatchBody bodyMatcher }
 
 bodyMatcher :: [Network.HTTP.Types.Header] -> Body -> Maybe String
-bodyMatcher _ body = if body == "{}" then Nothing else Just $ show body
+bodyMatcher _ "{}" = Nothing
+bodyMatcher _ body = Just $ show body
