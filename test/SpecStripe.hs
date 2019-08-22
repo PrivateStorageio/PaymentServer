@@ -19,6 +19,9 @@ import Test.Hspec
 import Test.Hspec.Wai
   ( WaiSession
   , WaiExpectation
+  , MatchBody(MatchBody)
+  , ResponseMatcher(matchBody)
+  , Body
   , with
   , post
   , shouldRespondWith
@@ -36,9 +39,24 @@ import Util.Gen
 import Util.JSON
   ( -- ToJSON instance for Event
   )
-import Lib
-  ( app
+import Network.HTTP.Types
+  ( Header
   )
+import Servant
+  ( Application
+  , Proxy(Proxy)
+  , serve
+  )
+import PaymentServer.Processors.Stripe
+  ( StripeAPI
+  , stripeServer
+  )
+
+stripeAPI :: Proxy StripeAPI
+stripeAPI = Proxy
+
+app :: Application
+app = serve stripeAPI stripeServer
 
 aChargeEvent :: IO LazyBS.ByteString
 aChargeEvent = encode <$> generate chargeSucceededEvents
@@ -49,8 +67,8 @@ spec_webhook = with (return app) $
   -- use QuickCheck (or Hedgehog) to write property tests for web code.
 
   describe "error behavior of POST /webhook" $ do
-    it "responds to non-JSON Content-Type with 400 (Invalid Request)" $
-      post "/webhook" "xxx" `shouldRespondWith` 400
+    it "responds to non-JSON Content-Type with 415 (Unsupported Media Type)" $
+      post "/webhook" "xxx" `shouldRespondWith` 415
 
     it "responds to JSON non-Event body with 400 (Invalid Request)" $
       postJSON "/webhook" "{}" `shouldRespondWith` 400
@@ -60,4 +78,7 @@ spec_webhook' = with (return app) $
   describe "success behavior of POST /webhook" $
     it "responds to a JSON Event body with 200 (OK)" $ do
       event <- liftIO aChargeEvent
-      postJSON "/webhook" event `shouldRespondWith` 200
+      postJSON "/webhook" event `shouldRespondWith` 200 { matchBody = MatchBody bodyMatcher }
+
+bodyMatcher :: [Network.HTTP.Types.Header] -> Body -> Maybe String
+bodyMatcher _ body = if body == "{}" then Nothing else Just $ show body

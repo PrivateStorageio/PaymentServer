@@ -9,7 +9,12 @@ import Data.Text
   )
 
 import Data.Time.Clock
-  ( UTCTime
+  ( UTCTime(UTCTime)
+  )
+
+import Data.Time.Clock.POSIX
+  ( POSIXTime
+  , posixSecondsToUTCTime
   )
 
 import Web.Stripe.Types
@@ -21,7 +26,7 @@ import Web.Stripe.Types
   , InvoiceId(InvoiceId)
   , ChargeId(ChargeId)
   , Expandable(Id)
-  , Currency(UnknownCurrency)
+  , Currency(USD, UnknownCurrency)
   , Amount(Amount)
   , StripeList(StripeList, list, totalCount, hasMore)
   )
@@ -38,6 +43,9 @@ import Test.QuickCheck
   ( Gen
   , Arbitrary
   , arbitrary
+  , Positive(Positive)
+  , oneof
+  , suchThatMap
   )
 
 import Test.QuickCheck.Instances.Time
@@ -51,11 +59,14 @@ instance Arbitrary Charge where
   arbitrary = Charge
     <$> arbitrary         --   chargeId :: ChargeId
     <*> return "charge"   --   chargeObject :: Text
-    <*> arbitrary         --   chargeCreated :: UTCTime
+    <*> posixTimes        --   chargeCreated :: UTCTime
     <*> arbitrary         --   chargeLiveMode :: Bool
     <*> arbitrary         --   chargePaid :: Bool
     <*> arbitrary         --   chargeAmount :: Amount
-    <*> return UnknownCurrency --   chargeCurrency :: Currency
+    <*> oneof
+    [ return UnknownCurrency
+    , return USD
+    ]                     --   chargeCurrency :: Currency
     <*> return False      --   chargeRefunded :: Bool
     <*> return Nothing    --   chargeCreditCard :: Maybe Card
     <*> arbitrary         --   chargeCaptured :: Bool
@@ -116,12 +127,11 @@ instance Arbitrary CustomerId where
 instance Arbitrary a => Arbitrary (Expandable a) where
   arbitrary = Id <$> arbitrary
 
-
 chargeSucceededEvents :: Gen Event
 chargeSucceededEvents =
   Event
   <$> arbitrary -- eventId
-  <*> arbitrary -- eventCreated
+  <*> posixTimes -- eventCreated
   <*> arbitrary -- eventLiveMode
   <*> return ChargeSucceededEvent -- eventType
   <*> (ChargeEvent
@@ -130,3 +140,9 @@ chargeSucceededEvents =
   <*> return "event" -- eventObject
   <*> arbitrary -- eventPendingWebHooks
   <*> arbitrary -- eventRequest
+
+posixTimes :: Gen UTCTime
+posixTimes = (arbitrary :: Gen Integer) `suchThatMap` (Just . posixSecondsToUTCTime . fromIntegral . abs)
+
+-- dropFractionalSeconds :: UTCTime -> UTCTime
+-- dropFractionalSeconds (UTCTime day dayTime) = UTCTime day (round dayTime)
