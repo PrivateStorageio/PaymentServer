@@ -1,13 +1,8 @@
-{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Main (main) where
 
-import Lib
-  ( app
-  )
-
-import Data.ByteString.Lazy as LazyBS
-import Data.ByteString as BS
+module Util.Gen
+  ( chargeSucceededEvents
+  ) where
 
 import Data.Text
   ( Text
@@ -15,10 +10,6 @@ import Data.Text
 
 import Data.Time.Clock
   ( UTCTime
-  )
-
-import Data.Aeson
-  ( encode
   )
 
 import Web.Stripe.Types
@@ -42,32 +33,10 @@ import Web.Stripe.Event
   , EventId(EventId)
   )
 
-import Test.Hspec
-  ( Spec
-  , hspec
-  , describe
-  , it
-  )
-import Test.Hspec.Wai
-  ( WaiSession
-  , with
-  , post
-  , request
-  , shouldRespondWith
-  )
-import Network.Wai.Test
-  ( SResponse
-  )
-
-import Network.HTTP.Types.Method
-  ( methodPost
-  )
 
 import Test.QuickCheck
   ( Gen
   , Arbitrary
-  , forAll
-  , property
   , arbitrary
   )
 
@@ -78,19 +47,10 @@ import Test.QuickCheck.Instances.Text
   ( -- Get the `Gen Text` instance
   )
 
-main :: IO ()
-main = hspec spec
-
--- Post some JSON to a path.
--- Return a function from path to a response
-postJSON :: BS.ByteString -> (LazyBS.ByteString -> WaiSession SResponse)
-postJSON path =
-  request methodPost path [("Content-Type", "application/json")]
-
 instance Arbitrary Charge where
   arbitrary = Charge
     <$> arbitrary         --   chargeId :: ChargeId
-    <*> arbitrary         --   chargeObject :: Text
+    <*> (return "charge") --   chargeObject :: Text
     <*> arbitrary         --   chargeCreated :: UTCTime
     <*> arbitrary         --   chargeLiveMode :: Bool
     <*> arbitrary         --   chargePaid :: Bool
@@ -167,20 +127,6 @@ chargeSucceededEvents =
   <*> (ChargeEvent
        <$> arbitrary -- the charge
       ) -- eventData
-  <*> arbitrary -- eventObject
+  <*> (return "event") -- eventObject
   <*> arbitrary -- eventPendingWebHooks
   <*> arbitrary -- eventRequest
-
-spec :: Spec
-spec = with (return app) $ do
-  describe "error behavior of POST /webhook" $ do
-    it "responds to non-JSON Content-Type with 400 (Invalid Request)" $
-      post "/webhook" "{}" `shouldRespondWith` 400
-
-    it "responds to JSON non-Event body with 400 (Invalid Request)" $
-      postJSON "/webhook" "{}" `shouldRespondWith` 400
-
-  describe "success behavior of POST /webhook" $ do
-    it "responds to JSON-encoded Event body with 200 (OK)" $
-      forAll chargeSucceededEvents $ \event ->
-        postJSON "/webhook" (encode event) `shouldRespondWith` 200
