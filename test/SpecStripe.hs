@@ -24,13 +24,8 @@ import Test.Hspec.Wai
   , shouldRespondWith
   , liftIO
   )
-import Test.Hspec.Wai.QuickCheck
-  ( property
-  )
 import Test.QuickCheck
-  ( Property
-  , generate
-  , forAll
+  ( generate
   )
 import Util.WAI
   ( postJSON
