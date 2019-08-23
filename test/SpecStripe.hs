@@ -28,13 +28,15 @@ import Test.Hspec.Wai
   , shouldRespondWith
   , liftIO
   )
+import Test.Hspec.Wai.QuickCheck
+  ( property
+  )
 import Test.QuickCheck
   ( Property
   , Gen
   , arbitrary
   , suchThat
   , suchThatMap
-  , property
   , generate
   , forAll
   , (===)
@@ -47,7 +49,8 @@ import Util.WAI
   ( postJSON
   )
 import Util.Gen
-  ( chargeSucceededEvents
+  ( GoodChargeEvent(GoodChargeEvent)
+  , chargeSucceededEvents
   , hasVoucher
   )
 import Util.JSON
@@ -83,14 +86,8 @@ stripeAPI = Proxy
 app :: IO Application
 app = memory >>= return . stripeServer >>= return . serve stripeAPI
 
-aChargeEvent :: IO LazyBS.ByteString
-aChargeEvent = encode <$> generate chargeSucceededEvents
-
 spec_webhook :: Spec
 spec_webhook = with app $ do
-  -- I would like to make these property tests but I can't figure out how to
-  -- use QuickCheck (or Hedgehog) to write property tests for web code.
-
   describe "error behavior of POST /webhook" $ do
     it "responds to non-JSON Content-Type with 415 (Unsupported Media Type)" $
       post "/webhook" "xxx" `shouldRespondWith` 415
@@ -98,10 +95,16 @@ spec_webhook = with app $ do
     it "responds to JSON non-Event body with 400 (Invalid Request)" $
       postJSON "/webhook" "{}" `shouldRespondWith` 400
 
+  -- I would like to make most or all of these into property tests.  *This*
+  -- test shows how you can do it.  Yay.  The main thing (for me, anyway) to
+  -- remember is to use `property` from Test.Hspec.Wai.QuickCheck and not from
+  -- `Test.QuickCheck`. :/ Unsure whether I love the apparent Haskell
+  -- convention of giving the same name to *similar* functions.
   describe "success behavior of POST /webhook" $
-    it "responds to a JSON Event body with 200 (OK)" $ do
-      event <- liftIO aChargeEvent
-      postJSON "/webhook" event `shouldRespondWith` 200 { matchBody = MatchBody bodyMatcher }
+    it "responds to a JSON Event body with 200 (OK)" $
+    property $
+    \(GoodChargeEvent event) ->
+      postJSON "/webhook" (encode event) `shouldRespondWith` 200 { matchBody = MatchBody bodyMatcher }
 
 bodyMatcher :: [Network.HTTP.Types.Header] -> Body -> Maybe String
 bodyMatcher _ "{}" = Nothing

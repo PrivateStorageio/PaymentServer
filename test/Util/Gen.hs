@@ -4,6 +4,7 @@ module Util.Gen
   ( chargeSucceededEvents
   , posixTimes
   , hasVoucher
+  , GoodChargeEvent(GoodChargeEvent)
   ) where
 
 import Data.Text
@@ -142,6 +143,13 @@ chargeSucceededEvents =
   <*> return "event" -- eventObject
   <*> arbitrary -- eventPendingWebHooks
   <*> arbitrary -- eventRequest
+
+
+data GoodChargeEvent = GoodChargeEvent Event deriving (Show, Eq)
+
+instance Arbitrary GoodChargeEvent where
+  arbitrary = chargeSucceededEvents `suchThatMap` (Just . GoodChargeEvent)
+
 
 posixTimes :: Gen UTCTime
 posixTimes = (arbitrary :: Gen Integer) `suchThatMap` (Just . posixSecondsToUTCTime . fromIntegral . abs)
