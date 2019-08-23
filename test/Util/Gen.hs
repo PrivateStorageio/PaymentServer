@@ -2,6 +2,8 @@
 
 module Util.Gen
   ( chargeSucceededEvents
+  , posixTimes
+  , hasVoucher
   ) where
 
 import Data.Text
@@ -144,5 +146,5 @@ chargeSucceededEvents =
 posixTimes :: Gen UTCTime
 posixTimes = (arbitrary :: Gen Integer) `suchThatMap` (Just . posixSecondsToUTCTime . fromIntegral . abs)
 
--- dropFractionalSeconds :: UTCTime -> UTCTime
--- dropFractionalSeconds (UTCTime day dayTime) = UTCTime day (round dayTime)
+hasVoucher :: MetaData -> Bool
+hasVoucher (MetaData items) = any (== "Voucher") . (map fst) $ items
