@@ -35,23 +35,19 @@ import Test.QuickCheck
   ( Property
   , Gen
   , arbitrary
-  , suchThat
-  , suchThatMap
   , generate
   , forAll
   , (===)
   , (=/=)
   )
-import Test.QuickCheck.Instances.Tuple
-  ( (>*<)
-  )
 import Util.WAI
   ( postJSON
   )
 import Util.Gen
-  ( GoodChargeEvent(GoodChargeEvent)
+  ( ChargeEvents(GoodChargeEvent, BadChargeEvent)
   , chargeSucceededEvents
-  , hasVoucher
+  , metaDatasWithVoucher
+  , metaDatasWithoutVoucher
   )
 import Util.JSON
   ( -- ToJSON instance for Event
@@ -76,9 +72,6 @@ import PaymentServer.Persistence
   ( Voucher
   , memory
   )
-import Data.List.Index
-  ( insertAt
-  )
 
 stripeAPI :: Proxy StripeAPI
 stripeAPI = Proxy
@@ -102,25 +95,21 @@ spec_webhook = with app $ do
   -- convention of giving the same name to *similar* functions.
   describe "success behavior of POST /webhook" $
     it "responds to a JSON Event body with 200 (OK)" $
-    property $
-    \(GoodChargeEvent event) ->
-      postJSON "/webhook" (encode event) `shouldRespondWith` 200 { matchBody = MatchBody bodyMatcher }
+    let
+      test e =
+        postJSON "/webhook" (encode e) `shouldRespondWith` 200 { matchBody = MatchBody bodyMatcher }
+      -- For now these are the same.  Maybe they always will be?  The HTTP
+      -- behavior is the same though the backend behavior may differ.
+      xtest_postWithEventBody (GoodChargeEvent e) = test e
+      xtest_postWithEventBody (BadChargeEvent e) = test e
+    in
+      property xtest_postWithEventBody
+
+
 
 bodyMatcher :: [Network.HTTP.Types.Header] -> Body -> Maybe String
 bodyMatcher _ "{}" = Nothing
 bodyMatcher _ body = Just $ show body
-
-metaDatasWithoutVoucher = (arbitrary :: Gen MetaData) `suchThat` (not . hasVoucher)
-
--- Just filtering out random metadatas that don't have a voucher makes for an
--- incredibly inefficient generator.  So start without a voucher and then add
--- one.
-metaDatasWithVoucher = ((arbitrary :: Gen Voucher) >*< metaDatasWithoutVoucher) `suchThatMap` (Just. uncurry addVoucher)
-
-addVoucher :: Voucher -> MetaData -> MetaData
-addVoucher voucher (MetaData []) = MetaData [("Voucher", voucher)]
-addVoucher voucher (MetaData items) =
-  MetaData (insertAt (1234567 `mod` length items) ("Voucher", voucher) items)
 
 prop_getVoucherFindsVoucher :: Property
 prop_getVoucherFindsVoucher = forAll metaDatasWithVoucher $ \x ->

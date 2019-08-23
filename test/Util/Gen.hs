@@ -2,24 +2,26 @@
 
 module Util.Gen
   ( chargeSucceededEvents
+  , metaDatasWithoutVoucher
+  , metaDatasWithVoucher
   , posixTimes
   , hasVoucher
-  , GoodChargeEvent(GoodChargeEvent)
+  , ChargeEvents(GoodChargeEvent, BadChargeEvent)
   ) where
 
 import Data.Text
   ( Text
   )
-
+import Data.List.Index
+  ( insertAt
+  )
 import Data.Time.Clock
   ( UTCTime(UTCTime)
   )
-
 import Data.Time.Clock.POSIX
   ( POSIXTime
   , posixSecondsToUTCTime
   )
-
 import Web.Stripe.Types
   ( Charge(Charge)
   , StatementDescription(StatementDescription)
@@ -33,60 +35,36 @@ import Web.Stripe.Types
   , Amount(Amount)
   , StripeList(StripeList, list, totalCount, hasMore)
   )
-
 import Web.Stripe.Event
   ( Event(Event, eventId, eventCreated, eventLiveMode, eventType, eventData, eventObject, eventPendingWebHooks, eventRequest)
   , EventType(ChargeSucceededEvent)
   , EventData(ChargeEvent)
   , EventId(EventId)
   )
-
-
 import Test.QuickCheck
   ( Gen
   , Arbitrary
   , arbitrary
   , Positive(Positive)
   , oneof
+  , suchThat
   , suchThatMap
   )
-
+import Test.QuickCheck.Instances.Tuple
+  ( (>*<)
+  )
 import Test.QuickCheck.Instances.Time
   ( -- Get the `Gen UTCTime` instance
   )
 import Test.QuickCheck.Instances.Text
   ( -- Get the `Gen Text` instance
   )
+import PaymentServer.Persistence
+  ( Voucher
+  )
 
 instance Arbitrary Charge where
-  arbitrary = Charge
-    <$> arbitrary         --   chargeId :: ChargeId
-    <*> return "charge"   --   chargeObject :: Text
-    <*> posixTimes        --   chargeCreated :: UTCTime
-    <*> arbitrary         --   chargeLiveMode :: Bool
-    <*> arbitrary         --   chargePaid :: Bool
-    <*> arbitrary         --   chargeAmount :: Amount
-    <*> oneof
-    [ return UnknownCurrency
-    , return USD
-    ]                     --   chargeCurrency :: Currency
-    <*> return False      --   chargeRefunded :: Bool
-    <*> return Nothing    --   chargeCreditCard :: Maybe Card
-    <*> arbitrary         --   chargeCaptured :: Bool
-    <*> return mempty     --   chargeRefunds :: StripeList Refund
-    <*> return Nothing    --   chargeBalanceTransaction :: Maybe (Expandable TransactionId)
-    <*> return Nothing    --   chargeFailureMessage :: Maybe Text
-    <*> return Nothing    --   chargeFailureCode :: Maybe Text
-    <*> return 0          --   chargeAmountRefunded :: Int
-    <*> arbitrary         --   chargeCustomerId :: Maybe (Expandable CustomerId)
-    <*> return Nothing    --   chargeInvoice :: Maybe (Expandable InvoiceId)
-    <*> arbitrary         --   chargeDescription :: Maybe Description
-    <*> return Nothing    --   chargeDispute :: Maybe Dispute
-    <*> arbitrary         --   chargeMetaData :: MetaData
-    <*> arbitrary         --   chargeStatementDescription :: Maybe StatementDescription
-    <*> arbitrary         --   chargeReceiptEmail :: Maybe Text
-    <*> arbitrary         --   chargeReceiptNumber :: Maybe Text
-
+  arbitrary = charges True
 
 instance Semigroup (StripeList a) where
   -- Very weak implementation
@@ -106,10 +84,19 @@ instance Arbitrary EventId where
 instance Arbitrary StatementDescription where
   arbitrary = StatementDescription <$> arbitrary
 
+metaDatasWithoutVoucher = (arbitrary :: Gen MetaData) `suchThat` (not . hasVoucher)
+-- Just filtering out random metadatas that don't have a voucher makes for an
+-- incredibly inefficient generator.  So start without a voucher and then add
+-- one.
+metaDatasWithVoucher = ((arbitrary :: Gen Voucher) >*< metaDatasWithoutVoucher) `suchThatMap` (Just. uncurry addVoucher)
+
+addVoucher :: Voucher -> MetaData -> MetaData
+addVoucher voucher (MetaData []) = MetaData [("Voucher", voucher)]
+addVoucher voucher (MetaData items) =
+  MetaData (insertAt (1234567 `mod` length items) ("Voucher", voucher) items)
 
 instance Arbitrary MetaData where
   arbitrary = MetaData <$> arbitrary
-
 
 instance Arbitrary Description where
   arbitrary = Description <$> arbitrary
@@ -130,26 +117,68 @@ instance Arbitrary CustomerId where
 instance Arbitrary a => Arbitrary (Expandable a) where
   arbitrary = Id <$> arbitrary
 
-chargeSucceededEvents :: Gen Event
-chargeSucceededEvents =
+chargeSucceededEvents :: Bool -> Gen Event
+chargeSucceededEvents withVoucher =
   Event
   <$> arbitrary -- eventId
   <*> posixTimes -- eventCreated
   <*> arbitrary -- eventLiveMode
   <*> return ChargeSucceededEvent -- eventType
-  <*> (ChargeEvent
-       <$> arbitrary -- the charge
-      ) -- eventData
+  <*> chargeEvents withVoucher -- eventData
   <*> return "event" -- eventObject
   <*> arbitrary -- eventPendingWebHooks
   <*> arbitrary -- eventRequest
 
 
-data GoodChargeEvent = GoodChargeEvent Event deriving (Show, Eq)
+chargeEvents :: Bool -> Gen EventData
+chargeEvents withVoucher =
+  ChargeEvent <$> charges withVoucher
 
-instance Arbitrary GoodChargeEvent where
-  arbitrary = chargeSucceededEvents `suchThatMap` (Just . GoodChargeEvent)
+charges :: Bool -> Gen Charge
+charges withVoucher =
+  Charge
+  <$> arbitrary         --   chargeId :: ChargeId
+  <*> return "charge"   --   chargeObject :: Text
+  <*> posixTimes        --   chargeCreated :: UTCTime
+  <*> arbitrary         --   chargeLiveMode :: Bool
+  <*> arbitrary         --   chargePaid :: Bool
+  <*> arbitrary         --   chargeAmount :: Amount
+  <*> oneof
+  [ return UnknownCurrency
+  , return USD
+  ]                     --   chargeCurrency :: Currency
+  <*> return False      --   chargeRefunded :: Bool
+  <*> return Nothing    --   chargeCreditCard :: Maybe Card
+  <*> arbitrary         --   chargeCaptured :: Bool
+  <*> return mempty     --   chargeRefunds :: StripeList Refund
+  <*> return Nothing    --   chargeBalanceTransaction :: Maybe (Expandable TransactionId)
+  <*> return Nothing    --   chargeFailureMessage :: Maybe Text
+  <*> return Nothing    --   chargeFailureCode :: Maybe Text
+  <*> return 0          --   chargeAmountRefunded :: Int
+  <*> arbitrary         --   chargeCustomerId :: Maybe (Expandable CustomerId)
+  <*> return Nothing    --   chargeInvoice :: Maybe (Expandable InvoiceId)
+  <*> arbitrary         --   chargeDescription :: Maybe Description
+  <*> return Nothing    --   chargeDispute :: Maybe Dispute
+  <*> (
+  if withVoucher then
+    metaDatasWithVoucher
+  else
+    metaDatasWithVoucher
+  )                     --   chargeMetaData :: MetaData
+  <*> arbitrary         --   chargeStatementDescription :: Maybe StatementDescription
+  <*> arbitrary         --   chargeReceiptEmail :: Maybe Text
+  <*> arbitrary         --   chargeReceiptNumber :: Maybe Text
 
+data ChargeEvents
+  = GoodChargeEvent Event
+  | BadChargeEvent Event
+  deriving (Show, Eq)
+
+instance Arbitrary ChargeEvents where
+  arbitrary = oneof
+    [ chargeSucceededEvents True `suchThatMap` (Just . GoodChargeEvent)
+    , chargeSucceededEvents False `suchThatMap` (Just . BadChargeEvent)
+    ]
 
 posixTimes :: Gen UTCTime
 posixTimes = (arbitrary :: Gen Integer) `suchThatMap` (Just . posixSecondsToUTCTime . fromIntegral . abs)
