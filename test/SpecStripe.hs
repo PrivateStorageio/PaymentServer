@@ -99,7 +99,10 @@ spec_webhook = with app $ do
       test e =
         postJSON "/webhook" (encode e) `shouldRespondWith` 200 { matchBody = MatchBody bodyMatcher }
       -- For now these are the same.  Maybe they always will be?  The HTTP
-      -- behavior is the same though the backend behavior may differ.
+      -- behavior is the same though the backend behavior may differ.  Note
+      -- that a "test_" prefix would cause tasty-discover to find this and try
+      -- to call it - but it can't since it's not a top-level, let alone
+      -- exported.
       xtest_postWithEventBody (GoodChargeEvent e) = test e
       xtest_postWithEventBody (BadChargeEvent e) = test e
     in
