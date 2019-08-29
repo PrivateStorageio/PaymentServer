@@ -50,6 +50,7 @@ test-suite PaymentServer-test
                      , hspec
                      , hspec-wai
                      , hspec-wai-json
+                     , hspec-expectations
                      , aeson
                      , stripe-core
                      , time
