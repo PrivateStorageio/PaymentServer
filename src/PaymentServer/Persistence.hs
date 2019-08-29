@@ -64,11 +64,15 @@ class VoucherDatabase d where
     -> IO (Either RedeemError ()) -- ^ Left indicating the redemption is not allowed or Right indicating it is.
 
 -- | MemoryVoucherDatabase is a voucher database that only persists state
--- in-memory.  The state does not outlive the process which creates it.  This
--- is primarily useful for testing.
+-- in-memory.  The state does not outlive the process which creates it (nor
+-- even the MemoryVoucherDatabase value).  This is primarily useful for
+-- testing.
 data MemoryVoucherDatabase =
-  Memory
-  { paid :: IORef (Set.Set Voucher)
+  Memory {
+    -- | A set of vouchers which have been paid for.
+    paid :: IORef (Set.Set Voucher)
+    -- | A mapping from redeemed vouchers to fingerprints associated with the
+    -- redemption.
   , redeemed :: IORef (Map.Map Voucher Fingerprint)
   }
 
