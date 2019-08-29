@@ -77,7 +77,7 @@ stripeAPI :: Proxy StripeAPI
 stripeAPI = Proxy
 
 app :: IO Application
-app = memory >>= return . stripeServer >>= return . serve stripeAPI
+app = serve stripeAPI . stripeServer <$> memory
 
 spec_webhook :: Spec
 spec_webhook = with app $ do

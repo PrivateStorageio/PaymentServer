@@ -7,10 +7,6 @@
 
 module SpecPersistence where
 
-import Test.QuickCheck
-  ( Property
-  , (==>)
-  )
 import Control.Monad.IO.Class
   ( liftIO
   )
@@ -23,7 +19,9 @@ import Test.Hspec.Expectations
   ( shouldReturn
   )
 import Test.QuickCheck
-  ( property
+  ( Property
+  , property
+  , (==>)
   )
 import Test.QuickCheck.Monadic
   ( monadicIO
@@ -77,8 +75,9 @@ paidVoucherMismatchFingerprint getDB = property $ \voucher fingerprint fingerpri
   redeem fingerprint' `shouldReturn` Left AlreadyRedeemed
 
 makeSpec :: VoucherDatabase d => IO d -> Spec
-makeSpec getDB = do
-  describe "voucher interactions" $ do
+makeSpec getDB =
+  describe "voucher interactions" $
+  do
     it "denies redemption of a not-paid-for voucher" $ unpaidVoucherNotRedeemable getDB
     it "allows redemption of paid-for vouchers" $ paidVoucherRedeemable getDB
     it "allows multiple redemption as long as the same fingerprint is used" $ paidVoucherMultiRedeemable getDB

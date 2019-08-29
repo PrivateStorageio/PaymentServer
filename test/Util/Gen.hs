@@ -163,7 +163,7 @@ charges withVoucher =
   if withVoucher then
     metaDatasWithVoucher
   else
-    metaDatasWithVoucher
+    metaDatasWithoutVoucher
   )                     --   chargeMetaData :: MetaData
   <*> arbitrary         --   chargeStatementDescription :: Maybe StatementDescription
   <*> arbitrary         --   chargeReceiptEmail :: Maybe Text
@@ -184,4 +184,4 @@ posixTimes :: Gen UTCTime
 posixTimes = (arbitrary :: Gen Integer) `suchThatMap` (Just . posixSecondsToUTCTime . fromIntegral . abs)
 
 hasVoucher :: MetaData -> Bool
-hasVoucher (MetaData items) = any (== "Voucher") . (map fst) $ items
+hasVoucher (MetaData items) = elem "Voucher" . map fst $ items
