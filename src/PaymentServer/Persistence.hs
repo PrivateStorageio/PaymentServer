@@ -1,9 +1,14 @@
 module PaymentServer.Persistence
   ( Voucher
+  , Fingerprint
+  , RedeemError(NotPaid, AlreadyRedeemed)
   , VoucherDatabase(payForVoucher, redeemVoucher)
   , memory
   ) where
 
+import Control.Monad
+  ( liftM
+  )
 import Data.Text
   ( Text
   )
@@ -13,6 +18,7 @@ import Data.IORef
   ( IORef
   , newIORef
   , modifyIORef
+  , readIORef
   )
 
 -- | A voucher is a unique identifier which can be associated with a payment.
@@ -27,6 +33,7 @@ data RedeemError =
   NotPaid
   -- | The voucher has already been redeemed.
   | AlreadyRedeemed
+  deriving (Show, Eq)
 
 -- | A fingerprint cryptographically identifies a redemption of a voucher.
 -- When a voucher is redeemed, a number of random tokens are received
@@ -69,6 +76,21 @@ instance VoucherDatabase MemoryVoucherDatabase where
   payForVoucher Memory{ paid = paid, redeemed = redeemed } voucher = do
     modifyIORef paid (Set.insert voucher)
     return ()
+
+  redeemVoucher Memory{ paid = paid, redeemed = redeemed } voucher fingerprint = do
+    unpaid <- (liftM $ Set.notMember voucher) . readIORef $ paid
+    existingFingerprint <- (liftM $ Map.lookup voucher) . readIORef $ redeemed
+    case (unpaid, existingFingerprint) of
+      (True, _) ->
+        return $ Left NotPaid
+      (False, Nothing) -> do
+        modifyIORef redeemed (Map.insert voucher fingerprint)
+        return $ Right ()
+      (False, Just fingerprint') ->
+        if fingerprint == fingerprint' then
+          return $ Right ()
+        else
+          return $ Left AlreadyRedeemed
 
 -- | Create a new, empty MemoryVoucherDatabase.
 memory :: IO MemoryVoucherDatabase

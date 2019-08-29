@@ -41,6 +41,7 @@ test-suite PaymentServer-test
   hs-source-dirs:      test
   main-is:             Driver.hs
   other-modules:       SpecStripe
+                     , SpecPersistence
                      , Util.WAI
                      , Util.Gen
                      , Util.JSON
