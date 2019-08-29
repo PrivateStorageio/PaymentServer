@@ -82,8 +82,8 @@ instance VoucherDatabase MemoryVoucherDatabase where
     return ()
 
   redeemVoucher Memory{ paid = paid, redeemed = redeemed } voucher fingerprint = do
-    unpaid <- (liftM $ Set.notMember voucher) . readIORef $ paid
-    existingFingerprint <- (liftM $ Map.lookup voucher) . readIORef $ redeemed
+    unpaid <- Set.notMember voucher <$> readIORef paid
+    existingFingerprint <- Map.lookup voucher <$> readIORef redeemed
     case (unpaid, existingFingerprint) of
       (True, _) ->
         return $ Left NotPaid
