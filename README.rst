@@ -1,6 +1,18 @@
 PaymentServer
 =============
 
+PaymentServer maintains the state of a voucher database with respect to payments.
+It receives payment notifications from payment processors and notes this in the database.
+
+Currently, Stripe is supported.
+
+Building
+--------
+
+Build using Stack::
+
+  $ stack build
+
 Testing
 -------
 
