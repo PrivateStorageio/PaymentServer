@@ -13,9 +13,8 @@ First, run the server::
 
   $ stack run
 
-Then configure Stripe with a webhook pointing at the server.
-The hook lives at ``/v1/stripe/webhook`` so configure Stripe with,
-eg, ``http://youraddress:8081/v1/stripe/webhook``.
+Then configure Stripe with a `webhook`_ pointing at the server and receiving the *charge.successful* event.
+Configure Stripe with ``http://<youraddress>:8081/v1/stripe/webhook``.
 
 Then create a testing charge using Stripe::
 
@@ -30,3 +29,5 @@ Then create a testing charge using Stripe::
 
 This results in Stripe making a callback to the PaymentServer with the charge details.
 The PaymentServer marks the voucher as paid in its database.
+
+.. _webhook: https://stripe.com/docs/webhooks/setup#configure-webhook-settings
