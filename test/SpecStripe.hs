@@ -14,6 +14,7 @@ import Data.Aeson
   )
 import Test.Hspec
   ( Spec
+  , parallel
   , describe
   , it
   )
@@ -72,6 +73,11 @@ import PaymentServer.Persistence
   ( Voucher
   , memory
   )
+import Util.Spec
+  ( wrongMethodNotAllowed
+  , nonJSONUnsupportedMediaType
+  , wrongJSONInvalidRequest
+  )
 
 stripeAPI :: Proxy StripeAPI
 stripeAPI = Proxy
@@ -80,13 +86,11 @@ app :: IO Application
 app = serve stripeAPI . stripeServer <$> memory
 
 spec_webhook :: Spec
-spec_webhook = with app $ do
+spec_webhook = with app $ parallel $ do
   describe "error behavior of POST /webhook" $ do
-    it "responds to non-JSON Content-Type with 415 (Unsupported Media Type)" $
-      post "/webhook" "xxx" `shouldRespondWith` 415
-
-    it "responds to JSON non-Event body with 400 (Invalid Request)" $
-      postJSON "/webhook" "{}" `shouldRespondWith` 400
+    wrongMethodNotAllowed "GET" "/webhook"
+    nonJSONUnsupportedMediaType "/webhook"
+    wrongJSONInvalidRequest "/webhook" "{}"
 
   -- I would like to make most or all of these into property tests.  *This*
   -- test shows how you can do it.  Yay.  The main thing (for me, anyway) to
@@ -107,7 +111,6 @@ spec_webhook = with app $ do
       xtest_postWithEventBody (BadChargeEvent e) = test e
     in
       property xtest_postWithEventBody
-
 
 
 bodyMatcher :: [Network.HTTP.Types.Header] -> Body -> Maybe String

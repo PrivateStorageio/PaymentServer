@@ -49,6 +49,7 @@ test-suite PaymentServer-test
                      , Util.WAI
                      , Util.Gen
                      , Util.JSON
+                     , Util.Spec
   build-depends:       base
                      , PaymentServer
                      , hspec
