@@ -1,20 +1,10 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeOperators #-}
-
+-- | This module implements the main entrypoint to the PaymentServer.
 module PaymentServer.Main
   ( main
   ) where
 
 import Data.Default
   ( def
-  )
-import Servant
-  ( Proxy(Proxy)
-  , Server
-  , Application
-  , serve
-  , (:>)
   )
 import Network.Wai.Handler.Warp
   ( run
@@ -28,24 +18,11 @@ import Network.Wai.Middleware.RequestLogger.JSON
   ( formatAsJSON
   )
 import PaymentServer.Persistence
-  ( VoucherDatabase
-  , memory
+  ( memory
   )
-import PaymentServer.Processors.Stripe
-  ( StripeAPI
-  , stripeServer
+import PaymentServer.Server
+  ( paymentServerApp
   )
-
-type PaymentServerAPI = "v1" :> "stripe" :> StripeAPI
-
-paymentServer :: VoucherDatabase d => d -> Server PaymentServerAPI
-paymentServer = stripeServer
-
-paymentServerAPI :: Proxy PaymentServerAPI
-paymentServerAPI = Proxy
-
-paymentServerApp :: VoucherDatabase d => d -> Application
-paymentServerApp = (serve paymentServerAPI) . paymentServer
 
 main :: IO ()
 main = do
