@@ -24,7 +24,9 @@ import PaymentServer.Persistence
   )
 
 -- | This is the complete type of the server API.
-type PaymentServerAPI = "v1" :> "stripe" :> StripeAPI
+type PaymentServerAPI
+  =    "v1" :> "stripe" :> StripeAPI
+  -- :<|> "v1" :> "redeem" :> RedeemAPI
 
 -- | Create a server which uses the given database.
 paymentServer :: VoucherDatabase d => d -> Server PaymentServerAPI

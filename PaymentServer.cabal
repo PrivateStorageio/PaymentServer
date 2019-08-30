@@ -17,6 +17,7 @@ library
   hs-source-dirs:      src
   exposed-modules:     PaymentServer.Processors.Stripe
                      , PaymentServer.Persistence
+                     , PaymentServer.Redemption
                      , PaymentServer.Server
                      , PaymentServer.Main
   build-depends:       base >= 4.7 && < 5
@@ -46,6 +47,7 @@ test-suite PaymentServer-test
   main-is:             Driver.hs
   other-modules:       SpecStripe
                      , SpecPersistence
+                     , SpecRedemption
                      , Util.WAI
                      , Util.Gen
                      , Util.JSON
