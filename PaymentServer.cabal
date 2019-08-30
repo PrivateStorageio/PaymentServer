@@ -23,6 +23,8 @@ library
                      , servant
                      , servant-server
                      , wai
+                     , wai-extra
+                     , data-default
                      , warp
                      , stripe-core
                      , text
