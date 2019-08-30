@@ -3,7 +3,5 @@ module Main
   ) where
 
 import PaymentServer.Main
-  ( run
+  ( main -- re-export
   )
-
-main = run
