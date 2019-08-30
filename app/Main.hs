@@ -1,4 +1,9 @@
-module Main where
+module Main
+  ( main
+  ) where
 
-main :: IO ()
-main = return ()
+import PaymentServer.Main
+  ( run
+  )
+
+main = run

@@ -17,6 +17,7 @@ library
   hs-source-dirs:      src
   exposed-modules:     PaymentServer.Processors.Stripe
                      , PaymentServer.Persistence
+                     , PaymentServer.Main
   build-depends:       base >= 4.7 && < 5
                      , aeson
                      , servant
