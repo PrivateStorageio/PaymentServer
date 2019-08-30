@@ -1,6 +1,7 @@
-module Main where
+module Main
+  ( main
+  ) where
 
-import Lib
-
-main :: IO ()
-main = startApp
+import PaymentServer.Main
+  ( main -- re-export
+  )

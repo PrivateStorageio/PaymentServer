@@ -15,12 +15,21 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Lib
+  exposed-modules:     PaymentServer.Processors.Stripe
+                     , PaymentServer.Persistence
+                     , PaymentServer.Server
+                     , PaymentServer.Main
   build-depends:       base >= 4.7 && < 5
                      , aeson
+                     , servant
                      , servant-server
                      , wai
+                     , wai-extra
+                     , data-default
                      , warp
+                     , stripe-core
+                     , text
+                     , containers
   default-language:    Haskell2010
 
 executable PaymentServer-exe
@@ -34,13 +43,37 @@ executable PaymentServer-exe
 test-suite PaymentServer-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
-  main-is:             Spec.hs
+  main-is:             Driver.hs
+  other-modules:       SpecStripe
+                     , SpecPersistence
+                     , Util.WAI
+                     , Util.Gen
+                     , Util.JSON
   build-depends:       base
                      , PaymentServer
                      , hspec
                      , hspec-wai
                      , hspec-wai-json
+                     , hspec-expectations
                      , aeson
+                     , stripe-core
+                     , time
+                     , QuickCheck
+                     , quickcheck-instances
+                     , checkers
+                     , wai-extra
+                     , bytestring
+                     , text
+                     , http-types
+                     , tasty
+                     , tasty-th
+                     , tasty-discover
+                     , tasty-quickcheck
+                     , tasty-hspec
+                     , servant-server
+                     , containers
+                     , unordered-containers
+                     , ilist
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 
