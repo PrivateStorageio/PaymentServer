@@ -28,24 +28,30 @@ import Test.Hspec
   , around
   , shouldReturn
   , shouldBe
+  , runIO
   )
 import Test.Hspec.Wai
   ( with
-  , post
   , shouldRespondWith
   , liftIO
   )
 import Test.Hspec.Wai.QuickCheck
   ( property
   )
+import Test.QuickCheck
+  ( (==>)
+  )
 import Test.QuickCheck.Monadic
-  ( assert
+  ( pre
   )
 import Test.QuickCheck.Instances.Text ()
 import Util.Spec
   ( wrongMethodNotAllowed
   , nonJSONUnsupportedMediaType
   , wrongJSONInvalidRequest
+  )
+import Util.WAI
+  ( postJSON
   )
 import PaymentServer.Redemption
   ( RedemptionAPI
@@ -80,19 +86,37 @@ withConnection :: VoucherDatabase d => IO d -> ((d -> IO ()) -> IO ())
 withConnection getDB = bracket getDB (\db -> return ())
 
 make_spec_db :: VoucherDatabase d => IO d -> Spec
-make_spec_db getDatabase =
-  before (getDatabase >>= return . app) $
-  describe "redemptionServer" $
-  do
-    it "responds to redemption of an unpaid voucher with 400 (Invalid Request)" $
+make_spec_db getDatabase = do
+  -- Create the database so we can interact with it directly in the tests
+  -- below.
+  database <- runIO getDatabase
+  before (return $ app database) $
+    describe "redemption attempts on the server" $ do
+    it "receive 400 (Invalid Request) when the voucher is unpaid" $
       property $ \(voucher :: Voucher) (tokens :: [BlindedToken]) ->
-      post path (encode $ Redeem voucher tokens) `shouldRespondWith` 400
+      postJSON path (encode $ Redeem voucher tokens) `shouldRespondWith` 400
 
-    it "responds to redemption of a paid voucher with 200 (OK)" $
+    it "receive 200 (OK) when the voucher is paid" $
       property $ \(voucher :: Voucher) (tokens :: [BlindedToken]) ->
       do
-        payForVoucher database voucher
-        post path (encode $ Redeem voucher tokens) `shouldRespondWith` 200
+        liftIO $ payForVoucher database voucher
+        postJSON path (encode $ Redeem voucher tokens) `shouldRespondWith` 200
+
+    it "receive 200 (OK) when the voucher is paid and previously redeemed with the same tokens" $
+      property $ \(voucher :: Voucher) (tokens :: [BlindedToken]) ->
+      do
+        liftIO $ payForVoucher database voucher
+        postJSON path (encode $ Redeem voucher tokens) `shouldRespondWith` 200
+        postJSON path (encode $ Redeem voucher tokens) `shouldRespondWith` 200
+
+    it "receive 400 (OK) when the voucher is paid and previously redeemed with different tokens" $
+      property $ \(voucher :: Voucher) (firstTokens :: [BlindedToken]) (secondTokens :: [BlindedToken]) ->
+      do
+        liftIO $ payForVoucher database voucher
+        postJSON path (encode $ Redeem voucher firstTokens) `shouldRespondWith` 200
+        postJSON path (encode $ Redeem voucher secondTokens) `shouldRespondWith` 400
+
+
 
 
 spec_memory_db :: Spec

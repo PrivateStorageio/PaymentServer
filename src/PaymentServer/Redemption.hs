@@ -15,7 +15,9 @@ module PaymentServer.Redemption
 import GHC.Generics
   ( Generic
   )
-
+import Control.Monad.IO.Class
+  ( liftIO
+  )
 import Data.Text
   ( Text
   )
@@ -30,6 +32,7 @@ import Data.Aeson
   )
 import Servant
   ( Server
+  , Handler
   , ServerError(errBody, errHeaders)
   , err400
   , throwError
@@ -41,12 +44,14 @@ import Servant.API
   , (:>)
   )
 import PaymentServer.Persistence
-  ( VoucherDatabase
+  ( VoucherDatabase(redeemVoucher)
+  , Fingerprint
   , Voucher
   )
 
 data Result
   = Failed
+  | Succeeded
   deriving (Show, Eq)
 
 -- | A blinded token is presented along with a voucher to be signed and the
@@ -64,6 +69,7 @@ instance ToJSON Redeem where
 
 instance ToJSON Result where
   toJSON Failed = object [ "success" .= False ]
+  toJSON Succeeded = object [ "success" .= True ]
 
 type RedemptionAPI = ReqBody '[JSON] Redeem :> Post '[JSON] Result
 
@@ -73,6 +79,15 @@ jsonErr400 = err400
   }
 
 redemptionServer :: VoucherDatabase d => d -> Server RedemptionAPI
-redemptionServer _ = redeem
+redemptionServer = redeem
 
-redeem request = return Failed -- throwError jsonErr400
+redeem :: VoucherDatabase d => d -> Redeem -> Handler Result
+redeem database (Redeem voucher tokens) = do
+  let fingerprint = fingerprintFromTokens tokens
+  result <- liftIO $ PaymentServer.Persistence.redeemVoucher database voucher fingerprint
+  case result of
+    Left err -> return Failed
+    Right () -> return Succeeded
+
+fingerprintFromTokens :: [BlindedToken] -> Fingerprint
+fingerprintFromTokens _ = "fingerprint"
