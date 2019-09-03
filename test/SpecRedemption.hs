@@ -11,6 +11,9 @@ import Text.Printf
 import Control.Exception
   ( bracket
   )
+import Data.Aeson
+ ( encode
+ )
 import Servant
   ( Application
   , Proxy(Proxy)
@@ -35,6 +38,10 @@ import Test.Hspec.Wai
 import Test.Hspec.Wai.QuickCheck
   ( property
   )
+import Test.QuickCheck.Monadic
+  ( assert
+  )
+import Test.QuickCheck.Instances.Text ()
 import Util.Spec
   ( wrongMethodNotAllowed
   , nonJSONUnsupportedMediaType
@@ -42,6 +49,8 @@ import Util.Spec
   )
 import PaymentServer.Redemption
   ( RedemptionAPI
+  , BlindedToken
+  , Redeem(Redeem)
   , redemptionServer
   )
 import PaymentServer.Persistence
@@ -70,10 +79,15 @@ spec_simple = with (app <$> memory) $ parallel $ do
 withConnection :: VoucherDatabase d => IO d -> ((d -> IO ()) -> IO ())
 withConnection getDB = bracket getDB (\db -> return ())
 
-spec_db :: Spec
-spec_db = do
-  around (withConnection memory) $ do
-    describe "redemptionServer" $ do
-      it "responds to redemption of an unpaid voucher with 400 (Invalid Request)" $
-        \(db :: MemoryVoucherDatabase) -> do
-          payForVoucher db "abcdefg"
+make_spec_db :: VoucherDatabase d => IO d -> Spec
+make_spec_db getDatabase =
+  before (getDatabase >>= return . app) $
+  describe "redemptionServer" $
+  it "responds to redemption of an unpaid voucher with 400 (Invalid Request)" $
+  property $ \(voucher :: Voucher) (tokens :: [BlindedToken]) ->
+  do
+    post path (encode $ Redeem voucher tokens) `shouldRespondWith` 400
+
+spec_memory_db :: Spec
+spec_memory_db =
+  make_spec_db memory

@@ -7,6 +7,8 @@
 -- signatures.
 module PaymentServer.Redemption
   ( RedemptionAPI
+  , BlindedToken
+  , Redeem(Redeem)
   , redemptionServer
   ) where
 
@@ -18,7 +20,7 @@ import Data.Text
   ( Text
   )
 import Data.Aeson
-  ( ToJSON(toJSON)
+  ( ToJSON(toJSON, toEncoding)
   , FromJSON
   , genericToEncoding
   , defaultOptions
@@ -47,6 +49,8 @@ data Result
   = Failed
   deriving (Show, Eq)
 
+-- | A blinded token is presented along with a voucher to be signed and the
+-- signatures returned to the caller.
 type BlindedToken = Text
 
 data Redeem
@@ -54,6 +58,9 @@ data Redeem
   deriving (Show, Eq, Generic)
 
 instance FromJSON Redeem
+
+instance ToJSON Redeem where
+  toEncoding = genericToEncoding defaultOptions
 
 instance ToJSON Result where
   toJSON Failed = object [ "success" .= False ]
