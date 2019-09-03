@@ -83,10 +83,17 @@ make_spec_db :: VoucherDatabase d => IO d -> Spec
 make_spec_db getDatabase =
   before (getDatabase >>= return . app) $
   describe "redemptionServer" $
-  it "responds to redemption of an unpaid voucher with 400 (Invalid Request)" $
-  property $ \(voucher :: Voucher) (tokens :: [BlindedToken]) ->
   do
-    post path (encode $ Redeem voucher tokens) `shouldRespondWith` 400
+    it "responds to redemption of an unpaid voucher with 400 (Invalid Request)" $
+      property $ \(voucher :: Voucher) (tokens :: [BlindedToken]) ->
+      post path (encode $ Redeem voucher tokens) `shouldRespondWith` 400
+
+    it "responds to redemption of a paid voucher with 200 (OK)" $
+      property $ \(voucher :: Voucher) (tokens :: [BlindedToken]) ->
+      do
+        payForVoucher database voucher
+        post path (encode $ Redeem voucher tokens) `shouldRespondWith` 200
+
 
 spec_memory_db :: Spec
 spec_memory_db =
