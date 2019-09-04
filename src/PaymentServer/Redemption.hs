@@ -81,9 +81,13 @@ data Result
 -- signatures returned to the caller.
 type BlindedToken = Text
 
+-- | A complete redemption attempt which can be presented at the redemption
+-- endpoint.
 data Redeem
-  = Redeem { redeemVoucher :: Voucher, redeemTokens :: [BlindedToken] }
-  deriving (Show, Eq, Generic)
+  = Redeem
+  { redeemVoucher :: Voucher        -- ^ The voucher being redeemed.
+  , redeemTokens :: [BlindedToken]  -- ^ Tokens to be signed as part of this redemption.
+  } deriving (Show, Eq, Generic)
 
 instance FromJSON Redeem
 
@@ -120,6 +124,9 @@ jsonErr400 = err400
 redemptionServer :: VoucherDatabase d => d -> Server RedemptionAPI
 redemptionServer = redeem
 
+-- | Handler for redemption requests.  Use the database to try to redeem the
+-- voucher and return signatures.  Return a failure if this is not possible
+-- (eg because the voucher was already redeemed).
 redeem :: VoucherDatabase d => d -> Redeem -> Handler Result
 redeem database (Redeem voucher tokens) = do
   let fingerprint = fingerprintFromTokens tokens
@@ -128,6 +135,8 @@ redeem database (Redeem voucher tokens) = do
     Left err -> throwError jsonErr400
     Right () -> return $ Succeeded "" [] ""
 
+-- | Compute a cryptographic hash (fingerprint) of a list of tokens which can
+-- be used as an identifier for this exact sequence of tokens.
 fingerprintFromTokens :: [BlindedToken] -> Fingerprint
 fingerprintFromTokens =
   let
