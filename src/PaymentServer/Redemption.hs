@@ -61,9 +61,20 @@ import PaymentServer.Persistence
   , Voucher
   )
 
+-- | A cryptographic signature of a blinded token created using our private
+-- key.
+type Signature = Text
+
+-- | A public key corresponding to our private key.
+type PublicKey = Text
+
+-- | A zero-knowledge proof that signatures were created of the corresponding
+-- blinded tokens using the corresponding public key's private key.
+type Proof = Text
+
 data Result
   = Failed
-  | Succeeded
+  | Succeeded PublicKey [Signature] Proof
   deriving (Show, Eq)
 
 -- | A blinded token is presented along with a voucher to be signed and the
@@ -81,12 +92,23 @@ instance ToJSON Redeem where
 
 instance ToJSON Result where
   toJSON Failed = object [ "success" .= False ]
-  toJSON Succeeded = object [ "success" .= True ]
+  toJSON (Succeeded key signatures proof) = object
+    [ "success" .= True
+    , "public-key" .= key
+    , "signatures" .= signatures
+    , "proof" .= proof
+    ]
 
 instance FromJSON Result where
     parseJSON = withObject "Result" $ \v ->
       v .: "success" >>= \success ->
-      return $ if success then Succeeded else Failed
+      if success then
+        Succeeded
+        <$> v .: "public-key"
+        <*> v .: "signatures"
+        <*> v .: "proof"
+      else
+        return Failed
 
 type RedemptionAPI = ReqBody '[JSON] Redeem :> Post '[JSON] Result
 
@@ -104,7 +126,7 @@ redeem database (Redeem voucher tokens) = do
   result <- liftIO $ PaymentServer.Persistence.redeemVoucher database voucher fingerprint
   case result of
     Left err -> throwError jsonErr400
-    Right () -> return Succeeded
+    Right () -> return $ Succeeded "" [] ""
 
 fingerprintFromTokens :: [BlindedToken] -> Fingerprint
 fingerprintFromTokens =

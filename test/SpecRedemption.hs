@@ -156,7 +156,9 @@ spec_redemption = parallel $ do
       it "receive a success response when redemption succeeds" $ property $
         \(voucher :: Voucher) (tokens :: [BlindedToken]) ->
           propertyRedeem path voucher tokens 200
-          { matchBody = matchJSONBody Succeeded
+          -- TODO: Get some real crypto involved to be able to replace these
+          -- dummy values.
+          { matchBody = matchJSONBody $ Succeeded "" [] ""
           , matchHeaders = ["Content-Type" <:> "application/json;charset=utf-8"]
           }
 
