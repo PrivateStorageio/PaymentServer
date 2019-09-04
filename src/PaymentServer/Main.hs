@@ -10,12 +10,9 @@ import Network.Wai.Handler.Warp
   ( run
   )
 import Network.Wai.Middleware.RequestLogger
-  ( OutputFormat(Detailed, CustomOutputFormatWithDetails)
+  ( OutputFormat(Detailed)
   , outputFormat
   , mkRequestLogger
-  )
-import Network.Wai.Middleware.RequestLogger.JSON
-  ( formatAsJSON
   )
 import PaymentServer.Persistence
   ( memory
