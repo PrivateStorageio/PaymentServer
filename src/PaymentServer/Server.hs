@@ -13,10 +13,15 @@ import Servant
   , Application
   , serve
   , (:>)
+  , (:<|>)((:<|>))
   )
 import PaymentServer.Processors.Stripe
   ( StripeAPI
   , stripeServer
+  )
+import PaymentServer.Redemption
+  ( RedemptionAPI
+  , redemptionServer
   )
 import PaymentServer.Persistence
   ( VoucherDatabase
@@ -25,11 +30,13 @@ import PaymentServer.Persistence
 -- | This is the complete type of the server API.
 type PaymentServerAPI
   =    "v1" :> "stripe" :> StripeAPI
-  -- :<|> "v1" :> "redeem" :> RedeemAPI
+  :<|> "v1" :> "redeem" :> RedemptionAPI
 
 -- | Create a server which uses the given database.
 paymentServer :: VoucherDatabase d => d -> Server PaymentServerAPI
-paymentServer = stripeServer
+paymentServer d =
+  stripeServer d
+  :<|> redemptionServer d
 
 paymentServerAPI :: Proxy PaymentServerAPI
 paymentServerAPI = Proxy
