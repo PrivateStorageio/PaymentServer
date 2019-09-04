@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeOperators #-}
 
@@ -14,21 +13,30 @@ import Servant
   , Application
   , serve
   , (:>)
+  , (:<|>)((:<|>))
   )
 import PaymentServer.Processors.Stripe
   ( StripeAPI
   , stripeServer
+  )
+import PaymentServer.Redemption
+  ( RedemptionAPI
+  , redemptionServer
   )
 import PaymentServer.Persistence
   ( VoucherDatabase
   )
 
 -- | This is the complete type of the server API.
-type PaymentServerAPI = "v1" :> "stripe" :> StripeAPI
+type PaymentServerAPI
+  =    "v1" :> "stripe" :> StripeAPI
+  :<|> "v1" :> "redeem" :> RedemptionAPI
 
 -- | Create a server which uses the given database.
 paymentServer :: VoucherDatabase d => d -> Server PaymentServerAPI
-paymentServer = stripeServer
+paymentServer d =
+  stripeServer d
+  :<|> redemptionServer d
 
 paymentServerAPI :: Proxy PaymentServerAPI
 paymentServerAPI = Proxy
@@ -36,4 +44,4 @@ paymentServerAPI = Proxy
 -- | Create a Servant Application which serves the payment server API using
 -- the given database.
 paymentServerApp :: VoucherDatabase d => d -> Application
-paymentServerApp = (serve paymentServerAPI) . paymentServer
+paymentServerApp = serve paymentServerAPI . paymentServer

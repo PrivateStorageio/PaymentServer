@@ -3,6 +3,7 @@ module PaymentServer.Persistence
   , Fingerprint
   , RedeemError(NotPaid, AlreadyRedeemed)
   , VoucherDatabase(payForVoucher, redeemVoucher)
+  , MemoryVoucherDatabase
   , memory
   ) where
 
