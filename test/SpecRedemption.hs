@@ -15,7 +15,9 @@ import Control.Exception
   ( bracket
   )
 import Data.Aeson
- ( encode
+ ( FromJSON
+ , decode
+ , encode
  )
 import Servant
   ( Application
@@ -33,9 +35,15 @@ import Test.Hspec
   , shouldBe
   , runIO
   )
+import Network.HTTP.Types
+  ( Header
+  )
 import Test.Hspec.Wai
-  ( ResponseMatcher(ResponseMatcher)
+  ( ResponseMatcher(matchBody, matchHeaders)
+  , (<:>)
   , WaiExpectation
+  , Body
+  , MatchBody(MatchBody)
   , with
   , shouldRespondWith
   , liftIO
@@ -63,6 +71,7 @@ import PaymentServer.Redemption
   ( RedemptionAPI
   , BlindedToken
   , Redeem(Redeem)
+  , Result(Failed, Succeeded)
   , redemptionServer
   )
 import PaymentServer.Persistence
@@ -132,15 +141,24 @@ spec_redemption = parallel $ do
 
 
   describe "redemption" $ do
-    with (return . app $ RefuseRedemption NotPaid) $
-      it "receives 400 (Invalid Request) when the voucher is not paid" $ property $
-      \(voucher :: Voucher) (tokens :: [BlindedToken]) ->
-        propertyRedeem path voucher tokens 400
+    with (return . app $ RefuseRedemption NotPaid) $ do
+      it "receives a failure response when the voucher is not paid" $ property $
+        \(voucher :: Voucher) (tokens :: [BlindedToken]) ->
+          propertyRedeem path voucher tokens 400
+          { matchBody = matchJSONBody Failed
+          -- major/minor, fine.  charset=utf-8... okay.  but really this is
+          -- overspecified by encoding the exact byte sequence.  I'd rather
+          -- assert semantic equality.
+          , matchHeaders = ["Content-Type" <:> "application/json;charset=utf-8"]
+          }
 
-    with (return $ app PermitRedemption) $
-      it "receive 200 (OK) when redemption succeeds" $ property $
-      \(voucher :: Voucher) (tokens :: [BlindedToken]) ->
-        propertyRedeem path voucher tokens 200
+    with (return $ app PermitRedemption) $ do
+      it "receive a success response when redemption succeeds" $ property $
+        \(voucher :: Voucher) (tokens :: [BlindedToken]) ->
+          propertyRedeem path voucher tokens 200
+          { matchBody = matchJSONBody Succeeded
+          , matchHeaders = ["Content-Type" <:> "application/json;charset=utf-8"]
+          }
 
     -- it "receive 200 (OK) when the voucher is paid and previously redeemed with the same tokens" $
     --   property $ \(voucher :: Voucher) (tokens :: [BlindedToken]) ->
@@ -155,3 +173,19 @@ spec_redemption = parallel $ do
     --     liftIO $ payForVoucher database voucher
     --     postJSON path (encode $ Redeem voucher firstTokens) `shouldRespondWith` 200
     --     postJSON path (encode $ Redeem voucher secondTokens) `shouldRespondWith` 400
+
+matchJSONBody :: Result -> MatchBody
+matchJSONBody expected =
+  let
+    bodyMatcher :: [Header] -> Body -> Maybe String
+    bodyMatcher headers actualBody =
+      case decode actualBody of
+        Nothing ->
+          Just $ "failed to decode body as value of expected type: " ++ show actualBody
+        Just actual ->
+          if actual == expected then
+            Nothing
+          else
+            Just $ "decoded body does not equal expected value: " ++ show actual ++ show expected
+  in
+    MatchBody bodyMatcher

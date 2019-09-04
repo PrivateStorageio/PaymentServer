@@ -9,6 +9,7 @@ module PaymentServer.Redemption
   ( RedemptionAPI
   , BlindedToken
   , Redeem(Redeem)
+  , Result(Failed, Succeeded)
   , redemptionServer
   ) where
 
@@ -28,7 +29,9 @@ import Data.Text.Encoding
   )
 import Data.Aeson
   ( ToJSON(toJSON, toEncoding)
-  , FromJSON
+  , FromJSON(parseJSON)
+  , withObject
+  , (.:)
   , genericToEncoding
   , defaultOptions
   , encode
@@ -80,11 +83,16 @@ instance ToJSON Result where
   toJSON Failed = object [ "success" .= False ]
   toJSON Succeeded = object [ "success" .= True ]
 
+instance FromJSON Result where
+    parseJSON = withObject "Result" $ \v ->
+      v .: "success" >>= \success ->
+      return $ if success then Succeeded else Failed
+
 type RedemptionAPI = ReqBody '[JSON] Redeem :> Post '[JSON] Result
 
 jsonErr400 = err400
   { errBody = encode Failed
-  , errHeaders = [ ("Content-Type", "application/json") ]
+  , errHeaders = [ ("Content-Type", "application/json;charset=utf-8") ]
   }
 
 redemptionServer :: VoucherDatabase d => d -> Server RedemptionAPI
