@@ -4,7 +4,9 @@
 -- | This module exposes a Servant-based Network.Wai server for payment
 -- interactions.
 module PaymentServer.Server
-  ( paymentServerApp
+  ( PaymentServerAPI
+  , paymentServerAPI
+  , paymentServerApp
   ) where
 
 import Servant
