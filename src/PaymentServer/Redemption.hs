@@ -25,7 +25,6 @@ import Data.Text
   )
 import Data.Text.Encoding
   ( encodeUtf8
-  , decodeUtf8
   )
 import Data.Aeson
   ( ToJSON(toJSON, toEncoding)

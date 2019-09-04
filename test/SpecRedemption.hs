@@ -11,12 +11,8 @@ import Data.ByteString
 import Text.Printf
   ( printf
   )
-import Control.Exception
-  ( bracket
-  )
 import Data.Aeson
- ( FromJSON
- , decode
+ ( decode
  , encode
  )
 import Servant
@@ -29,10 +25,6 @@ import Test.Hspec
   , parallel
   , describe
   , it
-  , before
-  , around
-  , shouldReturn
-  , shouldBe
   , runIO
   )
 import Network.HTTP.Types
@@ -50,13 +42,6 @@ import Test.Hspec.Wai
   )
 import Test.Hspec.Wai.QuickCheck
   ( property
-  )
-import Test.QuickCheck
-  ( Property
-  , (==>)
-  )
-import Test.QuickCheck.Monadic
-  ( pre
   )
 import Test.QuickCheck.Instances.Text ()
 import Util.Spec
@@ -77,9 +62,7 @@ import PaymentServer.Redemption
 import PaymentServer.Persistence
   ( RedeemError(NotPaid)
   , Voucher
-  , Fingerprint
   , VoucherDatabase(payForVoucher, redeemVoucher)
-  , MemoryVoucherDatabase
   , memory
   )
 
@@ -141,7 +124,7 @@ spec_redemption = parallel $ do
 
 
   describe "redemption" $ do
-    with (return . app $ RefuseRedemption NotPaid) $ do
+    with (return . app $ RefuseRedemption NotPaid) $
       it "receives a failure response when the voucher is not paid" $ property $
         \(voucher :: Voucher) (tokens :: [BlindedToken]) ->
           propertyRedeem path voucher tokens 400
@@ -152,7 +135,7 @@ spec_redemption = parallel $ do
           , matchHeaders = ["Content-Type" <:> "application/json;charset=utf-8"]
           }
 
-    with (return $ app PermitRedemption) $ do
+    with (return $ app PermitRedemption) $
       it "receive a success response when redemption succeeds" $ property $
         \(voucher :: Voucher) (tokens :: [BlindedToken]) ->
           propertyRedeem path voucher tokens 200

@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeOperators #-}
 
@@ -38,4 +37,4 @@ paymentServerAPI = Proxy
 -- | Create a Servant Application which serves the payment server API using
 -- the given database.
 paymentServerApp :: VoucherDatabase d => d -> Application
-paymentServerApp = (serve paymentServerAPI) . paymentServer
+paymentServerApp = serve paymentServerAPI . paymentServer
