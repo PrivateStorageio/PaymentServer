@@ -31,11 +31,9 @@ tests = do
 
   t3 <- pure $ QC.testProperty "getVoucherWithoutVoucher" SpecStripe.prop_getVoucherWithoutVoucher
 
-  t4 <- HS.testSpec "simple" SpecRedemption.spec_simple
+  t4 <- HS.testSpec "redemption" SpecRedemption.spec_redemption
 
-  t5 <- HS.testSpec "memory db" SpecRedemption.spec_memory_db
-
-  pure $ T.testGroup "./test/Driver.hs" [t0,t1,t2,t3,t4,t5]
+  pure $ T.testGroup "./test/Driver.hs" [t0,t1,t2,t3,t4]
 ingredients :: [T.Ingredient]
 ingredients = T.defaultIngredients
 main :: IO ()

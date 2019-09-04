@@ -20,6 +20,11 @@ import Control.Monad.IO.Class
   )
 import Data.Text
   ( Text
+  , pack
+  )
+import Data.Text.Encoding
+  ( encodeUtf8
+  , decodeUtf8
   )
 import Data.Aeson
   ( ToJSON(toJSON, toEncoding)
@@ -42,6 +47,10 @@ import Servant.API
   , Post
   , ReqBody
   , (:>)
+  )
+import Crypto.Hash
+  ( SHA3_512(SHA3_512)
+  , hashWith
   )
 import PaymentServer.Persistence
   ( VoucherDatabase(redeemVoucher)
@@ -86,8 +95,12 @@ redeem database (Redeem voucher tokens) = do
   let fingerprint = fingerprintFromTokens tokens
   result <- liftIO $ PaymentServer.Persistence.redeemVoucher database voucher fingerprint
   case result of
-    Left err -> return Failed
+    Left err -> throwError jsonErr400
     Right () -> return Succeeded
 
 fingerprintFromTokens :: [BlindedToken] -> Fingerprint
-fingerprintFromTokens _ = "fingerprint"
+fingerprintFromTokens =
+  let
+    hash = pack . show . hashWith SHA3_512 . encodeUtf8
+  in
+    foldl (\b a -> hash $ a `mappend` b) "" . map hash
