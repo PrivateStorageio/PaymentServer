@@ -7,7 +7,6 @@
 -- signatures.
 module PaymentServer.Redemption
   ( RedemptionAPI
-  , BlindedToken
   , Redeem(Redeem)
   , Result(Failed, Succeeded)
   , redemptionServer
@@ -20,8 +19,7 @@ import Control.Monad.IO.Class
   ( liftIO
   )
 import Data.Text
-  ( Text
-  , pack
+  ( pack
   )
 import Data.Text.Encoding
   ( encodeUtf8
@@ -59,26 +57,19 @@ import PaymentServer.Persistence
   , Fingerprint
   , Voucher
   )
-
--- | A cryptographic signature of a blinded token created using our private
--- key.
-type Signature = Text
-
--- | A public key corresponding to our private key.
-type PublicKey = Text
-
--- | A zero-knowledge proof that signatures were created of the corresponding
--- blinded tokens using the corresponding public key's private key.
-type Proof = Text
+import PaymentServer.Issuer
+  ( Signature
+  , PublicKey
+  , Proof
+  , BlindedToken
+  , ChallengeBypass(ChallengeBypass)
+  , Issuer
+  )
 
 data Result
   = Failed
   | Succeeded PublicKey [Signature] Proof
   deriving (Show, Eq)
-
--- | A blinded token is presented along with a voucher to be signed and the
--- signatures returned to the caller.
-type BlindedToken = Text
 
 -- | A complete redemption attempt which can be presented at the redemption
 -- endpoint.
@@ -120,19 +111,23 @@ jsonErr400 = err400
   , errHeaders = [ ("Content-Type", "application/json;charset=utf-8") ]
   }
 
-redemptionServer :: VoucherDatabase d => d -> Server RedemptionAPI
+redemptionServer :: VoucherDatabase d => Issuer -> d -> Server RedemptionAPI
 redemptionServer = redeem
 
 -- | Handler for redemption requests.  Use the database to try to redeem the
 -- voucher and return signatures.  Return a failure if this is not possible
 -- (eg because the voucher was already redeemed).
-redeem :: VoucherDatabase d => d -> Redeem -> Handler Result
-redeem database (Redeem voucher tokens) = do
+redeem :: VoucherDatabase d => Issuer -> d -> Redeem -> Handler Result
+redeem issue database (Redeem voucher tokens) = do
   let fingerprint = fingerprintFromTokens tokens
   result <- liftIO $ PaymentServer.Persistence.redeemVoucher database voucher fingerprint
   case result of
     Left err -> throwError jsonErr400
-    Right () -> return $ Succeeded "" [] ""
+    Right () ->
+      let
+        (ChallengeBypass key signatures proof) = issue tokens
+      in
+        return $ Succeeded key signatures proof
 
 -- | Compute a cryptographic hash (fingerprint) of a list of tokens which can
 -- be used as an identifier for this exact sequence of tokens.

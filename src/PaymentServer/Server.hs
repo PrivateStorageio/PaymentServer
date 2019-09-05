@@ -23,6 +23,9 @@ import PaymentServer.Redemption
   ( RedemptionAPI
   , redemptionServer
   )
+import PaymentServer.Issuer
+  ( trivialIssue
+  )
 import PaymentServer.Persistence
   ( VoucherDatabase
   )
@@ -36,7 +39,7 @@ type PaymentServerAPI
 paymentServer :: VoucherDatabase d => d -> Server PaymentServerAPI
 paymentServer d =
   stripeServer d
-  :<|> redemptionServer d
+  :<|> redemptionServer trivialIssue d
 
 paymentServerAPI :: Proxy PaymentServerAPI
 paymentServerAPI = Proxy

@@ -52,9 +52,14 @@ import Util.Spec
 import Util.WAI
   ( postJSON
   )
+import PaymentServer.Issuer
+  ( BlindedToken
+  , ChallengeBypass(ChallengeBypass)
+  , Issuer
+  , trivialIssue
+  )
 import PaymentServer.Redemption
   ( RedemptionAPI
-  , BlindedToken
   , Redeem(Redeem)
   , Result(Failed, Succeeded)
   , redemptionServer
@@ -69,8 +74,8 @@ import PaymentServer.Persistence
 redemptionAPI :: Proxy RedemptionAPI
 redemptionAPI = Proxy
 
-app :: VoucherDatabase d => d -> Application
-app = serve redemptionAPI . redemptionServer
+app :: VoucherDatabase d => Issuer -> d -> Application
+app issue = serve redemptionAPI . redemptionServer issue
 
 path = "/"
 
@@ -96,7 +101,7 @@ instance VoucherDatabase VoucherDatabaseTestDouble where
 spec_redemption :: Spec
 spec_redemption = parallel $ do
   database <- runIO memory
-  with (return . app $ database) $
+  with (return $ app trivialIssue database) $
     do
       describe (printf "error behavior of POST %s" (show path)) $
         do
@@ -124,7 +129,7 @@ spec_redemption = parallel $ do
 
 
   describe "redemption" $ do
-    with (return . app $ RefuseRedemption NotPaid) $
+    with (return $ app trivialIssue (RefuseRedemption NotPaid)) $
       it "receives a failure response when the voucher is not paid" $ property $
         \(voucher :: Voucher) (tokens :: [BlindedToken]) ->
           propertyRedeem path voucher tokens 400
@@ -135,15 +140,18 @@ spec_redemption = parallel $ do
           , matchHeaders = ["Content-Type" <:> "application/json;charset=utf-8"]
           }
 
-    with (return $ app PermitRedemption) $
+    with (return $ app trivialIssue PermitRedemption) $
       it "receive a success response when redemption succeeds" $ property $
         \(voucher :: Voucher) (tokens :: [BlindedToken]) ->
-          propertyRedeem path voucher tokens 200
-          -- TODO: Get some real crypto involved to be able to replace these
-          -- dummy values.
-          { matchBody = matchJSONBody $ Succeeded "" [] ""
-          , matchHeaders = ["Content-Type" <:> "application/json;charset=utf-8"]
-          }
+          let
+            (ChallengeBypass key signatures proof) = trivialIssue tokens
+          in
+            propertyRedeem path voucher tokens 200
+            -- TODO: Get some real crypto involved to be able to replace these
+            -- dummy values.
+            { matchBody = matchJSONBody $ Succeeded key signatures proof
+            , matchHeaders = ["Content-Type" <:> "application/json;charset=utf-8"]
+            }
 
     -- it "receive 200 (OK) when the voucher is paid and previously redeemed with the same tokens" $
     --   property $ \(voucher :: Voucher) (tokens :: [BlindedToken]) ->
