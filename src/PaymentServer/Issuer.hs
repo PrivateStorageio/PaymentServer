@@ -10,13 +10,21 @@ module PaymentServer.Issuer
   , ChallengeBypass(ChallengeBypass)
   , Issuer
   , trivialIssue
+  , ristrettoIssue
   ) where
+
+import PaymentServer.Ristretto
+  ( ristretto
+  )
 
 import Data.Text
   ( Text
   )
 
--- | A public key corresponding to our private key.
+-- | A private key for signing.
+type SigningKey = Text
+
+-- | A public key corresponding to a SigningKey.
 type PublicKey = Text
 
 -- | A cryptographic signature of a blinded token created using our private
@@ -38,13 +46,19 @@ data ChallengeBypass =
 -- | An issuer accepts a list of blinded tokens and returns signatures of
 -- those tokens along with proof that it used a particular key to construct
 -- the signatures.
-type Issuer = [BlindedToken] -> ChallengeBypass
+type Issuer = [BlindedToken] -> IO ChallengeBypass
 
 -- | trivialIssue makes up and returns some nonsense values that satisfy the
 -- structural requirements but not the semantic ones.
 trivialIssue :: Issuer
 trivialIssue tokens =
+  return $
   ChallengeBypass
   "fake-public-key"
   (replicate (length tokens) "fake-signature")
   "fake-proof"
+
+ristrettoIssue :: SigningKey -> Issuer
+ristrettoIssue signingKey tokens = do
+  (publicKey, tokens, proof) <- ristretto signingKey tokens
+  return $ ChallengeBypass publicKey tokens proof

@@ -123,11 +123,9 @@ redeem issue database (Redeem voucher tokens) = do
   result <- liftIO $ PaymentServer.Persistence.redeemVoucher database voucher fingerprint
   case result of
     Left err -> throwError jsonErr400
-    Right () ->
-      let
-        (ChallengeBypass key signatures proof) = issue tokens
-      in
-        return $ Succeeded key signatures proof
+    Right () -> do
+      (ChallengeBypass key signatures proof) <- liftIO $ issue tokens
+      return $ Succeeded key signatures proof
 
 -- | Compute a cryptographic hash (fingerprint) of a list of tokens which can
 -- be used as an identifier for this exact sequence of tokens.

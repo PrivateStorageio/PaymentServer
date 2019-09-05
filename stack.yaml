@@ -39,6 +39,7 @@ packages:
 # (e.g., acme-missiles-0.3)
 extra-deps:
   - "stripe-core-2.5.0"
+  - "tasty-wai-0.1.1.0@sha256:44377c82bf1523c972fa361ea3d708fc423978dafc1d3bf2c6d9a2571ec69a08"
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
@@ -63,10 +64,3 @@ extra-deps:
 #
 # Allow a newer minor version of GHC than the snapshot specifies
 # compiler-check: newer-minor
-
-
-# https://docs.haskellstack.org/en/stable/nix_integration/#additions-to-your-stackyaml
-nix:
-  enable: true
-  packages:
-    - "zlib"

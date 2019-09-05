@@ -16,6 +16,7 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     PaymentServer.Processors.Stripe
+                     , PaymentServer.Ristretto
                      , PaymentServer.Issuer
                      , PaymentServer.Persistence
                      , PaymentServer.Redemption
@@ -35,6 +36,7 @@ library
                      , cryptonite
   default-language:    Haskell2010
   ghc-options:       -Wmissing-import-lists -Wunused-imports
+  pkgconfig-depends: ristretto
 
 executable PaymentServer-exe
   hs-source-dirs:      app
@@ -76,6 +78,7 @@ test-suite PaymentServer-test
                      , tasty-discover
                      , tasty-quickcheck
                      , tasty-hspec
+                     , tasty-wai
                      , servant-server
                      , containers
                      , unordered-containers
