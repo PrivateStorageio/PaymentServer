@@ -52,9 +52,13 @@ import Util.Spec
 import Util.WAI
   ( postJSON
   )
+import PaymentServer.Issuer
+  ( BlindedToken
+  , ChallengeBypass(ChallengeBypass)
+  , trivialIssue
+  )
 import PaymentServer.Redemption
   ( RedemptionAPI
-  , BlindedToken
   , Redeem(Redeem)
   , Result(Failed, Succeeded)
   , redemptionServer
@@ -138,12 +142,15 @@ spec_redemption = parallel $ do
     with (return $ app PermitRedemption) $
       it "receive a success response when redemption succeeds" $ property $
         \(voucher :: Voucher) (tokens :: [BlindedToken]) ->
-          propertyRedeem path voucher tokens 200
-          -- TODO: Get some real crypto involved to be able to replace these
-          -- dummy values.
-          { matchBody = matchJSONBody $ Succeeded "" [] ""
-          , matchHeaders = ["Content-Type" <:> "application/json;charset=utf-8"]
-          }
+          let
+            (ChallengeBypass key signatures proof) = trivialIssue tokens
+          in
+            propertyRedeem path voucher tokens 200
+            -- TODO: Get some real crypto involved to be able to replace these
+            -- dummy values.
+            { matchBody = matchJSONBody $ Succeeded key signatures proof
+            , matchHeaders = ["Content-Type" <:> "application/json;charset=utf-8"]
+            }
 
     -- it "receive 200 (OK) when the voucher is paid and previously redeemed with the same tokens" $
     --   property $ \(voucher :: Voucher) (tokens :: [BlindedToken]) ->
