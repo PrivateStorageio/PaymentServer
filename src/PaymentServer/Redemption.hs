@@ -63,7 +63,7 @@ import PaymentServer.Issuer
   , Proof
   , BlindedToken
   , ChallengeBypass(ChallengeBypass)
-  , trivialIssue
+  , Issuer
   )
 
 data Result
@@ -111,21 +111,21 @@ jsonErr400 = err400
   , errHeaders = [ ("Content-Type", "application/json;charset=utf-8") ]
   }
 
-redemptionServer :: VoucherDatabase d => d -> Server RedemptionAPI
+redemptionServer :: VoucherDatabase d => Issuer -> d -> Server RedemptionAPI
 redemptionServer = redeem
 
 -- | Handler for redemption requests.  Use the database to try to redeem the
 -- voucher and return signatures.  Return a failure if this is not possible
 -- (eg because the voucher was already redeemed).
-redeem :: VoucherDatabase d => d -> Redeem -> Handler Result
-redeem database (Redeem voucher tokens) = do
+redeem :: VoucherDatabase d => Issuer -> d -> Redeem -> Handler Result
+redeem issue database (Redeem voucher tokens) = do
   let fingerprint = fingerprintFromTokens tokens
   result <- liftIO $ PaymentServer.Persistence.redeemVoucher database voucher fingerprint
   case result of
     Left err -> throwError jsonErr400
     Right () ->
       let
-        (ChallengeBypass key signatures proof) = trivialIssue tokens
+        (ChallengeBypass key signatures proof) = issue tokens
       in
         return $ Succeeded key signatures proof
 
