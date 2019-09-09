@@ -22,15 +22,15 @@ jobs:
       - run:
           name: "Install Git"
           command: |
-            # Required for the checkout and run steps
-            nix-env -i git openssh stack
+            # Required for the checkout step.
+            nix-env -i git openssh
 
       - "checkout"
 
       - run:
           name: "Run Tests"
           command: |
-            stack test --coverage
+            nix-shell shell.nix --run "stack test --coverage"
 
 workflows:
   version: 2
