@@ -23,7 +23,7 @@ jobs:
           name: "Install Git"
           command: |
             # Required for the checkout and run steps
-            nix-env -i git openssh
+            nix-env -i git openssh stack
 
       - "checkout"
 
