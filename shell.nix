@@ -4,9 +4,9 @@ let
     sha256 = "0cdq342wrkvkyccygpp1gvwp7hhqg68hljjwld4vjixm901ayy14";
   }) {};
 in
-{ pkgs ? pinnedPkgs }:
-pkgs.mkShell {
+{ ... }:
+pinnedPkgs.mkShell {
   buildInputs = [
-    pkgs.stack
+    pinnedPkgs.stack
   ];
 }
