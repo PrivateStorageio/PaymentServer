@@ -34,7 +34,7 @@ jobs:
       - run:
           name: "Run Tests"
           command: |
-            nix-shell shell.nix --run "stack test --coverage"
+            nix-shell shell.nix --run "stack --test --no-terminal --coverage"
 
 workflows:
   version: 2
