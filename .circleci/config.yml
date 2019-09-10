@@ -26,7 +26,7 @@ jobs:
       - run:
           name: "Setup NIX_PATH Environment Variable"
           command: |
-            echo "export NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/$NIXPKGS_REV.tar.gz >> $BASH_ENV"
+            echo "export NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/$NIXPKGS_REV.tar.gz" >> $BASH_ENV
 
       - restore_cache:
           name: "Restore Nix Store Paths"
