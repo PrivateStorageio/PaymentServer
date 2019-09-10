@@ -24,6 +24,16 @@ jobs:
 
     steps:
       - run:
+          name: "Install CA Certificates"
+          command: |
+            # Required for cache and artifact interactions.  Though we use a
+            # nix image, it's actually an alpine base...  The CircleCI cache
+            # management and artifact uploader don't know how to use the nix
+            # ca bundle we could install.
+            apk update
+            apk add ca-certificates
+
+      - run:
           name: "Install Git"
           command: |
             # Required for the checkout step.
