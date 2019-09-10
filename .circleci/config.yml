@@ -75,6 +75,9 @@ jobs:
           name: "Cache Nix Store Paths"
           key: paymentserver-nix-store-v1-{{ .Environment.NIXPKGS_REV }}
 
+      - store_artifacts:
+          path: ".stack-work/logs"
+
 workflows:
   version: 2
   everything:
