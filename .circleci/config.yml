@@ -31,10 +31,24 @@ jobs:
 
       - "checkout"
 
+      - restore_cache:
+          # Read about caching dependencies: https://circleci.com/docs/2.0/caching/
+          name: "Restore Cached Dependencies"
+          keys:
+            - paymentserver-v1-{{ checksum "stack.yaml" }}-{{ checksum "PaymentServer.cabal" }}
+            - paymentserver-v1-{{ checksum "stack.yaml" }}
+
       - run:
           name: "Run Tests"
           command: |
             nix-shell shell.nix --run "stack test --no-terminal --coverage"
+
+      - save_cache:
+          name: "Cache Dependencies"
+          key: paymentserver-v1-{{ checksum "stack.yaml" }}-{{ checksum "PaymentServer.cabal" }}
+          paths:
+            - "/root/.stack"
+            - ".stack-work"
 
 workflows:
   version: 2
