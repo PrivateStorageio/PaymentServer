@@ -17,7 +17,7 @@ version: 2.1
 jobs:
   test:
     docker:
-      - image: "nixos/nix:2.2.1"
+      - image: "nixorg/nix:circleci"
 
     environment:
       NIXPKGS_REV: "3c83ad6ac13b67101cc3e2e07781963a010c1624"
@@ -28,27 +28,11 @@ jobs:
           command: |
             echo "export NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/$NIXPKGS_REV.tar.gz >> $BASH_ENV"
 
-      - run:
-          name: "Install CA Certificates"
-          command: |
-            # Required for cache and artifact interactions.  Though we use a
-            # nix image, it's actually an alpine base...  The CircleCI cache
-            # management and artifact uploader don't know how to use the nix
-            # ca bundle we could install.
-            apk update
-            apk add ca-certificates
-
       - restore_cache:
           name: "Restore Nix Store Paths"
           keys:
             - paymentserver-nix-store-v1-{{ .Environment.NIXPKGS_REV }}
             - paymentserver-nix-store-v1-
-
-      - run:
-          name: "Install Git"
-          command: |
-            # Required for the checkout step.
-            nix-env -i git openssh
 
       - "checkout"
 
