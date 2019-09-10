@@ -20,9 +20,14 @@ jobs:
       - image: "nixos/nix:2.2.1"
 
     environment:
-      NIX_PATH: "nixpkgs=https://github.com/NixOS/nixpkgs/archive/3c83ad6ac13b67101cc3e2e07781963a010c1624.tar.gz"
+      NIXPKGS_REV: "3c83ad6ac13b67101cc3e2e07781963a010c1624"
 
     steps:
+      - run:
+          name: "Setup NIX_PATH Environment Variable"
+          command: |
+            echo "export NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/$NIXPKGS_REV.tar.gz >> $BASH_ENV"
+
       - run:
           name: "Install CA Certificates"
           command: |
