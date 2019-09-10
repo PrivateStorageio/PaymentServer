@@ -64,6 +64,15 @@ jobs:
       - store_artifacts:
           path: ".stack-work/logs"
 
+      - run:
+          name: "Prepare Coverage Report For Upload"
+          command: |
+            mv $(stack path --local-install-root)/hpc /tmp
+
+      - store_artifacts:
+          path: "/tmp/hpc"
+          destination: "coverage"
+
 workflows:
   version: 2
   everything:
