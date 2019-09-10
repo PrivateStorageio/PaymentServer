@@ -46,8 +46,6 @@ jobs:
       - run:
           name: "Run Tests"
           command: |
-            env
-            cat $BASH_ENV
             nix-shell shell.nix --run "stack build --no-terminal --test --coverage --fast"
 
       - save_cache:
