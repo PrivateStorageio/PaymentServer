@@ -38,6 +38,12 @@ jobs:
             apk update
             apk add ca-certificates
 
+      - restore_cache:
+          name: "Restore Nix Store Paths"
+          keys:
+            - paymentserver-nix-store-v1-{{ .Environment.NIXPKGS_REV }}
+            - paymentserver-nix-store-v1-
+
       - run:
           name: "Install Git"
           command: |
@@ -64,6 +70,10 @@ jobs:
           paths:
             - "/root/.stack"
             - ".stack-work"
+
+      - save_cache:
+          name: "Cache Nix Store Paths"
+          key: paymentserver-nix-store-v1-{{ .Environment.NIXPKGS_REV }}
 
 workflows:
   version: 2
