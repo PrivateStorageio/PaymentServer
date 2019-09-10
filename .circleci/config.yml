@@ -67,7 +67,7 @@ jobs:
       - run:
           name: "Prepare Coverage Report For Upload"
           command: |
-            mv $(stack path --local-install-root)/hpc /tmp
+            mv $(nix-shell shell.nix --run "stack path --local-install-root")/hpc /tmp
 
       - store_artifacts:
           path: "/tmp/hpc"
