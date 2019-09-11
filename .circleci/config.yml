@@ -17,27 +17,54 @@ version: 2.1
 jobs:
   test:
     docker:
+      # Run in a highly Nix-capable environment.  This lets us use Stack's nix
+      # integration and other useful Nix features to specify and run the
+      # build.
       - image: "nixorg/nix:circleci"
 
     environment:
+      # Specify a revision of NixOS/nixpkgs to run against.  This essentially
+      # pins the majority of the software involved in the build.  This
+      # revision is selected arbitrarily.  It's somewhat current as of the
+      # time of this comment.  We can bump it to a newer version when that
+      # makes sense.  Meanwhile, the platform won't shift around beneath us
+      # unexpectedly.
       NIXPKGS_REV: "3c83ad6ac13b67101cc3e2e07781963a010c1624"
 
     steps:
       - run:
+          # Get NIX_PATH set for the rest of the job so that the revision of
+          # nixpkgs we selected will be used everywhere Nix pulls in software.
+          # There is no way to set an environment variable containing the
+          # value of another environment variable on CircleCI except to use
+          # the `BASE_ENV` feature as we do here.
           name: "Setup NIX_PATH Environment Variable"
           command: |
             echo "export NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/$NIXPKGS_REV.tar.gz" >> $BASH_ENV
 
       - restore_cache:
+          # Get all of Nix's state relating to the particular revision of
+          # nixpkgs we're using.  It will always be the same.  CircleCI
+          # artifacts and nixpkgs store objects are probably mostly hosted in
+          # the same place (S3) so there's not a lot of difference for
+          # anything that's pre-built.  For anything we end up building
+          # ourselves, though, this saves us all of the build time (less the
+          # download time).
+          #
+          # Read about caching dependencies: https://circleci.com/docs/2.0/caching/
           name: "Restore Nix Store Paths"
           keys:
             - paymentserver-nix-store-v1-{{ .Environment.NIXPKGS_REV }}
             - paymentserver-nix-store-v1-
 
+      # Get *our* source code.
       - "checkout"
 
       - restore_cache:
-          # Read about caching dependencies: https://circleci.com/docs/2.0/caching/
+          # Restore the cache of Stack's state.  This will have all of the
+          # compiled Haskell libraries we depend on and even the compiled
+          # output of our own libraries, if the source hasn't changed since
+          # the cache was written (but usually it will have).
           name: "Restore Cached Dependencies"
           keys:
             - paymentserver-v1-{{ checksum "stack.yaml" }}-{{ checksum "PaymentServer.cabal" }}
@@ -46,6 +73,20 @@ jobs:
       - run:
           name: "Run Tests"
           command: |
+            # shell.nix gives us the stack we want.  Then stack.yaml specifies
+            # some more of the Nix-based environment to be able to build and
+            # run the tests.
+            #
+            # --no-terminal avoids having fancy progress reports written to
+            # stdout.
+            #
+            # --coverage gathers test coverage information to be published
+            # below.
+            #
+            # --fast turns off compiler optimizations which probably doesn't
+            # make a lot of difference in our code but it can speed up build
+            # times for our dependencies (as well as reduce compiler memory
+            # usage which may be important at least for stripe-core).
             nix-shell shell.nix --run "stack build --no-terminal --test --coverage --fast"
 
       - save_cache:
@@ -62,6 +103,7 @@ jobs:
             - "/nix"
 
       - store_artifacts:
+          # There may be useful build logs here.
           path: ".stack-work/logs"
 
       - run:
@@ -70,6 +112,8 @@ jobs:
             mv $(nix-shell shell.nix --run "stack path --local-install-root")/hpc /tmp
 
       - store_artifacts:
+          # This contains the html coverage report as well as the raw data in
+          # .tix format.
           path: "/tmp/hpc"
           destination: "coverage"
 
