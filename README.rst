@@ -16,11 +16,7 @@ Build using Stack::
 Testing
 -------
 
-You can run the PaymentServer automated test suite using stack::
-
-  $ stack test
-
-You may also want to perform manual integration testing against Stripe.
+You can perform manual integration testing against Stripe.
 First, run the server::
 
   $ stack run
