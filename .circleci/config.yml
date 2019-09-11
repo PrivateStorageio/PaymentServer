@@ -75,6 +75,15 @@ jobs:
             - paymentserver-v1-{{ checksum "stack.yaml" }}
 
       - run:
+          name: "Build Dependencies"
+          command: |
+            nix-shell shell.nix --run "stack build --only-dependencies --interleaved-output"
+
+          # Give it a good long while.  stripe-core, in particular, can take a
+          # while to build.
+          no_output_timeout: "20m"
+
+      - run:
           name: "Run Tests"
           command: |
             # shell.nix gives us the stack we want.  Then stack.yaml specifies
