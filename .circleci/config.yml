@@ -75,6 +75,42 @@ jobs:
             - paymentserver-v1-{{ checksum "stack.yaml" }}
 
       - run:
+          # Build just our dependencies.  It's nice to have this as a separate
+          # step so failures here are more easily identified as being
+          # unrelated to our code.
+          #
+          # See below for explanation of the various flags passed in.  If the
+          # flags here differ from those below in a way that makes ghc think a
+          # library needs to be rebuilt then we'll build everything twice and
+          # our cache will be useless!  Try not to make that happen.
+          name: "Build Dependencies"
+          command: |
+            BUILD="stack build \
+            --no-terminal \
+            --only-dependencies \
+            --fast \
+            --test \
+            --no-run-tests \
+            --jobs 1 \
+            --interleaved-output"
+            nix-shell shell.nix --run "$BUILD"
+
+          # Give it a good long while.  stripe-core, in particular, can take a
+          # while to build.
+          no_output_timeout: "20m"
+
+      - save_cache:
+          # We can save the stack cache right here.  It will have everything
+          # we want in it now that the dependencies have been built.  And this
+          # way we get to save the cache whether or not the test suite goes on
+          # to succeed.
+          name: "Cache Dependencies"
+          key: paymentserver-v1-{{ checksum "stack.yaml" }}-{{ checksum "PaymentServer.cabal" }}
+          paths:
+            - "/root/.stack"
+            - ".stack-work"
+
+      - run:
           name: "Run Tests"
           command: |
             # shell.nix gives us the stack we want.  Then stack.yaml specifies
@@ -111,13 +147,6 @@ jobs:
               --haddock-internal \
               --no-haddock-deps"
             nix-shell shell.nix --run "$BUILD"
-
-      - save_cache:
-          name: "Cache Dependencies"
-          key: paymentserver-v1-{{ checksum "stack.yaml" }}-{{ checksum "PaymentServer.cabal" }}
-          paths:
-            - "/root/.stack"
-            - ".stack-work"
 
       - save_cache:
           name: "Cache Nix Store Paths"
