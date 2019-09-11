@@ -75,9 +75,16 @@ jobs:
             - paymentserver-v1-{{ checksum "stack.yaml" }}
 
       - run:
+          # Build just our dependencies.  It's nice to have this as a separate
+          # step so failures here are more easily identified as being
+          # unrelated to our code.
           name: "Build Dependencies"
           command: |
-            nix-shell shell.nix --run "stack build --only-dependencies --interleaved-output"
+            BUILD="stack build \
+            --no-terminal \
+            --only-dependencies \
+            --interleaved-output"
+            nix-shell shell.nix --run "$BUILD"
 
           # Give it a good long while.  stripe-core, in particular, can take a
           # while to build.
