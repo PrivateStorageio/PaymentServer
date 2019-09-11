@@ -15,7 +15,7 @@
 version: 2.1
 
 jobs:
-  test:
+  build:
     docker:
       # Run in a highly Nix-capable environment.  This lets us use Stack's nix
       # integration and other useful Nix features to specify and run the
@@ -89,8 +89,6 @@ jobs:
             --no-terminal \
             --only-dependencies \
             --fast \
-            --test \
-            --no-run-tests \
             --jobs 1 \
             --interleaved-output"
             nix-shell shell.nix --run "$BUILD"
@@ -125,19 +123,12 @@ jobs:
             # times for our dependencies (as well as reduce compiler memory
             # usage which may be important at least for stripe-core).
             #
-            # --test runs the test suite.
-            #
-            # --coverage gathers coverage information during the test run.
-            # Steps below publish the result.
-            #
             # --haddock builds the Haskell API documentation.
             # --haddock-internal builds docs even for unexposed modules.
             # --no-haddock-deps skips building docs for all our dependencies.
             BUILD="stack build \
               --no-terminal \
               --fast \
-              --test \
-              --coverage \
               --haddock \
               --haddock-internal \
               --no-haddock-deps"
@@ -174,4 +165,4 @@ workflows:
   version: 2
   everything:
     jobs:
-      - "test"
+      - "build"
