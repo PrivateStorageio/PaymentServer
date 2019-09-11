@@ -84,6 +84,7 @@ jobs:
             --no-terminal \
             --only-dependencies \
             --fast \
+            --jobs 1 \
             --interleaved-output"
             nix-shell shell.nix --run "$BUILD"
 
