@@ -78,6 +78,11 @@ jobs:
           # Build just our dependencies.  It's nice to have this as a separate
           # step so failures here are more easily identified as being
           # unrelated to our code.
+          #
+          # See below for explanation of the various flags passed in.  If the
+          # flags here differ from those below in a way that makes ghc think a
+          # library needs to be rebuilt then we'll build everything twice and
+          # our cache will be useless!  Try not to make that happen.
           name: "Build Dependencies"
           command: |
             BUILD="stack build \
