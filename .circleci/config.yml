@@ -54,6 +54,10 @@ jobs:
           # Read about caching dependencies: https://circleci.com/docs/2.0/caching/
           name: "Restore Nix Store Paths"
           keys:
+            # This doesn't work right.  "<no value>" is interpolated in,
+            # instead of the value for NIXPKGS_REV set above.
+            #
+            # https://github.com/PrivateStorageio/PaymentServer/issues/15
             - paymentserver-nix-store-v1-{{ .Environment.NIXPKGS_REV }}
             - paymentserver-nix-store-v1-
 
