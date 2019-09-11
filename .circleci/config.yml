@@ -118,10 +118,6 @@ jobs:
             # --no-terminal avoids having fancy progress reports written to
             # stdout.
             #
-            # --interleaved-output dumps realtime output on build progress.
-            # This may help avoid timeouts when building large packages (eg
-            # stripe-core).
-            #
             # --fast turns off compiler optimizations which probably doesn't
             # make a lot of difference in our code but it can speed up build
             # times for our dependencies (as well as reduce compiler memory
@@ -132,7 +128,6 @@ jobs:
             # --no-haddock-deps skips building docs for all our dependencies.
             BUILD="stack build \
               --no-terminal \
-              --interleaved-output \
               --fast \
               --haddock \
               --haddock-internal \
