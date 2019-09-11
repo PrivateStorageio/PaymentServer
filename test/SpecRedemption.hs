@@ -20,6 +20,36 @@ import Servant
   , Proxy(Proxy)
   , serve
   )
+import Test.Tasty.Providers
+  ( TestName
+  , singleTest
+  )
+import Test.Tasty
+  ( TestTree
+  , testGroup
+  , withResource
+  )
+import Test.Tasty.HUnit
+  ( Assertion
+  , testCase
+  )
+import Test.Tasty.Wai
+  ( testWai
+  , assertStatus'
+  , assertBody
+  , assertHeader
+  , get
+  )
+
+import Test.Tasty.QuickCheck
+  ( testProperty
+  )
+
+import Network.HTTP.Types
+  ( status200
+  , status405
+  )
+
 import Test.Hspec
   ( Spec
   , parallel
@@ -184,3 +214,23 @@ matchJSONBody expected =
             Just $ "decoded body does not equal expected value: " ++ show actual ++ show expected
   in
     MatchBody bodyMatcher
+
+-- testWithDatabase :: VoucherDatabase d => d -> Assertion
+-- testWithDatabase database =
+--   let
+--     testApp = app trivialIssue database
+--   in
+
+-- test_redemption :: TestTree
+-- test_redemption =
+--   let
+--     testApp = memory >>= (return . app trivialIssue)
+--   in
+--   withResource testApp (\x -> return ()) $ \getApp ->
+--   testGroup "Voucher Redemption"
+--   [ testWai' getApp "a non-POST receives a 405 (Method Not Allowed) response" $
+--     do
+--       res <- get "/"
+--       assertStatus' status405 res
+--       assertBody "blub" res
+--   ]

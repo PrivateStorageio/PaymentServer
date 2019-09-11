@@ -78,6 +78,7 @@ test-suite PaymentServer-test
                      , tasty-discover
                      , tasty-quickcheck
                      , tasty-hspec
+                     , tasty-hunit
                      , tasty-wai
                      , servant-server
                      , containers
