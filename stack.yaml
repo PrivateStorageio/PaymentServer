@@ -64,9 +64,7 @@ extra-deps:
 # Allow a newer minor version of GHC than the snapshot specifies
 # compiler-check: newer-minor
 
-
-# https://docs.haskellstack.org/en/stable/nix_integration/#additions-to-your-stackyaml
 nix:
   enable: true
-  packages:
-    - "zlib"
+  # https://docs.haskellstack.org/en/stable/nix_integration/#using-a-custom-shellnix-file
+  shell-file: "stack-shell.nix"

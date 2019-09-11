@@ -35,6 +35,7 @@ library
                      , cryptonite
   default-language:    Haskell2010
   ghc-options:       -Wmissing-import-lists -Wunused-imports
+  pkgconfig-depends: ristretto
 
 executable PaymentServer-exe
   hs-source-dirs:      app
