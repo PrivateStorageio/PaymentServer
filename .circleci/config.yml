@@ -83,6 +83,7 @@ jobs:
             BUILD="stack build \
             --no-terminal \
             --only-dependencies \
+            --fast \
             --interleaved-output"
             nix-shell shell.nix --run "$BUILD"
 
