@@ -109,7 +109,7 @@ jobs:
             - ".stack-work"
 
       - run:
-          name: "Run Tests"
+          name: "Building"
           command: |
             # shell.nix gives us the stack we want.  Then stack.yaml specifies
             # some more of the Nix-based environment to be able to build and
