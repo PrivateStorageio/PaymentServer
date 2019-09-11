@@ -66,4 +66,5 @@ extra-deps:
 
 nix:
   enable: true
+  # https://docs.haskellstack.org/en/stable/nix_integration/#using-a-custom-shellnix-file
   shell-file: "stack-shell.nix"
