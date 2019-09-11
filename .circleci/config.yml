@@ -84,16 +84,28 @@ jobs:
             # --no-terminal avoids having fancy progress reports written to
             # stdout.
             #
-            # --coverage gathers test coverage information to be published
-            # below.
-            #
-            # --haddock-internal builds our own Haskell API docs with Haddock
-            #
             # --fast turns off compiler optimizations which probably doesn't
             # make a lot of difference in our code but it can speed up build
             # times for our dependencies (as well as reduce compiler memory
             # usage which may be important at least for stripe-core).
-            nix-shell shell.nix --run "stack build --no-terminal --test --coverage --haddock-internal --fast"
+            #
+            # --test runs the test suite.
+            #
+            # --coverage gathers coverage information during the test run.
+            # Steps below publish the result.
+            #
+            # --haddock builds the Haskell API documentation.
+            # --haddock-internal builds docs even for unexposed modules.
+            # --no-haddock-deps skips building docs for all our dependencies.
+            BUILD="stack build \
+              --no-terminal \
+              --fast \
+              --test \
+              --coverage \
+              --haddock \
+              --haddock-internal \
+              --no-haddock-deps"
+            nix-shell shell.nix --run "$BUILD"
 
       - save_cache:
           name: "Cache Dependencies"
