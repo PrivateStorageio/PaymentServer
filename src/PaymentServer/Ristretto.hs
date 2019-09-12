@@ -73,11 +73,11 @@ ristretto textSigningKey textTokens = do
 
 -- | randomSigningKey generates a new signing key at random and returns it
 -- encoded as a base64 string.
-randomSigningKey :: IO String
+randomSigningKey :: IO Text
 randomSigningKey = do
   cSigningKey <- signing_key_random
   cString <- signing_key_encode_base64 cSigningKey
   signing_key_destroy cSigningKey
   result <- peekCString cString
   free cString
-  return result
+  return $ pack result
