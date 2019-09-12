@@ -2,7 +2,8 @@
 {-# LANGUAGE EmptyDataDecls #-}
 
 module PaymentServer.Ristretto
-  ( ristretto
+  ( randomSigningKey
+  , ristretto
   ) where
 
 import Data.Text
@@ -17,6 +18,10 @@ import Foreign.C.String
   ( CString
   , withCString
   , newCString
+  , peekCString
+  )
+import Foreign.Marshal.Alloc
+  ( free
   )
 
 data C_BlindedToken
@@ -32,6 +37,7 @@ foreign import ccall "public_key_encode_base64" public_key_encode_base64 :: Ptr 
 
 foreign import ccall "signing_key_random" signing_key_random :: IO (Ptr C_SigningKey)
 foreign import ccall "signing_key_decode_base64" signing_key_decode_base64 :: CString -> IO (Ptr C_SigningKey)
+foreign import ccall "signing_key_encode_base64" signing_key_encode_base64 :: Ptr C_SigningKey -> IO CString
 foreign import ccall "signing_key_destroy" signing_key_destroy :: Ptr C_SigningKey -> IO ()
 foreign import ccall "signing_key_get_public_key" signing_key_get_public_key :: Ptr C_SigningKey -> IO (Ptr C_PublicKey)
 foreign import ccall "signing_key_sign" signing_key_sign :: Ptr C_SigningKey -> Ptr C_BlindedToken -> IO (Ptr C_SignedToken)
@@ -64,3 +70,14 @@ ristretto textSigningKey textTokens = do
     --   encodedTokens
     --   encodedProof
   return (mempty, [], mempty)
+
+-- | randomSigningKey generates a new signing key at random and returns it
+-- encoded as a base64 string.
+randomSigningKey :: IO String
+randomSigningKey = do
+  cSigningKey <- signing_key_random
+  cString <- signing_key_encode_base64 cSigningKey
+  signing_key_destroy cSigningKey
+  result <- peekCString cString
+  free cString
+  return result
