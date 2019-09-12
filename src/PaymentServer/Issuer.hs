@@ -58,7 +58,12 @@ trivialIssue tokens =
   (replicate (length tokens) "fake-signature")
   "fake-proof"
 
-ristrettoIssue :: SigningKey -> Issuer
+-- | ristrettoIssue uses Ristretto-flavored PrivacyPass (aka
+-- `challenge-bypass-ristretto`) to create token signatures in a
+-- privacy-preserving manner.
+ristrettoIssue
+  :: SigningKey    -- ^ The key to provide to the PrivacyPass signer.
+  -> Issuer        -- ^ An issuer using the given key.
 ristrettoIssue signingKey tokens = do
   (publicKey, tokens, proof) <- ristretto signingKey tokens
   return $ ChallengeBypass publicKey tokens proof

@@ -24,7 +24,7 @@ import PaymentServer.Redemption
   , redemptionServer
   )
 import PaymentServer.Issuer
-  ( trivialIssue
+  ( Issuer
   )
 import PaymentServer.Persistence
   ( VoucherDatabase
@@ -36,15 +36,15 @@ type PaymentServerAPI
   :<|> "v1" :> "redeem" :> RedemptionAPI
 
 -- | Create a server which uses the given database.
-paymentServer :: VoucherDatabase d => d -> Server PaymentServerAPI
-paymentServer d =
-  stripeServer d
-  :<|> redemptionServer trivialIssue d
+paymentServer :: VoucherDatabase d => Issuer -> d -> Server PaymentServerAPI
+paymentServer issuer database =
+  stripeServer database
+  :<|> redemptionServer issuer database
 
 paymentServerAPI :: Proxy PaymentServerAPI
 paymentServerAPI = Proxy
 
 -- | Create a Servant Application which serves the payment server API using
 -- the given database.
-paymentServerApp :: VoucherDatabase d => d -> Application
-paymentServerApp = serve paymentServerAPI . paymentServer
+paymentServerApp :: VoucherDatabase d => Issuer -> d -> Application
+paymentServerApp issuer = serve paymentServerAPI . paymentServer issuer

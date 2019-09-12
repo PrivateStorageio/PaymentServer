@@ -23,6 +23,7 @@ library
                      , PaymentServer.Server
                      , PaymentServer.Main
   build-depends:       base >= 4.7 && < 5
+                     , optparse-applicative
                      , aeson
                      , servant
                      , servant-server
