@@ -46,13 +46,13 @@ data ChallengeBypass =
 -- | An issuer accepts a list of blinded tokens and returns signatures of
 -- those tokens along with proof that it used a particular key to construct
 -- the signatures.
-type Issuer = [BlindedToken] -> IO ChallengeBypass
+type Issuer = [BlindedToken] -> IO (Maybe ChallengeBypass)
 
 -- | trivialIssue makes up and returns some nonsense values that satisfy the
 -- structural requirements but not the semantic ones.
 trivialIssue :: Issuer
 trivialIssue tokens =
-  return $
+  return . Just $
   ChallengeBypass
   "fake-public-key"
   (replicate (length tokens) "fake-signature")
@@ -65,5 +65,9 @@ ristrettoIssue
   :: SigningKey    -- ^ The key to provide to the PrivacyPass signer.
   -> Issuer        -- ^ An issuer using the given key.
 ristrettoIssue signingKey tokens = do
-  (publicKey, tokens, proof) <- ristretto signingKey tokens
-  return $ ChallengeBypass publicKey tokens proof
+  issuance <- ristretto signingKey tokens
+  case issuance of
+    Right (publicKey, tokens, proof) -> return . Just $ ChallengeBypass publicKey tokens proof
+    Left err -> do
+      putStrLn . show $ err
+      return Nothing

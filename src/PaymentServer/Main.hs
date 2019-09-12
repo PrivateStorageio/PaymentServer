@@ -39,6 +39,7 @@ import Options.Applicative
   , ParserInfo
   , option
   , auto
+  , str
   , optional
   , long
   , help
@@ -82,7 +83,7 @@ sample = ServerConfig
     <> help "Which issuer to use: trivial or ristretto"
     <> showDefault
     <> value Trivial )
-  <*> optional (option auto
+  <*> optional (option str
   ( long "signing-key"
     <> help "The base64 encoded signing key (ristretto only)"
     <> showDefault ) )
@@ -91,7 +92,7 @@ sample = ServerConfig
     <> help "Which database to use: sqlite3 or memory"
     <> showDefault
     <> value Memory )
-  <*> optional ( option auto
+  <*> optional ( option str
   ( long "database-path"
     <> help "Path to on-disk database (sqlite3 only)"
     <> showDefault ) )

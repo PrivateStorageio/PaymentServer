@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE EmptyDataDecls #-}
 
@@ -6,13 +7,19 @@ module PaymentServer.Ristretto
   , ristretto
   ) where
 
+import Control.Exception
+  ( bracket
+  , assert
+  )
 import Data.Text
   ( Text
   , unpack
+  , pack
   )
 
 import Foreign.Ptr
   ( Ptr
+  , nullPtr
   )
 import Foreign.C.String
   ( CString
@@ -22,6 +29,9 @@ import Foreign.C.String
   )
 import Foreign.Marshal.Alloc
   ( free
+  )
+import Foreign.Marshal.Array
+  ( withArray
   )
 
 data C_BlindedToken
@@ -44,32 +54,92 @@ foreign import ccall "signing_key_sign" signing_key_sign :: Ptr C_SigningKey -> 
 
 foreign import ccall "signed_token_encode_base64" signed_token_encode_base64 :: Ptr C_SignedToken -> IO CString
 
-foreign import ccall "batch_dleq_proof_new" batch_dleq_proof_new :: Ptr C_BlindedToken -> Ptr C_SignedToken -> Int -> Ptr C_SigningKey -> IO (Ptr C_BatchDLEQProof)
+foreign import ccall "batch_dleq_proof_new" batch_dleq_proof_new :: Ptr (Ptr C_BlindedToken) -> Ptr (Ptr C_SignedToken) -> Int -> Ptr C_SigningKey -> IO (Ptr C_BatchDLEQProof)
 foreign import ccall "batch_dleq_proof_encode_base64" batch_dleq_proof_encode_base64 :: Ptr C_BatchDLEQProof -> IO CString
 foreign import ccall "batch_dleq_proof_destroy" batch_dleq_proof_destroy :: Ptr C_BatchDLEQProof -> IO ()
 
+-- | Private type to represent the return value of ristretto.
+type Issuance =
+  ( Text         -- |^ The base64-encoded public key corresponding to the
+                 -- signing key which generated the signatures.
+  , [Text]       -- |^ A list of base64-encoded token signatures.
+  , Text         -- |^ The base64-encoded batch DLEQ proof that the signatures
+                 -- were made with the signing key corresponding to the public
+                 -- key.
+  )
+
+data RistrettoFailure
+  = SigningKeyAllocation
+  | SigningKeyDecoding
+  | BlindedTokenAllocation
+  | BlindedTokenDecoding
+  | SignedTokenAllocation
+  | TokenSigning
+  | SignedTokenEncoding
+  | ProofCreation
+  | SignedTokenPeek
+  | PublicKeyLookup
+  | PublicKeyEncoding
+  deriving (Show, Eq)
+
+
 ristretto
-  :: Text                       -- ^ The base64 encoded signing key.
-  -> [Text]                     -- ^ A list of the base64 blinded tokens.
-  -> IO (Text, [Text], Text)    -- ^ The base64 public key, list of base64 signed tokens, and the base64 proof.
-ristretto textSigningKey textTokens = do
-  let stringSigningKey = unpack textSigningKey
-  cStringSigningKey <- newCString stringSigningKey
-  signingKey <- signing_key_decode_base64 cStringSigningKey
-  let stringTokens = map unpack textTokens
-  cStringTokens <- mapM newCString stringTokens
-  blindedTokens <- mapM blinded_token_decode_base64 cStringTokens
-  signedTokens <- mapM (signing_key_sign signingKey) blindedTokens
-    -- encodedTokens <- map signed_token_encode_base64 signedTokens
-    -- proof <- batch_dleq_proof_new blindedTokens signedTokens (length blindedTokens) signingKey
-    -- encodedProof <- batch_dleq_proof_encode_base64 proof
-    -- publicKey <- signing_key_get_public_key signingKey
-    -- encodedPublicKey <- public_key_encode_base64 publicKey
-    -- ChallengeBypass
-    --   encodedPublicKey
-    --   encodedTokens
-    --   encodedProof
-  return (mempty, [], mempty)
+  :: Text                                  -- ^ The base64 encoded signing key.
+  -> [Text]                                -- ^ A list of the base64 blinded tokens.
+  -> IO (Either RistrettoFailure Issuance) -- ^ Left for an error, otherwise
+                                           -- Right with the ristretto results
+ristretto textSigningKey textTokens =
+  let
+    newProof blindedTokens signedTokens signingKey =
+      withArray blindedTokens $ \cBlindedTokensArray ->
+      withArray signedTokens $ \cSignedTokensArray ->
+      batch_dleq_proof_new cBlindedTokensArray cSignedTokensArray (length blindedTokens) signingKey
+
+    newEncodedProof blindedTokens signedTokens signingKey =
+      bracket (newProof blindedTokens signedTokens signingKey) batch_dleq_proof_destroy $ \proof ->
+      bracket (batch_dleq_proof_encode_base64 proof) free peekCString
+
+    stringSigningKey = unpack textSigningKey
+    stringTokens = map unpack textTokens
+  in
+    do
+      cStringSigningKey <- newCString stringSigningKey
+      case cStringSigningKey == nullPtr of
+        True -> return $ Left SigningKeyAllocation
+        False -> do
+          signingKey <- signing_key_decode_base64 cStringSigningKey
+          case signingKey == nullPtr of
+            True -> return $ Left SigningKeyDecoding
+            False -> do
+              cStringTokens <- mapM newCString stringTokens
+              case any (== nullPtr) cStringTokens of
+                True -> return $ Left BlindedTokenAllocation
+                False -> do
+                  blindedTokens <- mapM blinded_token_decode_base64 cStringTokens
+                  case any (== nullPtr) blindedTokens of
+                    True -> return $ Left BlindedTokenDecoding
+                    False -> do
+                      signedTokens <- mapM (signing_key_sign signingKey) blindedTokens
+                      case any (== nullPtr) signedTokens of
+                        True -> return $ Left TokenSigning
+                        False -> do
+                          encodedCStringSignedTokens <- mapM signed_token_encode_base64 signedTokens
+                          case any (== nullPtr) encodedCStringSignedTokens of
+                            True -> return $ Left SignedTokenEncoding
+                            False -> do
+                              encodedSignedTokens <- mapM peekCString encodedCStringSignedTokens
+                              encodedProof <- newEncodedProof blindedTokens signedTokens signingKey
+                              publicKey <- signing_key_get_public_key signingKey
+                              case publicKey == nullPtr of
+                                True -> return $ Left PublicKeyLookup
+                                False -> do
+                                  cStringEncodedPublicKey <- public_key_encode_base64 publicKey
+                                  case cStringEncodedPublicKey == nullPtr of
+                                    True -> return $ Left PublicKeyEncoding
+                                    False -> do
+                                      encodedPublicKey <- peekCString cStringEncodedPublicKey
+                                      return $ Right (pack encodedPublicKey, map pack encodedSignedTokens, pack encodedProof)
+
 
 -- | randomSigningKey generates a new signing key at random and returns it
 -- encoded as a base64 string.

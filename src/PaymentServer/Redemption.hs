@@ -54,6 +54,7 @@ import Crypto.Hash
   )
 import PaymentServer.Persistence
   ( VoucherDatabase(redeemVoucher)
+  , RedeemError(NotPaid, AlreadyRedeemed)
   , Fingerprint
   , Voucher
   )
@@ -122,10 +123,19 @@ redeem issue database (Redeem voucher tokens) = do
   let fingerprint = fingerprintFromTokens tokens
   result <- liftIO $ PaymentServer.Persistence.redeemVoucher database voucher fingerprint
   case result of
-    Left err -> throwError jsonErr400
+    Left NotPaid -> do
+      liftIO $ putStrLn "Attempt to redeem unpaid voucher"
+      throwError jsonErr400
+    Left AlreadyRedeemed -> do
+      liftIO $ putStrLn "Attempt to double-spend paid voucher"
+      throwError jsonErr400
     Right () -> do
-      (ChallengeBypass key signatures proof) <- liftIO $ issue tokens
-      return $ Succeeded key signatures proof
+      result <- liftIO $ issue tokens
+      case result of
+        Just (ChallengeBypass key signatures proof) ->
+          return $ Succeeded key signatures proof
+        Nothing ->
+          throwError jsonErr400
 
 -- | Compute a cryptographic hash (fingerprint) of a list of tokens which can
 -- be used as an identifier for this exact sequence of tokens.
