@@ -82,7 +82,6 @@ data RistrettoFailure
   | PublicKeyEncoding
   deriving (Show, Eq)
 
-
 ristretto
   :: Text                                  -- ^ The base64 encoded signing key.
   -> [Text]                                -- ^ A list of the base64 blinded tokens.
@@ -101,8 +100,9 @@ ristretto textSigningKey textTokens =
 
     stringSigningKey = unpack textSigningKey
     stringTokens = map unpack textTokens
-  in
-    do
+
+    extractKeyMaterial :: String -> IO (Either RistrettoFailure (Ptr C_SigningKey, Ptr C_PublicKey))
+    extractKeyMaterial stringSigningKey = do
       cStringSigningKey <- newCString stringSigningKey
       case cStringSigningKey == nullPtr of
         True -> return $ Left SigningKeyAllocation
@@ -111,6 +111,21 @@ ristretto textSigningKey textTokens =
           case signingKey == nullPtr of
             True -> return $ Left SigningKeyDecoding
             False -> do
+              publicKey <- signing_key_get_public_key signingKey
+              case publicKey == nullPtr of
+                True -> return $ Left PublicKeyLookup
+                False -> return $ Right (signingKey, publicKey)
+  in
+    do
+      keys <- extractKeyMaterial stringSigningKey
+      case keys of
+        Left err -> return $ Left err
+        Right (signingKey, publicKey) -> do
+          cStringEncodedPublicKey <- public_key_encode_base64 publicKey
+          case cStringEncodedPublicKey == nullPtr of
+            True -> return $ Left PublicKeyEncoding
+            False -> do
+              encodedPublicKey <- peekCString cStringEncodedPublicKey
               cStringTokens <- mapM newCString stringTokens
               case any (== nullPtr) cStringTokens of
                 True -> return $ Left BlindedTokenAllocation
@@ -129,16 +144,7 @@ ristretto textSigningKey textTokens =
                             False -> do
                               encodedSignedTokens <- mapM peekCString encodedCStringSignedTokens
                               encodedProof <- newEncodedProof blindedTokens signedTokens signingKey
-                              publicKey <- signing_key_get_public_key signingKey
-                              case publicKey == nullPtr of
-                                True -> return $ Left PublicKeyLookup
-                                False -> do
-                                  cStringEncodedPublicKey <- public_key_encode_base64 publicKey
-                                  case cStringEncodedPublicKey == nullPtr of
-                                    True -> return $ Left PublicKeyEncoding
-                                    False -> do
-                                      encodedPublicKey <- peekCString cStringEncodedPublicKey
-                                      return $ Right (pack encodedPublicKey, map pack encodedSignedTokens, pack encodedProof)
+                              return $ Right (pack encodedPublicKey, map pack encodedSignedTokens, pack encodedProof)
 
 
 -- | randomSigningKey generates a new signing key at random and returns it
