@@ -29,6 +29,10 @@ jobs:
       # time of this comment.  We can bump it to a newer version when that
       # makes sense.  Meanwhile, the platform won't shift around beneath us
       # unexpectedly.
+      #
+      # Note CircleCI cannot interpolate environment variables set here into
+      # cache keys.  Therefore, this value is *duplicated* below.  When
+      # changing it, change the value below as well.
       NIXPKGS_REV: "3c83ad6ac13b67101cc3e2e07781963a010c1624"
 
     steps:
@@ -54,11 +58,23 @@ jobs:
           # Read about caching dependencies: https://circleci.com/docs/2.0/caching/
           name: "Restore Nix Store Paths"
           keys:
-            # This doesn't work right.  "<no value>" is interpolated in,
-            # instead of the value for NIXPKGS_REV set above.
+            # Construct cache keys that allow sharing as long as nixpkgs and
+            # the Ristretto library are the same.
             #
-            # https://github.com/PrivateStorageio/PaymentServer/issues/15
-            - paymentserver-nix-store-v1-{{ .Environment.NIXPKGS_REV }}
+            # If the Ristretto library changes, we have to rebuild it so we
+            # may as well throw away the part of the cache with the old build
+            # and make a new one with the new build so we don't have to
+            # rebuild it *again* next time.
+            #
+            # If nixpkgs changes then potentially a lot of cached packages for
+            # the base system will be invalidated so we may as well drop them
+            # and make a new cache with the new packages.
+            #
+            # Note: The literal hash here must match NIXPKGS_REV set above.
+            # CircleCI doesn't let us interpolate that value so we *duplicate*
+            # it instead.
+            - paymentserver-nix-store-v1-3c83ad6ac13b67101cc3e2e07781963a010c1624-{{ checksum "ristretto.nix" }}
+            - paymentserver-nix-store-v1-3c83ad6ac13b67101cc3e2e07781963a010c1624-
             - paymentserver-nix-store-v1-
 
       # Get *our* source code.
