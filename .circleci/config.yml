@@ -29,10 +29,6 @@ jobs:
       # time of this comment.  We can bump it to a newer version when that
       # makes sense.  Meanwhile, the platform won't shift around beneath us
       # unexpectedly.
-      #
-      # Note CircleCI cannot interpolate environment variables set here into
-      # cache keys.  Therefore, this value is *duplicated* below.  When
-      # changing it, change the value below as well.
       NIXPKGS_REV: "3c83ad6ac13b67101cc3e2e07781963a010c1624"
 
     steps:
@@ -50,6 +46,15 @@ jobs:
       - "checkout"
 
       - "run":
+          # CircleCI won't let us interpolate NIXPKGS_REV into a cache key.
+          # Only CircleCI's own environment variables or variables set via the
+          # web interface in a "context" can be interpolated into cache keys.
+          # However, we can interpolate the checksum of a file...  Since we
+          # don't care about the exact revision, we just care that a new
+          # revision gives us a new string, we can write the revision to a
+          # file and then put the checksum of that file into the cache key.
+          # This way, we don't have to maintain the nixpkgs revision in two
+          # places and risk having them desynchronize.
           name: "Prepare For Cache Key"
           command: |
             echo "${NIXPKGS_REV}" > nixpkgs.rev
@@ -77,10 +82,6 @@ jobs:
             # If nixpkgs changes then potentially a lot of cached packages for
             # the base system will be invalidated so we may as well drop them
             # and make a new cache with the new packages.
-            #
-            # Note: The literal hash here must match NIXPKGS_REV set above.
-            # CircleCI doesn't let us interpolate that value so we *duplicate*
-            # it instead.
             - paymentserver-nix-store-v1-{{ checksum "nixpkgs.rev" }}-{{ checksum "ristretto.nix" }}
             - paymentserver-nix-store-v1-{{ checksum "nixpkgs.rev" }}-
             - paymentserver-nix-store-v1-
