@@ -49,6 +49,11 @@ jobs:
       # Get *our* source code.
       - "checkout"
 
+      - "run":
+          name: "Prepare For Cache Key"
+          command: |
+            echo "${NIXPKGS_REV}" > nixpkgs.rev
+
       - restore_cache:
           # Get all of Nix's state relating to the particular revision of
           # nixpkgs we're using.  It will always be the same.  CircleCI
@@ -76,8 +81,8 @@ jobs:
             # Note: The literal hash here must match NIXPKGS_REV set above.
             # CircleCI doesn't let us interpolate that value so we *duplicate*
             # it instead.
-            - paymentserver-nix-store-v1-3c83ad6ac13b67101cc3e2e07781963a010c1624-{{ checksum "ristretto.nix" }}
-            - paymentserver-nix-store-v1-3c83ad6ac13b67101cc3e2e07781963a010c1624-
+            - paymentserver-nix-store-v1-{{ checksum "nixpkgs.rev" }}-{{ checksum "ristretto.nix" }}
+            - paymentserver-nix-store-v1-{{ checksum "nixpkgs.rev" }}-
             - paymentserver-nix-store-v1-
 
       - restore_cache:
