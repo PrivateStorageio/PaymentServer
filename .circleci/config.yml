@@ -157,7 +157,7 @@ jobs:
 
       - save_cache:
           name: "Cache Nix Store Paths"
-          key: paymentserver-nix-store-v1-{{ .Environment.NIXPKGS_REV }}
+          key: paymentserver-nix-store-v1-{{ checksum "nixpkgs.rev" }}-{{ checksum "ristretto.nix" }}
           paths:
             - "/nix"
 
