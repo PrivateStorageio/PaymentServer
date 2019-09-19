@@ -19,6 +19,7 @@ import PaymentServer.Ristretto
 
 import Data.Text
   ( Text
+  , pack
   )
 
 -- | A private key for signing.
@@ -46,13 +47,13 @@ data ChallengeBypass =
 -- | An issuer accepts a list of blinded tokens and returns signatures of
 -- those tokens along with proof that it used a particular key to construct
 -- the signatures.
-type Issuer = [BlindedToken] -> IO (Maybe ChallengeBypass)
+type Issuer = [BlindedToken] -> (Either Text ChallengeBypass)
 
 -- | trivialIssue makes up and returns some nonsense values that satisfy the
 -- structural requirements but not the semantic ones.
 trivialIssue :: Issuer
 trivialIssue tokens =
-  return . Just $
+  Right $
   ChallengeBypass
   "fake-public-key"
   (replicate (length tokens) "fake-signature")
@@ -67,7 +68,5 @@ ristrettoIssue
 ristrettoIssue signingKey tokens = do
   let issuance = ristretto signingKey tokens
   case issuance of
-    Right (publicKey, tokens, proof) -> return . Just $ ChallengeBypass publicKey tokens proof
-    Left err -> do
-      putStrLn . show $ err
-      return Nothing
+    Right (publicKey, tokens, proof) -> Right $ ChallengeBypass publicKey tokens proof
+    Left err -> Left . pack . show $ err
