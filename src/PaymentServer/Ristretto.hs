@@ -11,6 +11,9 @@ import Control.Exception
   ( bracket
   , assert
   )
+import System.IO.Unsafe
+  ( unsafePerformIO
+  )
 import Data.Text
   ( Text
   , unpack
@@ -85,7 +88,7 @@ data RistrettoFailure
 ristretto
   :: Text                                  -- ^ The base64 encoded signing key.
   -> [Text]                                -- ^ A list of the base64 blinded tokens.
-  -> IO (Either RistrettoFailure Issuance) -- ^ Left for an error, otherwise
+  -> (Either RistrettoFailure Issuance)    -- ^ Left for an error, otherwise
                                            -- Right with the ristretto results
 ristretto textSigningKey textTokens =
   let
@@ -116,7 +119,7 @@ ristretto textSigningKey textTokens =
                 True -> return $ Left PublicKeyLookup
                 False -> return $ Right (signingKey, publicKey)
   in
-    do
+    unsafePerformIO $ do
       keys <- extractKeyMaterial stringSigningKey
       case keys of
         Left err -> return $ Left err

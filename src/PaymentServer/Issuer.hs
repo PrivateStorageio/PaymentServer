@@ -65,7 +65,7 @@ ristrettoIssue
   :: SigningKey    -- ^ The key to provide to the PrivacyPass signer.
   -> Issuer        -- ^ An issuer using the given key.
 ristrettoIssue signingKey tokens = do
-  issuance <- ristretto signingKey tokens
+  let issuance = ristretto signingKey tokens
   case issuance of
     Right (publicKey, tokens, proof) -> return . Just $ ChallengeBypass publicKey tokens proof
     Left err -> do
