@@ -63,10 +63,10 @@ foreign import ccall "batch_dleq_proof_destroy" batch_dleq_proof_destroy :: Ptr 
 
 -- | Private type to represent the return value of ristretto.
 type Issuance =
-  ( Text         -- |^ The base64-encoded public key corresponding to the
+  ( Text         -- ^ The base64-encoded public key corresponding to the
                  -- signing key which generated the signatures.
-  , [Text]       -- |^ A list of base64-encoded token signatures.
-  , Text         -- |^ The base64-encoded batch DLEQ proof that the signatures
+  , [Text]       -- ^ A list of base64-encoded token signatures.
+  , Text         -- ^ The base64-encoded batch DLEQ proof that the signatures
                  -- were made with the signing key corresponding to the public
                  -- key.
   )
