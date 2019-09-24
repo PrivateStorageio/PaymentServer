@@ -3,7 +3,8 @@
 {-# LANGUAGE EmptyDataDecls #-}
 
 module PaymentServer.Ristretto
-  ( randomSigningKey
+  ( Issuance(Issuance)
+  , randomSigningKey
   , ristretto
   ) where
 
@@ -62,14 +63,15 @@ foreign import ccall "batch_dleq_proof_encode_base64" batch_dleq_proof_encode_ba
 foreign import ccall "batch_dleq_proof_destroy" batch_dleq_proof_destroy :: Ptr C_BatchDLEQProof -> IO ()
 
 -- | Private type to represent the return value of ristretto.
-type Issuance =
-  ( Text         -- ^ The base64-encoded public key corresponding to the
-                 -- signing key which generated the signatures.
-  , [Text]       -- ^ A list of base64-encoded token signatures.
-  , Text         -- ^ The base64-encoded batch DLEQ proof that the signatures
-                 -- were made with the signing key corresponding to the public
-                 -- key.
-  )
+data Issuance =
+  Issuance
+  { publicKey  :: Text   -- ^ The base64-encoded public key corresponding to the
+                         -- signing key which generated the signatures.
+  , signatures :: [Text] -- ^ A list of base64-encoded token signatures.
+  , proof      :: Text   -- ^ The base64-encoded batch DLEQ proof that the signatures
+                         -- were made with the signing key corresponding to the public
+                         -- key.
+  }
 
 data RistrettoFailure
   = SigningKeyAllocation
@@ -147,7 +149,7 @@ ristretto textSigningKey textTokens =
                             False -> do
                               encodedSignedTokens <- mapM peekCString encodedCStringSignedTokens
                               encodedProof <- newEncodedProof blindedTokens signedTokens signingKey
-                              return $ Right (pack encodedPublicKey, map pack encodedSignedTokens, pack encodedProof)
+                              return . Right $ Issuance (pack encodedPublicKey) (map pack encodedSignedTokens) (pack encodedProof)
 
 
 -- | randomSigningKey generates a new signing key at random and returns it

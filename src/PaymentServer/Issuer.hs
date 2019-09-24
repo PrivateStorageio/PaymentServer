@@ -14,7 +14,8 @@ module PaymentServer.Issuer
   ) where
 
 import PaymentServer.Ristretto
-  ( ristretto
+  ( Issuance(Issuance)
+  , ristretto
   )
 
 import Data.Text
@@ -68,5 +69,5 @@ ristrettoIssue
 ristrettoIssue signingKey tokens = do
   let issuance = ristretto signingKey tokens
   case issuance of
-    Right (publicKey, tokens, proof) -> Right $ ChallengeBypass publicKey tokens proof
+    Right (Issuance publicKey tokens proof) -> Right $ ChallengeBypass publicKey tokens proof
     Left err -> Left . pack . show $ err
