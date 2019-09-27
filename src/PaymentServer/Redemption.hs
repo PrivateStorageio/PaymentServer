@@ -21,6 +21,7 @@ import Control.Monad.IO.Class
 import Data.Text
   ( pack
   )
+import qualified Data.Text.IO as TextIO
 import Data.Text.Encoding
   ( encodeUtf8
   )
@@ -54,6 +55,7 @@ import Crypto.Hash
   )
 import PaymentServer.Persistence
   ( VoucherDatabase(redeemVoucher)
+  , RedeemError(NotPaid, AlreadyRedeemed)
   , Fingerprint
   , Voucher
   )
@@ -122,12 +124,20 @@ redeem issue database (Redeem voucher tokens) = do
   let fingerprint = fingerprintFromTokens tokens
   result <- liftIO $ PaymentServer.Persistence.redeemVoucher database voucher fingerprint
   case result of
-    Left err -> throwError jsonErr400
-    Right () ->
-      let
-        (ChallengeBypass key signatures proof) = issue tokens
-      in
-        return $ Succeeded key signatures proof
+    Left NotPaid -> do
+      liftIO $ putStrLn "Attempt to redeem unpaid voucher"
+      throwError jsonErr400
+    Left AlreadyRedeemed -> do
+      liftIO $ putStrLn "Attempt to double-spend paid voucher"
+      throwError jsonErr400
+    Right () -> do
+      let result = issue tokens
+      case result of
+        Left reason -> do
+          liftIO $ TextIO.putStrLn reason
+          throwError jsonErr400
+        Right (ChallengeBypass key signatures proof) ->
+          return $ Succeeded key signatures proof
 
 -- | Compute a cryptographic hash (fingerprint) of a list of tokens which can
 -- be used as an identifier for this exact sequence of tokens.
