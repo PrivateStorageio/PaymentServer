@@ -48,7 +48,7 @@ data ChallengeBypass =
 -- | An issuer accepts a list of blinded tokens and returns signatures of
 -- those tokens along with proof that it used a particular key to construct
 -- the signatures.
-type Issuer = [BlindedToken] -> (Either Text ChallengeBypass)
+type Issuer = [BlindedToken] -> Either Text ChallengeBypass
 
 -- | trivialIssue makes up and returns some nonsense values that satisfy the
 -- structural requirements but not the semantic ones.

@@ -111,11 +111,11 @@ main =
       case (issuer, signingKey) of
         (Trivial, Nothing) -> Right trivialIssue
         (Ristretto, Just key) -> Right $ ristrettoIssue key
-        otherwise -> Left "invalid options"
+        _ -> Left "invalid options"
     getDatabase ServerConfig{ database, databasePath } =
       case (database, databasePath) of
         (Memory, Nothing) -> Right memory
-        otherwise -> Left "invalid options"
+        _ -> Left "invalid options"
   in do
     config <- execParser opts
     case getIssuer config of

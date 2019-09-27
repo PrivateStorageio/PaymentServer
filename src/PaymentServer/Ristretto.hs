@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE EmptyDataDecls #-}
 
@@ -90,7 +89,7 @@ data RistrettoFailure
 ristretto
   :: Text                                  -- ^ The base64 encoded signing key.
   -> [Text]                                -- ^ A list of the base64 blinded tokens.
-  -> (Either RistrettoFailure Issuance)    -- ^ Left for an error, otherwise
+  -> Either RistrettoFailure Issuance      -- ^ Left for an error, otherwise
                                            -- Right with the ristretto results
 ristretto textSigningKey textTokens =
   let
@@ -109,17 +108,17 @@ ristretto textSigningKey textTokens =
     extractKeyMaterial :: String -> IO (Either RistrettoFailure (Ptr C_SigningKey, Ptr C_PublicKey))
     extractKeyMaterial stringSigningKey = do
       cStringSigningKey <- newCString stringSigningKey
-      case cStringSigningKey == nullPtr of
-        True -> return $ Left SigningKeyAllocation
-        False -> do
+      if cStringSigningKey == nullPtr
+        then return $ Left SigningKeyAllocation
+        else do
           signingKey <- signing_key_decode_base64 cStringSigningKey
-          case signingKey == nullPtr of
-            True -> return $ Left SigningKeyDecoding
-            False -> do
+          if signingKey == nullPtr
+            then return $ Left SigningKeyDecoding
+            else do
               publicKey <- signing_key_get_public_key signingKey
-              case publicKey == nullPtr of
-                True -> return $ Left PublicKeyLookup
-                False -> return $ Right (signingKey, publicKey)
+              if publicKey == nullPtr
+                then return $ Left PublicKeyLookup
+                else return $ Right (signingKey, publicKey)
   in
     unsafePerformIO $ do
       keys <- extractKeyMaterial stringSigningKey
@@ -127,26 +126,26 @@ ristretto textSigningKey textTokens =
         Left err -> return $ Left err
         Right (signingKey, publicKey) -> do
           cStringEncodedPublicKey <- public_key_encode_base64 publicKey
-          case cStringEncodedPublicKey == nullPtr of
-            True -> return $ Left PublicKeyEncoding
-            False -> do
+          if cStringEncodedPublicKey == nullPtr
+            then return $ Left PublicKeyEncoding
+            else do
               encodedPublicKey <- peekCString cStringEncodedPublicKey
               cStringTokens <- mapM newCString stringTokens
-              case any (== nullPtr) cStringTokens of
-                True -> return $ Left BlindedTokenAllocation
-                False -> do
+              if nullPtr `elem` cStringTokens
+                then return $ Left BlindedTokenAllocation
+                else do
                   blindedTokens <- mapM blinded_token_decode_base64 cStringTokens
-                  case any (== nullPtr) blindedTokens of
-                    True -> return $ Left BlindedTokenDecoding
-                    False -> do
+                  if nullPtr `elem` blindedTokens
+                    then return $ Left BlindedTokenDecoding
+                    else do
                       signedTokens <- mapM (signing_key_sign signingKey) blindedTokens
-                      case any (== nullPtr) signedTokens of
-                        True -> return $ Left TokenSigning
-                        False -> do
+                      if nullPtr `elem` signedTokens
+                        then return $ Left TokenSigning
+                        else do
                           encodedCStringSignedTokens <- mapM signed_token_encode_base64 signedTokens
-                          case any (== nullPtr) encodedCStringSignedTokens of
-                            True -> return $ Left SignedTokenEncoding
-                            False -> do
+                          if nullPtr `elem` encodedCStringSignedTokens
+                            then return $ Left SignedTokenEncoding
+                            else do
                               encodedSignedTokens <- mapM peekCString encodedCStringSignedTokens
                               encodedProof <- newEncodedProof blindedTokens signedTokens signingKey
                               return . Right $ Issuance (pack encodedPublicKey) (map pack encodedSignedTokens) (pack encodedProof)
