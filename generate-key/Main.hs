@@ -1,3 +1,4 @@
+-- | Generate a random Ristretto-flavored PrivacyPass signing key.
 module Main
   ( main
   ) where
