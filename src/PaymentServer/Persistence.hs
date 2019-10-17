@@ -14,6 +14,7 @@ import Control.Monad
   )
 import Data.Text
   ( Text
+  , unpack
   )
 import qualified Data.Set as Set
 import qualified Data.Map as Map
@@ -116,7 +117,7 @@ instance VoucherDatabase Sqlite.Connection where
     undefined
   -- redeemVoucher :: Sqlite.Connection -> Voucher -> Fingerprint -> IO (Either RedeemError ())
   redeemVoucher dbConn voucher fingerprint = do
-    unpaid <- Set.notMember voucher <$> getPaidVouchers dbConn
+    unpaid <- Set.notMember voucher <$> (Set.fromList <$> getUnredeemedVouchers dbConn)
     existingFingerprint <- getVoucherFingerprint dbConn voucher
     case (unpaid, existingFingerprint) of
       (True, _) ->
@@ -133,9 +134,10 @@ instance VoucherDatabase Sqlite.Connection where
 instance FromRow Fingerprint where
   fromRow = Sqlite.field
 
-getPaidVouchers :: Sqlite.Connection -> IO (Set.Set Voucher)
-getPaidVouchers dbConn = Set.fromList <$>
-  Sqlite.query_ dbConn "SELECT DISTINCT name FROM vouchers"
+-- | Paid but not redeemed
+getUnredeemedVouchers :: Sqlite.Connection -> IO [Voucher]
+getUnredeemedVouchers dbConn =
+  Sqlite.query_ dbConn "SELECT DISTINCT NAME FROM vouchers INNER JOIN redeemed_new WHERE vouchers.id != redeemed.voucher_id"
 
 getVoucherFingerprint :: Sqlite.Connection -> Voucher -> IO [Fingerprint]
 getVoucherFingerprint dbConn voucher = do
@@ -143,6 +145,6 @@ getVoucherFingerprint dbConn voucher = do
 
 getDBConnection :: Text -> IO ()
 getDBConnection name = do
-  dbConn <- Sqlite.open name
-  Sqlite.execute_ dbConn "CREATE TABLE IF NOT EXISTS vouchers (id INTEGER PRIMARY KEY, name TEXT)"
+  dbConn <- Sqlite.open (unpack name)
+  Sqlite.execute_ dbConn "CREATE TABLE IF NOT EXISTS vouchers (id INTEGER PRIMARY KEY, name TEXT UNIQUE"
   Sqlite.execute_ dbConn "CREATE TABLE IF NOT EXISTS redeemed (id INTEGER PRIMARY KEY, voucher_id INTEGER, fingerprint TEXT, FOREIGN KEY (voucher_id) REFERENCES vouchers(id))"
