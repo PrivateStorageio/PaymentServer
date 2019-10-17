@@ -144,5 +144,5 @@ getVoucherFingerprint dbConn voucher = do
 getDBConnection :: Text -> IO ()
 getDBConnection name = do
   dbConn <- Sqlite.open name
-  Sqlite.execute_ dbConn "CREATE TABLE vouchers (id INTEGER PRIMARY KEY, name TEXT)"
-  Sqlite.execute_ dbConn "CREATE TABLE redeemed (id INTEGER PRIMARY KEY, voucher_id INTEGER, fingerprint TEXT, FOREIGN KEY (voucher_id) REFERENCES vouchers(id))"
+  Sqlite.execute_ dbConn "CREATE TABLE IF NOT EXISTS vouchers (id INTEGER PRIMARY KEY, name TEXT)"
+  Sqlite.execute_ dbConn "CREATE TABLE IF NOT EXISTS redeemed (id INTEGER PRIMARY KEY, voucher_id INTEGER, fingerprint TEXT, FOREIGN KEY (voucher_id) REFERENCES vouchers(id))"
