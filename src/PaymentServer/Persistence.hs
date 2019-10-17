@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 module PaymentServer.Persistence
   ( Voucher
   , Fingerprint
@@ -20,6 +22,10 @@ import Data.IORef
   , newIORef
   , modifyIORef
   , readIORef
+  )
+import qualified Database.SQLite.Simple as Sqlite
+import           Database.SQLite.Simple.FromRow
+  ( FromRow(fromRow)
   )
 
 -- | A voucher is a unique identifier which can be associated with a payment.
@@ -103,3 +109,34 @@ memory = do
   paid <- newIORef mempty
   redeemed <- newIORef mempty
   return $ Memory paid redeemed
+
+instance VoucherDatabase Sqlite.Connection where
+  -- payForVoucher :: Sqlite.Connection -> Voucher -> IO ()
+  payForVoucher dbConn voucher = do
+    undefined
+  -- redeemVoucher :: Sqlite.Connection -> Voucher -> Fingerprint -> IO (Either RedeemError ())
+  redeemVoucher dbConn voucher fingerprint = do
+    unpaid <- Set.notMember voucher <$> getPaidVouchers dbConn
+    existingFingerprint <- getVoucherFingerprint dbConn voucher
+    case (unpaid, existingFingerprint) of
+      (True, _) ->
+        return $ Left NotPaid
+      (False, []) ->
+        -- TODO: insert voucher and fingerprint into the redeemed table
+        return $ Right ()
+      (False, [fingerprint']) ->
+        if fingerprint == fingerprint' then
+          return $ Right ()
+        else
+          return $ Left AlreadyRedeemed
+
+instance FromRow Fingerprint where
+  fromRow = Sqlite.field
+
+getPaidVouchers :: Sqlite.Connection -> IO (Set.Set Voucher)
+getPaidVouchers dbConn = Set.fromList <$>
+  Sqlite.query_ dbConn "SELECT DISTINCT name FROM vouchers"
+
+getVoucherFingerprint :: Sqlite.Connection -> Voucher -> IO [Fingerprint]
+getVoucherFingerprint dbConn voucher = do
+  Sqlite.query dbConn "SELECT redeemed.fingerprint FROM vouchers INNER JOIN redeemed ON vouchers.id = redeemed.voucher_id AND vouchers.name = ?" (Sqlite.Only voucher)
