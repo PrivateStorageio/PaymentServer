@@ -140,3 +140,9 @@ getPaidVouchers dbConn = Set.fromList <$>
 getVoucherFingerprint :: Sqlite.Connection -> Voucher -> IO [Fingerprint]
 getVoucherFingerprint dbConn voucher = do
   Sqlite.query dbConn "SELECT redeemed.fingerprint FROM vouchers INNER JOIN redeemed ON vouchers.id = redeemed.voucher_id AND vouchers.name = ?" (Sqlite.Only voucher)
+
+getDBConnection :: Text -> IO ()
+getDBConnection name = do
+  dbConn <- Sqlite.open name
+  Sqlite.execute_ dbConn "CREATE TABLE vouchers (id INTEGER PRIMARY KEY, name TEXT)"
+  Sqlite.execute_ dbConn "CREATE TABLE redeemed (id INTEGER PRIMARY KEY, voucher_id INTEGER, fingerprint TEXT, FOREIGN KEY (voucher_id) REFERENCES vouchers(id))"
