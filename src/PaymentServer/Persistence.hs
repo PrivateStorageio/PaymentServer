@@ -117,7 +117,7 @@ instance VoucherDatabase Sqlite.Connection where
     undefined
   -- redeemVoucher :: Sqlite.Connection -> Voucher -> Fingerprint -> IO (Either RedeemError ())
   redeemVoucher dbConn voucher fingerprint = do
-    unpaid <- Set.notMember voucher <$> (Set.fromList <$> getUnredeemedVouchers dbConn)
+    unpaid <- isVoucherUnpaid dbConn voucher
     existingFingerprint <- getVoucherFingerprint dbConn voucher
     case (unpaid, existingFingerprint) of
       (True, _) ->
@@ -135,11 +135,7 @@ instance FromRow Fingerprint where
   fromRow = Sqlite.field
 
 
--- | All paid but not redeemed vouchers
-getUnredeemedVouchers :: Sqlite.Connection -> IO [Voucher]
-getUnredeemedVouchers dbConn =
-  Sqlite.query_ dbConn "SELECT DISTINCT name FROM vouchers INNER JOIN redeemed WHERE vouchers.id != redeemed.voucher_id"
-
+-- | Checks if the given `voucher` is unpaid.
 isVoucherUnpaid :: Sqlite.Connection -> Voucher -> IO Bool
 isVoucherUnpaid dbConn voucher = do
   results <- Sqlite.query dbConn "SELECT DISTINCT name FROM vouchers INNER JOIN redeemed WHERE vouchers.id != redeemed.voucher_id AND vouchers.name = ?" (Sqlite.Only voucher) :: IO [Voucher]
