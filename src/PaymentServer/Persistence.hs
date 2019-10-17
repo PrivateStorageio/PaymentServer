@@ -134,10 +134,16 @@ instance VoucherDatabase Sqlite.Connection where
 instance FromRow Fingerprint where
   fromRow = Sqlite.field
 
--- | Paid but not redeemed
+
+-- | All paid but not redeemed vouchers
 getUnredeemedVouchers :: Sqlite.Connection -> IO [Voucher]
 getUnredeemedVouchers dbConn =
-  Sqlite.query_ dbConn "SELECT DISTINCT NAME FROM vouchers INNER JOIN redeemed_new WHERE vouchers.id != redeemed.voucher_id"
+  Sqlite.query_ dbConn "SELECT DISTINCT name FROM vouchers INNER JOIN redeemed WHERE vouchers.id != redeemed.voucher_id"
+
+isVoucherUnpaid :: Sqlite.Connection -> Voucher -> IO Bool
+isVoucherUnpaid dbConn voucher = do
+  results <- Sqlite.query dbConn "SELECT DISTINCT name FROM vouchers INNER JOIN redeemed WHERE vouchers.id != redeemed.voucher_id AND vouchers.name = ?" (Sqlite.Only voucher) :: IO [Voucher]
+  return (results == [])
 
 getVoucherFingerprint :: Sqlite.Connection -> Voucher -> IO [Fingerprint]
 getVoucherFingerprint dbConn voucher = do
