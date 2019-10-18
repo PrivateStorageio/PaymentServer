@@ -113,8 +113,7 @@ memory = do
 
 instance VoucherDatabase Sqlite.Connection where
   -- payForVoucher :: Sqlite.Connection -> Voucher -> IO ()
-  payForVoucher dbConn voucher = do
-    undefined
+  payForVoucher = insertVoucher
   -- redeemVoucher :: Sqlite.Connection -> Voucher -> Fingerprint -> IO (Either RedeemError ())
   redeemVoucher dbConn voucher fingerprint = do
     unpaid <- isVoucherUnpaid dbConn voucher
@@ -144,6 +143,10 @@ isVoucherUnpaid dbConn voucher = do
 getVoucherFingerprint :: Sqlite.Connection -> Voucher -> IO [Fingerprint]
 getVoucherFingerprint dbConn voucher = do
   Sqlite.query dbConn "SELECT redeemed.fingerprint FROM vouchers INNER JOIN redeemed ON vouchers.id = redeemed.voucher_id AND vouchers.name = ?" (Sqlite.Only voucher)
+
+insertVoucher :: Sqlite.Connection -> Voucher -> IO ()
+insertVoucher dbConn voucher =
+  Sqlite.execute dbConn "INSERT INTO vouchers (name) VALUES (?)" (Sqlite.Only voucher)
 
 getDBConnection :: Text -> IO ()
 getDBConnection name = do
