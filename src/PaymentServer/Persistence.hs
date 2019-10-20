@@ -7,6 +7,12 @@ module PaymentServer.Persistence
   , VoucherDatabase(payForVoucher, redeemVoucher)
   , MemoryVoucherDatabase
   , memory
+  , getDBConnection
+  -- * for testing
+  , isVoucherUnpaid
+  , getVoucherFingerprint
+  , insertVoucher
+  , insertVoucherAndFingerprint
   ) where
 
 import Control.Monad
@@ -121,8 +127,8 @@ instance VoucherDatabase Sqlite.Connection where
     case (unpaid, existingFingerprint) of
       (True, _) ->
         return $ Left NotPaid
-      (False, []) ->
-        -- TODO: insert voucher and fingerprint into the redeemed table
+      (False, []) -> do
+        insertVoucherAndFingerprint dbConn voucher fingerprint
         return $ Right ()
       (False, [fingerprint']) ->
         if fingerprint == fingerprint' then
@@ -130,9 +136,9 @@ instance VoucherDatabase Sqlite.Connection where
         else
           return $ Left AlreadyRedeemed
 
+
 instance FromRow Fingerprint where
   fromRow = Sqlite.field
-
 
 -- | Checks if the given `voucher` is unpaid.
 isVoucherUnpaid :: Sqlite.Connection -> Voucher -> IO Bool
@@ -148,8 +154,13 @@ insertVoucher :: Sqlite.Connection -> Voucher -> IO ()
 insertVoucher dbConn voucher =
   Sqlite.execute dbConn "INSERT INTO vouchers (name) VALUES (?)" (Sqlite.Only voucher)
 
-getDBConnection :: Text -> IO ()
+insertVoucherAndFingerprint :: Sqlite.Connection -> Voucher -> Fingerprint -> IO ()
+insertVoucherAndFingerprint dbConn voucher fingerprint =
+  Sqlite.execute dbConn "INSERT INTO redeemed (voucher_id, fingerprint) VALUES ((SELECT id FROM vouchers_new WHERE name = ?), ?)" (voucher, fingerprint)
+
+getDBConnection :: Text -> IO Sqlite.Connection
 getDBConnection name = do
   dbConn <- Sqlite.open (unpack name)
-  Sqlite.execute_ dbConn "CREATE TABLE IF NOT EXISTS vouchers (id INTEGER PRIMARY KEY, name TEXT UNIQUE"
+  Sqlite.execute_ dbConn "CREATE TABLE IF NOT EXISTS vouchers (id INTEGER PRIMARY KEY, name TEXT UNIQUE)"
   Sqlite.execute_ dbConn "CREATE TABLE IF NOT EXISTS redeemed (id INTEGER PRIMARY KEY, voucher_id INTEGER, fingerprint TEXT, FOREIGN KEY (voucher_id) REFERENCES vouchers(id))"
+  return dbConn
