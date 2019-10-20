@@ -4,6 +4,7 @@ module PaymentServer.Persistence
   ( Voucher
   , Fingerprint
   , RedeemError(NotPaid, AlreadyRedeemed)
+  , Database(Memory, SQLite3)
   , VoucherDatabase(payForVoucher, redeemVoucher)
   , MemoryVoucherDatabase
   , memory
@@ -49,6 +50,11 @@ data RedeemError =
   | AlreadyRedeemed
   deriving (Show, Eq)
 
+data Database =
+  Memory
+  | SQLite3
+  deriving (Show, Eq, Ord, Read)
+
 -- | A fingerprint cryptographically identifies a redemption of a voucher.
 -- When a voucher is redeemed, a number of random tokens are received
 -- alongside it.  These tokens are signed to create ZKAPs to return to the
@@ -82,7 +88,7 @@ class VoucherDatabase d where
 -- even the MemoryVoucherDatabase value).  This is primarily useful for
 -- testing.
 data MemoryVoucherDatabase =
-  Memory {
+  MemoryDB {
     -- | A set of vouchers which have been paid for.
     paid :: IORef (Set.Set Voucher)
     -- | A mapping from redeemed vouchers to fingerprints associated with the
@@ -91,11 +97,11 @@ data MemoryVoucherDatabase =
   }
 
 instance VoucherDatabase MemoryVoucherDatabase where
-  payForVoucher Memory{ paid = paid, redeemed = redeemed } voucher = do
+  payForVoucher MemoryDB{ paid = paid, redeemed = redeemed } voucher = do
     modifyIORef paid (Set.insert voucher)
     return ()
 
-  redeemVoucher Memory{ paid = paid, redeemed = redeemed } voucher fingerprint = do
+  redeemVoucher MemoryDB{ paid = paid, redeemed = redeemed } voucher fingerprint = do
     unpaid <- Set.notMember voucher <$> readIORef paid
     existingFingerprint <- Map.lookup voucher <$> readIORef redeemed
     case (unpaid, existingFingerprint) of
@@ -115,7 +121,7 @@ memory :: IO MemoryVoucherDatabase
 memory = do
   paid <- newIORef mempty
   redeemed <- newIORef mempty
-  return $ Memory paid redeemed
+  return $ MemoryDB paid redeemed
 
 instance VoucherDatabase Sqlite.Connection where
   -- payForVoucher :: Sqlite.Connection -> Voucher -> IO ()

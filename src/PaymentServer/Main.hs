@@ -25,6 +25,7 @@ import Network.Wai.Middleware.RequestLogger
   )
 import PaymentServer.Persistence
   ( memory
+  , Database(Memory, SQLite3)
   )
 import PaymentServer.Issuer
   ( trivialIssue
@@ -63,11 +64,6 @@ data Issuer =
   | Ristretto
   deriving (Show, Eq, Ord, Read)
 
-data Database =
-  Memory
-  | SQLite3
-  deriving (Show, Eq, Ord, Read)
-
 data ServerConfig = ServerConfig
   { issuer       :: Issuer
   , signingKey   :: Maybe Text
@@ -91,7 +87,7 @@ sample = ServerConfig
   ( long "database"
     <> help "Which database to use: sqlite3 or memory"
     <> showDefault
-    <> value Memory )
+    <> value SQLite3 )
   <*> optional ( option str
   ( long "database-path"
     <> help "Path to on-disk database (sqlite3 only)"
