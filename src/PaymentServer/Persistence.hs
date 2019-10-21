@@ -4,9 +4,8 @@ module PaymentServer.Persistence
   ( Voucher
   , Fingerprint
   , RedeemError(NotPaid, AlreadyRedeemed)
-  , Database(Memory, SQLite3)
   , VoucherDatabase(payForVoucher, redeemVoucher)
-  , MemoryVoucherDatabase
+  , VoucherDatabaseState(MemoryDB, SQLiteDB)
   , memory
   , getDBConnection
   -- * for testing
@@ -50,11 +49,6 @@ data RedeemError =
   | AlreadyRedeemed
   deriving (Show, Eq)
 
-data Database =
-  Memory
-  | SQLite3
-  deriving (Show, Eq, Ord, Read)
-
 -- | A fingerprint cryptographically identifies a redemption of a voucher.
 -- When a voucher is redeemed, a number of random tokens are received
 -- alongside it.  These tokens are signed to create ZKAPs to return to the
@@ -87,7 +81,7 @@ class VoucherDatabase d where
 -- in-memory.  The state does not outlive the process which creates it (nor
 -- even the MemoryVoucherDatabase value).  This is primarily useful for
 -- testing.
-data MemoryVoucherDatabase =
+data VoucherDatabaseState =
   MemoryDB {
     -- | A set of vouchers which have been paid for.
     paid :: IORef (Set.Set Voucher)
@@ -95,11 +89,13 @@ data MemoryVoucherDatabase =
     -- redemption.
   , redeemed :: IORef (Map.Map Voucher Fingerprint)
   }
+  | SQLiteDB { conn :: Sqlite.Connection }
 
-instance VoucherDatabase MemoryVoucherDatabase where
+instance VoucherDatabase VoucherDatabaseState where
   payForVoucher MemoryDB{ paid = paid, redeemed = redeemed } voucher = do
     modifyIORef paid (Set.insert voucher)
     return ()
+  payForVoucher SQLiteDB{ conn = conn } voucher = insertVoucher conn voucher
 
   redeemVoucher MemoryDB{ paid = paid, redeemed = redeemed } voucher fingerprint = do
     unpaid <- Set.notMember voucher <$> readIORef paid
@@ -115,26 +111,14 @@ instance VoucherDatabase MemoryVoucherDatabase where
           return $ Right ()
         else
           return $ Left AlreadyRedeemed
-
--- | Create a new, empty MemoryVoucherDatabase.
-memory :: IO MemoryVoucherDatabase
-memory = do
-  paid <- newIORef mempty
-  redeemed <- newIORef mempty
-  return $ MemoryDB paid redeemed
-
-instance VoucherDatabase Sqlite.Connection where
-  -- payForVoucher :: Sqlite.Connection -> Voucher -> IO ()
-  payForVoucher = insertVoucher
-  -- redeemVoucher :: Sqlite.Connection -> Voucher -> Fingerprint -> IO (Either RedeemError ())
-  redeemVoucher dbConn voucher fingerprint = do
-    unpaid <- isVoucherUnpaid dbConn voucher
-    existingFingerprint <- getVoucherFingerprint dbConn voucher
+  redeemVoucher SQLiteDB { conn = conn } voucher fingerprint = do
+    unpaid <- isVoucherUnpaid conn voucher
+    existingFingerprint <- getVoucherFingerprint conn voucher
     case (unpaid, existingFingerprint) of
       (True, _) ->
         return $ Left NotPaid
       (False, []) -> do
-        insertVoucherAndFingerprint dbConn voucher fingerprint
+        insertVoucherAndFingerprint conn voucher fingerprint
         return $ Right ()
       (False, [fingerprint']) ->
         if fingerprint == fingerprint' then
@@ -142,6 +126,13 @@ instance VoucherDatabase Sqlite.Connection where
         else
           return $ Left AlreadyRedeemed
 
+
+-- | Create a new, empty MemoryVoucherDatabase.
+memory :: IO VoucherDatabaseState
+memory = do
+  paid <- newIORef mempty
+  redeemed <- newIORef mempty
+  return $ MemoryDB paid redeemed
 
 instance FromRow Fingerprint where
   fromRow = Sqlite.field
@@ -164,9 +155,9 @@ insertVoucherAndFingerprint :: Sqlite.Connection -> Voucher -> Fingerprint -> IO
 insertVoucherAndFingerprint dbConn voucher fingerprint =
   Sqlite.execute dbConn "INSERT INTO redeemed (voucher_id, fingerprint) VALUES ((SELECT id FROM vouchers_new WHERE name = ?), ?)" (voucher, fingerprint)
 
-getDBConnection :: Text -> IO Sqlite.Connection
+getDBConnection :: Text -> IO VoucherDatabaseState
 getDBConnection name = do
   dbConn <- Sqlite.open (unpack name)
   Sqlite.execute_ dbConn "CREATE TABLE IF NOT EXISTS vouchers (id INTEGER PRIMARY KEY, name TEXT UNIQUE)"
   Sqlite.execute_ dbConn "CREATE TABLE IF NOT EXISTS redeemed (id INTEGER PRIMARY KEY, voucher_id INTEGER, fingerprint TEXT, FOREIGN KEY (voucher_id) REFERENCES vouchers(id))"
-  return dbConn
+  return $ SQLiteDB dbConn
