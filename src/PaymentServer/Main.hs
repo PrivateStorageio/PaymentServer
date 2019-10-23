@@ -92,7 +92,7 @@ sample = ServerConfig
   ( long "database"
     <> help "Which database to use: sqlite3 or memory"
     <> showDefault
-    <> value SQLite3 )
+    <> value Memory )
   <*> optional ( option str
   ( long "database-path"
     <> help "Path to on-disk database (sqlite3 only)"
