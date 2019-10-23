@@ -108,7 +108,7 @@ instance VoucherDatabase VoucherDatabaseState where
     redeemVoucherHelper (unpaid, existingFingerprint) voucher fingerprint insertFn
 
 redeemVoucherHelper :: (Bool, Maybe Fingerprint) -> Voucher -> Fingerprint -> (Voucher -> Fingerprint -> IO ()) -> IO (Either RedeemError ())
-redeemVoucherHelper (unpaid, existingFingerprint) voucher fingerprint insertFn = do
+redeemVoucherHelper (unpaid, existingFingerprint) voucher fingerprint insertFn =
   case (unpaid, existingFingerprint) of
     (True, _) ->
       return $ Left NotPaid
