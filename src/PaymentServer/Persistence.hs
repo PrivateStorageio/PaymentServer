@@ -98,7 +98,7 @@ instance VoucherDatabase VoucherDatabaseState where
   redeemVoucher MemoryDB{ paid = paid, redeemed = redeemed } voucher fingerprint = do
     unpaid <- Set.notMember voucher <$> readIORef paid
     existingFingerprint <- Map.lookup voucher <$> readIORef redeemed
-    let insertFn voucher fingerprint = modifyIORef redeemed (Map.insert voucher fingerprint)
+    let insertFn = (modifyIORef redeemed .) . Map.insert
     redeemVoucherHelper (unpaid, existingFingerprint) voucher fingerprint insertFn
 
   redeemVoucher SQLiteDB { conn = conn } voucher fingerprint = do
