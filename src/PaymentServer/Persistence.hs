@@ -26,6 +26,9 @@ import qualified Database.SQLite.Simple as Sqlite
 import           Database.SQLite.Simple.FromRow
   ( FromRow(fromRow)
   )
+import Data.Maybe
+  ( listToMaybe
+  )
 
 -- | A voucher is a unique identifier which can be associated with a payment.
 -- A paid voucher can be redeemed for ZKAPs which can themselves be exchanged
@@ -95,32 +98,28 @@ instance VoucherDatabase VoucherDatabaseState where
   redeemVoucher MemoryDB{ paid = paid, redeemed = redeemed } voucher fingerprint = do
     unpaid <- Set.notMember voucher <$> readIORef paid
     existingFingerprint <- Map.lookup voucher <$> readIORef redeemed
-    case (unpaid, existingFingerprint) of
-      (True, _) ->
-        return $ Left NotPaid
-      (False, Nothing) -> do
-        modifyIORef redeemed (Map.insert voucher fingerprint)
-        return $ Right ()
-      (False, Just fingerprint') ->
-        if fingerprint == fingerprint' then
-          return $ Right ()
-        else
-          return $ Left AlreadyRedeemed
+    let insertFn voucher fingerprint = modifyIORef redeemed (Map.insert voucher fingerprint)
+    redeemVoucherHelper (unpaid, existingFingerprint) voucher fingerprint insertFn
+
   redeemVoucher SQLiteDB { conn = conn } voucher fingerprint = do
     unpaid <- isVoucherUnpaid conn voucher
-    existingFingerprint <- getVoucherFingerprint conn voucher
-    case (unpaid, existingFingerprint) of
-      (True, _) ->
-        return $ Left NotPaid
-      (False, []) -> do
-        insertVoucherAndFingerprint conn voucher fingerprint
-        return $ Right ()
-      (False, [fingerprint']) ->
-        if fingerprint == fingerprint' then
-          return $ Right ()
-        else
-          return $ Left AlreadyRedeemed
+    existingFingerprint <- listToMaybe <$> getVoucherFingerprint conn voucher
+    let insertFn = insertVoucherAndFingerprint conn
+    redeemVoucherHelper (unpaid, existingFingerprint) voucher fingerprint insertFn
 
+redeemVoucherHelper :: (Bool, Maybe Fingerprint) -> Voucher -> Fingerprint -> (Voucher -> Fingerprint -> IO ()) -> IO (Either RedeemError ())
+redeemVoucherHelper (unpaid, existingFingerprint) voucher fingerprint insertFn = do
+  case (unpaid, existingFingerprint) of
+    (True, _) ->
+      return $ Left NotPaid
+    (False, Nothing) -> do
+      insertFn voucher fingerprint
+      return $ Right ()
+    (False, Just fingerprint') ->
+      if fingerprint == fingerprint' then
+        return $ Right ()
+      else
+        return $ Left AlreadyRedeemed
 
 -- | Create a new, empty MemoryVoucherDatabase.
 memory :: IO VoucherDatabaseState
