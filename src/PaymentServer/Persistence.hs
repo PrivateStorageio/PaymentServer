@@ -101,7 +101,7 @@ instance VoucherDatabase VoucherDatabaseState where
     let insertFn = (modifyIORef redeemed .) . Map.insert
     redeemVoucherHelper (unpaid, existingFingerprint) voucher fingerprint insertFn
 
-  redeemVoucher SQLiteDB { conn = conn } voucher fingerprint = do
+  redeemVoucher SQLiteDB { conn = conn } voucher fingerprint = Sqlite.withExclusiveTransaction conn $ do
     unpaid <- isVoucherUnpaid conn voucher
     existingFingerprint <- getVoucherFingerprint conn voucher
     let insertFn = insertVoucherAndFingerprint conn
