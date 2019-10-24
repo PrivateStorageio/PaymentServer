@@ -146,7 +146,7 @@ insertVoucher dbConn voucher =
 
 insertVoucherAndFingerprint :: Sqlite.Connection -> Voucher -> Fingerprint -> IO ()
 insertVoucherAndFingerprint dbConn voucher fingerprint =
-  Sqlite.execute dbConn "INSERT INTO redeemed (voucher_id, fingerprint) VALUES ((SELECT id FROM vouchers_new WHERE name = ?), ?)" (voucher, fingerprint)
+  Sqlite.execute dbConn "INSERT INTO redeemed (voucher_id, fingerprint) VALUES ((SELECT id FROM vouchers WHERE name = ?), ?)" (voucher, fingerprint)
 
 -- | create and open a database with a given `name` and create the `voucher` table
 -- and `redeemed` table with the provided schema
