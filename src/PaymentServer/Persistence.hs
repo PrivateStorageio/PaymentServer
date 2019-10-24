@@ -151,8 +151,8 @@ insertVoucherAndFingerprint dbConn voucher fingerprint =
 -- | create and open a database with a given `name` and create the `voucher` table
 -- and `redeemed` table with the provided schema
 getDBConnection :: Text -> IO VoucherDatabaseState
-getDBConnection name = do
-  dbConn <- Sqlite.open (unpack name)
+getDBConnection path = do
+  dbConn <- Sqlite.open (unpack path)
   Sqlite.execute_ dbConn "PRAGMA foreign_keys = ON"
   Sqlite.execute_ dbConn "CREATE TABLE IF NOT EXISTS vouchers (id INTEGER PRIMARY KEY, name TEXT UNIQUE)"
   Sqlite.execute_ dbConn "CREATE TABLE IF NOT EXISTS redeemed (id INTEGER PRIMARY KEY, voucher_id INTEGER, fingerprint TEXT, FOREIGN KEY (voucher_id) REFERENCES vouchers(id))"
