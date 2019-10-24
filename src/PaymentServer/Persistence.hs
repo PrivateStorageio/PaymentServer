@@ -153,6 +153,7 @@ insertVoucherAndFingerprint dbConn voucher fingerprint =
 getDBConnection :: Text -> IO VoucherDatabaseState
 getDBConnection name = do
   dbConn <- Sqlite.open (unpack name)
+  Sqlite.execute_ dbConn "PRAGMA foreign_keys = ON"
   Sqlite.execute_ dbConn "CREATE TABLE IF NOT EXISTS vouchers (id INTEGER PRIMARY KEY, name TEXT UNIQUE)"
   Sqlite.execute_ dbConn "CREATE TABLE IF NOT EXISTS redeemed (id INTEGER PRIMARY KEY, voucher_id INTEGER, fingerprint TEXT, FOREIGN KEY (voucher_id) REFERENCES vouchers(id))"
   return $ SQLiteDB dbConn
