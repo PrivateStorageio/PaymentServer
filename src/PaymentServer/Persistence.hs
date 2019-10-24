@@ -103,7 +103,7 @@ instance VoucherDatabase VoucherDatabaseState where
 
   redeemVoucher SQLiteDB { conn = conn } voucher fingerprint = do
     unpaid <- isVoucherUnpaid conn voucher
-    existingFingerprint <- listToMaybe <$> getVoucherFingerprint conn voucher
+    existingFingerprint <- getVoucherFingerprint conn voucher
     let insertFn = insertVoucherAndFingerprint conn
     redeemVoucherHelper (unpaid, existingFingerprint) voucher fingerprint insertFn
 
@@ -136,9 +136,9 @@ isVoucherUnpaid :: Sqlite.Connection -> Voucher -> IO Bool
 isVoucherUnpaid dbConn voucher =
   null <$> (Sqlite.query dbConn "SELECT 1 FROM vouchers WHERE vouchers.name = ? LIMIT 1" (Sqlite.Only voucher) :: IO [Sqlite.Only Int])
 
-getVoucherFingerprint :: Sqlite.Connection -> Voucher -> IO [Fingerprint]
+getVoucherFingerprint :: Sqlite.Connection -> Voucher -> IO (Maybe Fingerprint)
 getVoucherFingerprint dbConn voucher =
-  Sqlite.query dbConn "SELECT redeemed.fingerprint FROM vouchers INNER JOIN redeemed ON vouchers.id = redeemed.voucher_id AND vouchers.name = ?" (Sqlite.Only voucher)
+  listToMaybe <$> Sqlite.query dbConn "SELECT redeemed.fingerprint FROM vouchers INNER JOIN redeemed ON vouchers.id = redeemed.voucher_id AND vouchers.name = ?" (Sqlite.Only voucher)
 
 insertVoucher :: Sqlite.Connection -> Voucher -> IO ()
 insertVoucher dbConn voucher =
