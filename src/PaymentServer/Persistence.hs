@@ -107,7 +107,12 @@ instance VoucherDatabase VoucherDatabaseState where
     let insertFn = insertVoucherAndFingerprint conn
     redeemVoucherHelper (unpaid, existingFingerprint) voucher fingerprint insertFn
 
-redeemVoucherHelper :: (Bool, Maybe Fingerprint) -> Voucher -> Fingerprint -> (Voucher -> Fingerprint -> IO ()) -> IO (Either RedeemError ())
+redeemVoucherHelper
+  :: (Bool, Maybe Fingerprint)
+  -> Voucher
+  -> Fingerprint
+  -> (Voucher -> Fingerprint -> IO ())
+  -> IO (Either RedeemError ())
 redeemVoucherHelper (unpaid, existingFingerprint) voucher fingerprint insertFn =
   case (unpaid, existingFingerprint) of
     (True, _) ->
