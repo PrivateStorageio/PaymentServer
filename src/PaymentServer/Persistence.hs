@@ -134,7 +134,7 @@ instance FromRow Fingerprint where
 -- | Checks if the given `voucher` is unpaid.
 isVoucherUnpaid :: Sqlite.Connection -> Voucher -> IO Bool
 isVoucherUnpaid dbConn voucher =
-  null <$> (Sqlite.query dbConn "SELECT 1 FROM vouchers WHERE vouchers.name = ? LIMIT 1" (Sqlite.Only voucher) :: IO [Voucher])
+  null <$> (Sqlite.query dbConn "SELECT 1 FROM vouchers WHERE vouchers.name = ? LIMIT 1" (Sqlite.Only voucher) :: IO [Sqlite.Only Int])
 
 getVoucherFingerprint :: Sqlite.Connection -> Voucher -> IO [Fingerprint]
 getVoucherFingerprint dbConn voucher =
