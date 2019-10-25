@@ -25,6 +25,7 @@ import Network.Wai.Middleware.RequestLogger
   )
 import PaymentServer.Persistence
   ( memory
+  , getDBConnection
   )
 import PaymentServer.Issuer
   ( trivialIssue
@@ -115,6 +116,7 @@ main =
     getDatabase ServerConfig{ database, databasePath } =
       case (database, databasePath) of
         (Memory, Nothing) -> Right memory
+        (SQLite3, Just path) -> Right (getDBConnection path)
         _ -> Left "invalid options"
   in do
     config <- execParser opts

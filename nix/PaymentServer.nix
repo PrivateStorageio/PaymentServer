@@ -69,6 +69,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
           (hsPkgs."text" or (buildDepError "text"))
           (hsPkgs."containers" or (buildDepError "containers"))
           (hsPkgs."cryptonite" or (buildDepError "cryptonite"))
+          (hsPkgs."sqlite-simple" or (buildDepError "sqlite-simple"))
           ];
         pkgconfig = [
           (pkgconfPkgs."ristretto" or (pkgConfDepError "ristretto"))
