@@ -99,21 +99,30 @@ instance VoucherDatabase VoucherDatabaseState where
     unpaid <- Set.notMember voucher <$> readIORef paid
     existingFingerprint <- Map.lookup voucher <$> readIORef redeemed
     let insertFn = (modifyIORef redeemed .) . Map.insert
-    redeemVoucherHelper (unpaid, existingFingerprint) voucher fingerprint insertFn
+    redeemVoucherHelper unpaid existingFingerprint voucher fingerprint insertFn
 
   redeemVoucher SQLiteDB { conn = conn } voucher fingerprint = Sqlite.withExclusiveTransaction conn $ do
     unpaid <- isVoucherUnpaid conn voucher
     existingFingerprint <- getVoucherFingerprint conn voucher
     let insertFn = insertVoucherAndFingerprint conn
-    redeemVoucherHelper (unpaid, existingFingerprint) voucher fingerprint insertFn
+    redeemVoucherHelper unpaid existingFingerprint voucher fingerprint insertFn
 
+-- | Allow a voucher to be redeemed if it has been paid for and not redeemed
+-- before or redeemed with the same fingerprint.
 redeemVoucherHelper
-  :: (Bool, Maybe Fingerprint)
-  -> Voucher
-  -> Fingerprint
-  -> (Voucher -> Fingerprint -> IO ())
-  -> IO (Either RedeemError ())
-redeemVoucherHelper (unpaid, existingFingerprint) voucher fingerprint insertFn =
+  :: Bool                                -- ^ Has the voucher been paid for?
+  -> Maybe Fingerprint                   -- ^ If it has been redeemed before,
+                                         -- with what fingerprint?
+  -> Voucher                             -- ^ The voucher in question.
+  -> Fingerprint                         -- ^ The fingerprint associated with
+                                         -- the new redemption attempt.
+  -> (Voucher -> Fingerprint -> IO ())   -- ^ A function to mark the voucher
+                                         -- as redeemed if this redemption
+                                         -- should succeed.
+  -> IO (Either RedeemError ())          -- ^ Right for successful redemption,
+                                         -- left with details about why it
+                                         -- failed.
+redeemVoucherHelper unpaid existingFingerprint voucher fingerprint insertFn =
   case (unpaid, existingFingerprint) of
     (True, _) ->
       return $ Left NotPaid
@@ -141,20 +150,25 @@ isVoucherUnpaid :: Sqlite.Connection -> Voucher -> IO Bool
 isVoucherUnpaid dbConn voucher =
   null <$> (Sqlite.query dbConn "SELECT 1 FROM vouchers WHERE vouchers.name = ? LIMIT 1" (Sqlite.Only voucher) :: IO [Sqlite.Only Int])
 
+-- | Retrieve an existing redemption fingerprint for the given voucher, if
+-- there is one.
 getVoucherFingerprint :: Sqlite.Connection -> Voucher -> IO (Maybe Fingerprint)
 getVoucherFingerprint dbConn voucher =
   listToMaybe <$> Sqlite.query dbConn "SELECT redeemed.fingerprint FROM vouchers INNER JOIN redeemed ON vouchers.id = redeemed.voucher_id AND vouchers.name = ?" (Sqlite.Only voucher)
 
+-- | Mark the given voucher as paid in the database.
 insertVoucher :: Sqlite.Connection -> Voucher -> IO ()
 insertVoucher dbConn voucher =
   Sqlite.execute dbConn "INSERT INTO vouchers (name) VALUES (?)" (Sqlite.Only voucher)
 
+-- | Mark the given voucher as having been redeemed (with the given
+-- fingerprint) in the database.
 insertVoucherAndFingerprint :: Sqlite.Connection -> Voucher -> Fingerprint -> IO ()
 insertVoucherAndFingerprint dbConn voucher fingerprint =
   Sqlite.execute dbConn "INSERT INTO redeemed (voucher_id, fingerprint) VALUES ((SELECT id FROM vouchers WHERE name = ?), ?)" (voucher, fingerprint)
 
--- | create and open a database with a given `name` and create the `voucher` table
--- and `redeemed` table with the provided schema
+-- | Create and open a database with a given `name` and create the `voucher`
+-- table and `redeemed` table with the provided schema.
 getDBConnection :: Text -> IO VoucherDatabaseState
 getDBConnection path = do
   dbConn <- Sqlite.open (unpack path)
