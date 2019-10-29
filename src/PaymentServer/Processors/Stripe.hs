@@ -16,6 +16,8 @@ import Text.Printf
   )
 import Data.Aeson
   ( ToJSON(toJSON)
+  , FromJSON(parseJSON)
+  , Object
   , object
   )
 import Servant
@@ -61,9 +63,8 @@ getVoucher (MetaData (x:xs)) = getVoucher (MetaData xs)
 stripeServer :: VoucherDatabase d => d -> Server StripeAPI
 stripeServer = webhook
 
+-- | Process charge succeeded events
 webhook :: VoucherDatabase d => d -> Event -> Handler Acknowledgement
-
--- Process charge succeeded events
 webhook d Event{eventId=Just (EventId eventId), eventType=ChargeSucceededEvent, eventData=(ChargeEvent charge)} =
   case getVoucher $ chargeMetaData charge of
     Nothing ->
@@ -83,3 +84,20 @@ webhook d Event{eventId=Just (EventId eventId), eventType=ChargeSucceededEvent, 
 webhook d _ =
   -- TODO: Record the eventId somewhere.
   return Ok
+
+
+-- | Browser facing API that takes token, voucher and a few other information
+-- and calls stripe charges API. If payment succeeds, then the voucher is stored
+-- in the voucher database.
+type BrowserAPI = "charge" :> ReqBody '[JSON] Token :> Post '[JSON] Acknowledgement
+
+data Token = Token
+  { token :: Text
+  , voucher :: Voucher
+  } deriving (Show, Eq)
+
+instance FromJSON Token where
+  parseJSON (Object v) = Token <$>
+                         v .: "token" <*>
+                         v .: "voucher"
+  parseJSON _ = mzero
