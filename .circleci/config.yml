@@ -162,7 +162,14 @@ jobs:
       - run:
           name: "Prepare Artifacts for Upload"
           command: |
-            mv $(nix-shell shell.nix --run "stack path --local-doc-root")/PaymentServer-* /tmp/PaymentServer-docs
+            # The flags passed to `stack path` need to pretty closely match
+            # those passed to `stack build` or the path comes out wrong.
+            #
+            PATH="stack path \
+              --haddock \
+              --haddock-internal \
+              --no-haddock-deps"
+            mv $(nix-shell shell.nix --run "$PATH")/PaymentServer-* /tmp/PaymentServer-docs
 
       - store_artifacts:
           # This contains the html haddock output for the project.
