@@ -11,14 +11,21 @@ module PaymentServer.Processors.Stripe
 import Control.Monad.IO.Class
   ( liftIO
   )
+import Control.Monad
+  ( mzero
+  )
+import Data.Text
+  ( Text
+  )
 import Text.Printf
   ( printf
   )
 import Data.Aeson
   ( ToJSON(toJSON)
   , FromJSON(parseJSON)
-  , Object
+  , Value(Object)
   , object
+  , (.:)
   )
 import Servant
   ( Server
@@ -29,6 +36,7 @@ import Servant.API
   , JSON
   , Post
   , (:>)
+  , (:<|>)(..)
   )
 import Web.Stripe.Event
   ( Event(Event, eventId, eventCreated, eventLiveMode, eventType, eventData, eventObject, eventPendingWebHooks, eventRequest)
@@ -51,7 +59,10 @@ data Acknowledgement = Ok
 instance ToJSON Acknowledgement where
   toJSON Ok = object []
 
-type StripeAPI = "webhook" :> ReqBody '[JSON] Event :> Post '[JSON] Acknowledgement
+type StripeAPI = WebhookAPI
+               :<|> ChargeAPI
+
+type WebhookAPI = "webhook" :> ReqBody '[JSON] Event :> Post '[JSON] Acknowledgement
 
 -- | getVoucher finds the metadata item with the key `"Voucher"` and returns
 -- the corresponding value, or Nothing.
@@ -61,7 +72,8 @@ getVoucher (MetaData (("Voucher", value):xs)) = Just value
 getVoucher (MetaData (x:xs)) = getVoucher (MetaData xs)
 
 stripeServer :: VoucherDatabase d => d -> Server StripeAPI
-stripeServer = webhook
+stripeServer d = (webhook d)
+                 :<|> (charge d)
 
 -- | Process charge succeeded events
 webhook :: VoucherDatabase d => d -> Event -> Handler Acknowledgement
@@ -89,7 +101,7 @@ webhook d _ =
 -- | Browser facing API that takes token, voucher and a few other information
 -- and calls stripe charges API. If payment succeeds, then the voucher is stored
 -- in the voucher database.
-type BrowserAPI = "charge" :> ReqBody '[JSON] Token :> Post '[JSON] Acknowledgement
+type ChargeAPI = "charge" :> ReqBody '[JSON] Token :> Post '[JSON] Acknowledgement
 
 data Token = Token
   { token :: Text
@@ -101,3 +113,8 @@ instance FromJSON Token where
                          v .: "token" <*>
                          v .: "voucher"
   parseJSON _ = mzero
+
+charge :: VoucherDatabase d => d -> Token -> Handler Acknowledgement
+charge d (Token token voucher) =
+  -- call the stripe Charge API
+  return Ok
