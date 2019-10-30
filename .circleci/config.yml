@@ -164,7 +164,7 @@ jobs:
           command: |
             # The flags passed to `stack path` need to pretty closely match
             # those passed to `stack build` or the path comes out wrong.
-            #
+            # https://github.com/commercialhaskell/stack/issues/4892
             PATH="stack path \
               --haddock \
               --haddock-internal \
