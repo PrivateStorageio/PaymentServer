@@ -165,11 +165,12 @@ jobs:
             # The flags passed to `stack path` need to pretty closely match
             # those passed to `stack build` or the path comes out wrong.
             # https://github.com/commercialhaskell/stack/issues/4892
+            set -x
             GETPATH="stack path \
               --haddock \
               --haddock-internal \
               --no-haddock-deps"
-            ls -l /tmp
+            ls -la /tmp
 
             mv $(nix-shell shell.nix --run "$GETPATH")/PaymentServer-* /tmp/PaymentServer-docs
 
