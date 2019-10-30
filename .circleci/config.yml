@@ -169,6 +169,8 @@ jobs:
               --haddock \
               --haddock-internal \
               --no-haddock-deps"
+            ls -l /tmp
+
             mv $(nix-shell shell.nix --run "$GETPATH")/PaymentServer-* /tmp/PaymentServer-docs
 
       - store_artifacts:
