@@ -165,11 +165,11 @@ jobs:
             # The flags passed to `stack path` need to pretty closely match
             # those passed to `stack build` or the path comes out wrong.
             # https://github.com/commercialhaskell/stack/issues/4892
-            PATH="stack path \
+            GETPATH="stack path \
               --haddock \
               --haddock-internal \
               --no-haddock-deps"
-            mv $(nix-shell shell.nix --run "$PATH")/PaymentServer-* /tmp/PaymentServer-docs
+            mv $(nix-shell shell.nix --run "$GETPATH")/PaymentServer-* /tmp/PaymentServer-docs
 
       - store_artifacts:
           # This contains the html haddock output for the project.
