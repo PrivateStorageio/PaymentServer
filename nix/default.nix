@@ -1,4 +1,4 @@
-{ pkgs ? import <nixpkgs> {} }:
+{ pkgs ? import <nixpkgs> { overlays = [ (import ./overlay.nix) ]; } }:
 
 let
   # Pin a particular version of haskell.nix.  The particular version isn't
