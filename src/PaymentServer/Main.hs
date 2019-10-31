@@ -11,6 +11,8 @@ import Text.Printf
   )
 import Data.Maybe
   ( maybeToList
+import Data.ByteString
+  ( ByteString
   )
 import Data.Text
   ( Text
@@ -90,6 +92,7 @@ data ServerConfig = ServerConfig
   , database        :: Database
   , databasePath    :: Maybe Text
   , endpoint        :: Endpoint
+  , stripeKey    :: ByteString
   }
   deriving (Show, Eq)
 
@@ -159,7 +162,9 @@ sample = ServerConfig
     <> help "Path to on-disk database (sqlite3 only)"
     <> showDefault ) )
   <*> (http <|> https)
-
+  <*> option str
+  ( long "stripe-key"
+    <> help "Stripe API key" )
 
 opts :: ParserInfo ServerConfig
 opts = info (sample <**> helper)
@@ -221,6 +226,8 @@ getApp config =
             exitFailure
           Right getDB -> do
             db <- getDB
-            let app = paymentServerApp issuer db
+            let port = 8081
+            let key = stripeKey config
+            let app = paymentServerApp key issuer db
             logger <- mkRequestLogger (def { outputFormat = Detailed True})
             return $ logger app

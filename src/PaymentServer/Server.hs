@@ -8,6 +8,9 @@ module PaymentServer.Server
   ( paymentServerApp
   ) where
 
+import Data.ByteString
+  ( ByteString
+  )
 import Servant
   ( Proxy(Proxy)
   , Server
@@ -37,9 +40,9 @@ type PaymentServerAPI
   :<|> "v1" :> "redeem" :> RedemptionAPI
 
 -- | Create a server which uses the given database.
-paymentServer :: VoucherDatabase d => Issuer -> d -> Server PaymentServerAPI
-paymentServer issuer database =
-  stripeServer database "test"
+paymentServer :: VoucherDatabase d => ByteString -> Issuer -> d -> Server PaymentServerAPI
+paymentServer key issuer database =
+  stripeServer database key
   :<|> redemptionServer issuer database
 
 paymentServerAPI :: Proxy PaymentServerAPI
@@ -47,5 +50,5 @@ paymentServerAPI = Proxy
 
 -- | Create a Servant Application which serves the payment server API using
 -- the given database.
-paymentServerApp :: VoucherDatabase d => Issuer -> d -> Application
-paymentServerApp issuer = serve paymentServerAPI . paymentServer issuer
+paymentServerApp :: VoucherDatabase d => ByteString -> Issuer -> d -> Application
+paymentServerApp key issuer = serve paymentServerAPI . paymentServer key issuer
