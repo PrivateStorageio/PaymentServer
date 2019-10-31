@@ -58,7 +58,9 @@ import PaymentServer.Persistence
   )
 import Web.Stripe.Charge
   ( createCharge
+  , chargeId
   , Amount(..)
+  , TokenId(..)
   )
 import Web.Stripe.Client
   ( StripeConfig(..)
@@ -66,6 +68,7 @@ import Web.Stripe.Client
   )
 import Web.Stripe
   ( stripe
+  , (-&-)
   )
 
 data Acknowledgement = Ok
@@ -86,8 +89,8 @@ getVoucher (MetaData (("Voucher", value):xs)) = Just value
 getVoucher (MetaData (x:xs)) = getVoucher (MetaData xs)
 
 stripeServer :: VoucherDatabase d => d -> ByteString -> Server StripeAPI
-stripeServer d key = (webhook d)
-                     :<|> (charge d key)
+stripeServer d key = webhook d
+                     :<|> charge d key
 
 -- | Process charge succeeded events
 webhook :: VoucherDatabase d => d -> Event -> Handler Acknowledgement
@@ -132,10 +135,14 @@ instance FromJSON Charges where
                          v .: "currency"
   parseJSON _ = mzero
 
+-- | call the stripe Charge API (with token, voucher in metadata, amount, currency etc
+-- and if the Charge is okay, then return set the voucher as "paid" in the database.
 charge :: VoucherDatabase d => d -> ByteString -> Charges -> Handler Acknowledgement
 charge d key (Charges token voucher amount currency) = do
-  -- call the stripe Charge API (with token, voucher in metadata, amount, currency etc
-  -- and if the Charge is okay, then return set the voucher as "paid" in the database.
   let config = StripeConfig (StripeKey key) Nothing
-  result <- liftIO $ stripe config $ createCharge (Amount amount) (read (unpack currency))
+      tokenId = TokenId token
+  result <- liftIO $ stripe config $
+    createCharge (Amount amount) (read (unpack currency))
+      -&- tokenId
+      -&- MetaData [("Voucher", voucher)]
   return Ok
