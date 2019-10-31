@@ -65,6 +65,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
           (hsPkgs."wai-extra" or (buildDepError "wai-extra"))
           (hsPkgs."data-default" or (buildDepError "data-default"))
           (hsPkgs."warp" or (buildDepError "warp"))
+          (hsPkgs."warp-tls" or (buildDepError "warp-tls"))
           (hsPkgs."stripe-core" or (buildDepError "stripe-core"))
           (hsPkgs."text" or (buildDepError "text"))
           (hsPkgs."containers" or (buildDepError "containers"))
