@@ -39,6 +39,8 @@ packages:
 # (e.g., acme-missiles-0.3)
 extra-deps:
   - "stripe-core-2.5.0"
+  - "stripe-haskell-2.5.0"
+  - "stripe-http-client-2.5.0"
 
 # Override default flag values for local packages and extra-deps
 # flags: {}

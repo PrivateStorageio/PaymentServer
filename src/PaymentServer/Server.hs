@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | This module exposes a Servant-based Network.Wai server for payment
 -- interactions.
@@ -38,7 +39,7 @@ type PaymentServerAPI
 -- | Create a server which uses the given database.
 paymentServer :: VoucherDatabase d => Issuer -> d -> Server PaymentServerAPI
 paymentServer issuer database =
-  stripeServer database
+  stripeServer database "test"
   :<|> redemptionServer issuer database
 
 paymentServerAPI :: Proxy PaymentServerAPI

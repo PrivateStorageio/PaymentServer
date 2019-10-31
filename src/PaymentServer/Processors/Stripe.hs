@@ -14,8 +14,12 @@ import Control.Monad.IO.Class
 import Control.Monad
   ( mzero
   )
+import Data.ByteString
+  ( ByteString
+  )
 import Data.Text
   ( Text
+  , unpack
   )
 import Text.Printf
   ( printf
@@ -52,7 +56,17 @@ import PaymentServer.Persistence
   ( Voucher
   , VoucherDatabase(payForVoucher)
   )
-
+import Web.Stripe.Charge
+  ( createCharge
+  , Amount(..)
+  )
+import Web.Stripe.Client
+  ( StripeConfig(..)
+  , StripeKey(..)
+  )
+import Web.Stripe
+  ( stripe
+  )
 
 data Acknowledgement = Ok
 
@@ -60,7 +74,7 @@ instance ToJSON Acknowledgement where
   toJSON Ok = object []
 
 type StripeAPI = WebhookAPI
-               :<|> ChargeAPI
+               :<|> ChargesAPI
 
 type WebhookAPI = "webhook" :> ReqBody '[JSON] Event :> Post '[JSON] Acknowledgement
 
@@ -71,9 +85,9 @@ getVoucher (MetaData []) = Nothing
 getVoucher (MetaData (("Voucher", value):xs)) = Just value
 getVoucher (MetaData (x:xs)) = getVoucher (MetaData xs)
 
-stripeServer :: VoucherDatabase d => d -> Server StripeAPI
-stripeServer d = (webhook d)
-                 :<|> (charge d)
+stripeServer :: VoucherDatabase d => d -> ByteString -> Server StripeAPI
+stripeServer d key = (webhook d)
+                     :<|> (charge d key)
 
 -- | Process charge succeeded events
 webhook :: VoucherDatabase d => d -> Event -> Handler Acknowledgement
@@ -101,20 +115,27 @@ webhook d _ =
 -- | Browser facing API that takes token, voucher and a few other information
 -- and calls stripe charges API. If payment succeeds, then the voucher is stored
 -- in the voucher database.
-type ChargeAPI = "charge" :> ReqBody '[JSON] Token :> Post '[JSON] Acknowledgement
+type ChargesAPI = "charge" :> ReqBody '[JSON] Charges :> Post '[JSON] Acknowledgement
 
-data Token = Token
+data Charges = Charges
   { token :: Text
   , voucher :: Voucher
+  , amount :: Int
+  , currency :: Text
   } deriving (Show, Eq)
 
-instance FromJSON Token where
-  parseJSON (Object v) = Token <$>
+instance FromJSON Charges where
+  parseJSON (Object v) = Charges <$>
                          v .: "token" <*>
-                         v .: "voucher"
+                         v .: "voucher" <*>
+                         v .: "amount" <*>
+                         v .: "currency"
   parseJSON _ = mzero
 
-charge :: VoucherDatabase d => d -> Token -> Handler Acknowledgement
-charge d (Token token voucher) =
-  -- call the stripe Charge API
+charge :: VoucherDatabase d => d -> ByteString -> Charges -> Handler Acknowledgement
+charge d key (Charges token voucher amount currency) = do
+  -- call the stripe Charge API (with token, voucher in metadata, amount, currency etc
+  -- and if the Charge is okay, then return set the voucher as "paid" in the database.
+  let config = StripeConfig (StripeKey key) Nothing
+  result <- liftIO $ stripe config $ createCharge (Amount amount) (read (unpack currency))
   return Ok
