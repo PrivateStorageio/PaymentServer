@@ -34,6 +34,8 @@ import Data.Aeson
 import Servant
   ( Server
   , Handler
+  , err400
+  , throwError
   )
 import Servant.API
   ( ReqBody
@@ -52,9 +54,8 @@ import Web.Stripe.Types
   ( Charge(Charge, chargeMetaData)
   , MetaData(MetaData)
   )
-import PaymentServer.Persistence
-  ( Voucher
-  , VoucherDatabase(payForVoucher)
+import Web.Stripe.Error
+  ( StripeError(..)
   )
 import Web.Stripe.Charge
   ( createCharge
@@ -69,6 +70,10 @@ import Web.Stripe.Client
 import Web.Stripe
   ( stripe
   , (-&-)
+  )
+import PaymentServer.Persistence
+  ( Voucher
+  , VoucherDatabase(payForVoucher)
   )
 
 data Acknowledgement = Ok
@@ -136,7 +141,7 @@ instance FromJSON Charges where
   parseJSON _ = mzero
 
 -- | call the stripe Charge API (with token, voucher in metadata, amount, currency etc
--- and if the Charge is okay, then return set the voucher as "paid" in the database.
+-- and if the Charge is okay, then set the voucher as "paid" in the database.
 charge :: VoucherDatabase d => d -> ByteString -> Charges -> Handler Acknowledgement
 charge d key (Charges token voucher amount currency) = do
   let config = StripeConfig (StripeKey key) Nothing
@@ -145,4 +150,8 @@ charge d key (Charges token voucher amount currency) = do
     createCharge (Amount amount) (read (unpack currency))
       -&- tokenId
       -&- MetaData [("Voucher", voucher)]
-  return Ok
+  case result of
+    Right (Charge {}) -> do
+      liftIO $ payForVoucher d voucher
+      return Ok
+    Left (StripeError {}) -> throwError err400
