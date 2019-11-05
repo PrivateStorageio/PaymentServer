@@ -35,6 +35,7 @@ import Servant
   ( Server
   , Handler
   , err400
+  , ServerError(errBody)
   , throwError
   )
 import Servant.API
@@ -154,4 +155,4 @@ charge d key (Charges token voucher amount currency) = do
     Right (Charge {}) -> do
       liftIO $ payForVoucher d voucher
       return Ok
-    Left (StripeError {}) -> throwError err400
+    Left (StripeError {}) -> throwError err400 { errBody = "Stripe charge didn't succeed" }
