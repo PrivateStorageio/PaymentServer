@@ -227,7 +227,6 @@ getApp config =
             exitFailure
           Right getDB -> do
             db <- getDB
-            let port = 8081
             let key = stripeKey config
             let app = paymentServerApp key issuer db
             logger <- mkRequestLogger (def { outputFormat = Detailed True})
