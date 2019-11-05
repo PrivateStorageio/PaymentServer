@@ -152,7 +152,16 @@ charge d key (Charges token voucher amount currency) = do
       -&- tokenId
       -&- MetaData [("Voucher", voucher)]
   case result of
-    Right (Charge {}) -> do
-      liftIO $ payForVoucher d voucher
-      return Ok
-    Left (StripeError {}) -> throwError err400 { errBody = "Stripe charge didn't succeed" }
+    Right Charge { chargeMetaData = metadata } ->
+      -- verify that we are getting the same metadata that we sent.
+      case metadata of
+        MetaData [("Voucher", v)] ->
+          if v == voucher
+            then
+            do
+              liftIO $ payForVoucher d voucher
+              return Ok
+            else
+            throwError err400 { errBody = "Voucher code mismatch" }
+        _ -> throwError err400 { errBody = "Voucher code not found" }
+    Left StripeError {} -> throwError err400 { errBody = "Stripe charge didn't succeed" }
