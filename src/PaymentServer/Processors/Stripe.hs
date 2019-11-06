@@ -62,17 +62,16 @@ import Web.Stripe.Types
   , Currency
   )
 import Web.Stripe.Error
-  ( StripeError(..)
+  ( StripeError(StripeError)
   )
 import Web.Stripe.Charge
   ( createCharge
-  , chargeId
-  , Amount(..)
-  , TokenId(..)
+  , Amount(Amount)
+  , TokenId(TokenId)
   )
 import Web.Stripe.Client
-  ( StripeConfig(..)
-  , StripeKey(..)
+  ( StripeConfig(StripeConfig)
+  , StripeKey(StripeKey)
   )
 import Web.Stripe
   ( stripe
