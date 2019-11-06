@@ -25,6 +25,7 @@ library
   build-depends:       base >= 4.7 && < 5
                      , optparse-applicative
                      , aeson
+                     , bytestring
                      , servant
                      , servant-server
                      , wai
@@ -32,6 +33,7 @@ library
                      , data-default
                      , warp
                      , warp-tls
+                     , stripe-haskell
                      , stripe-core
                      , text
                      , containers

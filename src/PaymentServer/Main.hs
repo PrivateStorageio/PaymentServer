@@ -47,6 +47,9 @@ import PaymentServer.Issuer
 import PaymentServer.Server
   ( paymentServerApp
   )
+import PaymentServer.Processors.Stripe
+  ( StripeSecretKey
+  )
 
 import Options.Applicative
   ( Parser
@@ -90,6 +93,7 @@ data ServerConfig = ServerConfig
   , database        :: Database
   , databasePath    :: Maybe Text
   , endpoint        :: Endpoint
+  , stripeKey       :: StripeSecretKey
   }
   deriving (Show, Eq)
 
@@ -159,7 +163,9 @@ sample = ServerConfig
     <> help "Path to on-disk database (sqlite3 only)"
     <> showDefault ) )
   <*> (http <|> https)
-
+  <*> option str
+  ( long "stripe-key"
+    <> help "Stripe Secret key" )
 
 opts :: ParserInfo ServerConfig
 opts = info (sample <**> helper)
@@ -221,6 +227,7 @@ getApp config =
             exitFailure
           Right getDB -> do
             db <- getDB
-            let app = paymentServerApp issuer db
+            let key = stripeKey config
+            let app = paymentServerApp key issuer db
             logger <- mkRequestLogger (def { outputFormat = Detailed True})
             return $ logger app

@@ -57,6 +57,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
       "library" = {
         depends = [
           (hsPkgs."base" or (buildDepError "base"))
+          (hsPkgs."bytestring" or (buildDepError "bytestring"))
           (hsPkgs."optparse-applicative" or (buildDepError "optparse-applicative"))
           (hsPkgs."aeson" or (buildDepError "aeson"))
           (hsPkgs."servant" or (buildDepError "servant"))
@@ -67,6 +68,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
           (hsPkgs."warp" or (buildDepError "warp"))
           (hsPkgs."warp-tls" or (buildDepError "warp-tls"))
           (hsPkgs."stripe-core" or (buildDepError "stripe-core"))
+          (hsPkgs."stripe-haskell" or (buildDepError "stripe-haskell"))
           (hsPkgs."text" or (buildDepError "text"))
           (hsPkgs."containers" or (buildDepError "containers"))
           (hsPkgs."cryptonite" or (buildDepError "cryptonite"))

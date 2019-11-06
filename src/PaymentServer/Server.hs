@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | This module exposes a Servant-based Network.Wai server for payment
 -- interactions.
@@ -17,6 +18,7 @@ import Servant
   )
 import PaymentServer.Processors.Stripe
   ( StripeAPI
+  , StripeSecretKey
   , stripeServer
   )
 import PaymentServer.Redemption
@@ -36,9 +38,9 @@ type PaymentServerAPI
   :<|> "v1" :> "redeem" :> RedemptionAPI
 
 -- | Create a server which uses the given database.
-paymentServer :: VoucherDatabase d => Issuer -> d -> Server PaymentServerAPI
-paymentServer issuer database =
-  stripeServer database
+paymentServer :: VoucherDatabase d => StripeSecretKey -> Issuer -> d -> Server PaymentServerAPI
+paymentServer key issuer database =
+  stripeServer key database
   :<|> redemptionServer issuer database
 
 paymentServerAPI :: Proxy PaymentServerAPI
@@ -46,5 +48,5 @@ paymentServerAPI = Proxy
 
 -- | Create a Servant Application which serves the payment server API using
 -- the given database.
-paymentServerApp :: VoucherDatabase d => Issuer -> d -> Application
-paymentServerApp issuer = serve paymentServerAPI . paymentServer issuer
+paymentServerApp :: VoucherDatabase d => StripeSecretKey -> Issuer -> d -> Application
+paymentServerApp key issuer = serve paymentServerAPI . paymentServer key issuer
