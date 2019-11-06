@@ -93,8 +93,8 @@ jobs:
           # the cache was written (but usually it will have).
           name: "Restore Cached Dependencies"
           keys:
-            - paymentserver-v1-{{ checksum "stack.yaml" }}-{{ checksum "PaymentServer.cabal" }}
-            - paymentserver-v1-{{ checksum "stack.yaml" }}
+            - paymentserver-v2-{{ checksum "stack.yaml" }}-{{ checksum "PaymentServer.cabal" }}
+            - paymentserver-v2-{{ checksum "stack.yaml" }}
 
       - run:
           # Build just our dependencies.  It's nice to have this as a separate
@@ -124,7 +124,7 @@ jobs:
           # way we get to save the cache whether or not the test suite goes on
           # to succeed.
           name: "Cache Dependencies"
-          key: paymentserver-v1-{{ checksum "stack.yaml" }}-{{ checksum "PaymentServer.cabal" }}
+          key: paymentserver-v2-{{ checksum "stack.yaml" }}-{{ checksum "PaymentServer.cabal" }}
           paths:
             - "/root/.stack"
             - ".stack-work"
