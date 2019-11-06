@@ -165,7 +165,7 @@ sample = ServerConfig
   <*> (http <|> https)
   <*> option str
   ( long "stripe-key"
-    <> help "Stripe API key" )
+    <> help "Stripe Secret key" )
 
 opts :: ParserInfo ServerConfig
 opts = info (sample <**> helper)
