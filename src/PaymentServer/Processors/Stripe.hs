@@ -81,7 +81,7 @@ import PaymentServer.Persistence
   , VoucherDatabase(payForVoucher)
   )
 
-type StripePrivateKey = ByteString
+type StripeSecretKey = ByteString
 
 data Acknowledgement = Ok
 
@@ -100,7 +100,7 @@ getVoucher (MetaData []) = Nothing
 getVoucher (MetaData (("Voucher", value):xs)) = Just value
 getVoucher (MetaData (x:xs)) = getVoucher (MetaData xs)
 
-stripeServer :: VoucherDatabase d => d -> StripePrivateKey -> Server StripeAPI
+stripeServer :: VoucherDatabase d => d -> StripeSecretKey -> Server StripeAPI
 stripeServer d key = webhook d
                      :<|> charge d key
 
@@ -149,7 +149,7 @@ instance FromJSON Charges where
 
 -- | call the stripe Charge API (with token, voucher in metadata, amount, currency etc
 -- and if the Charge is okay, then set the voucher as "paid" in the database.
-charge :: VoucherDatabase d => d -> StripePrivateKey -> Charges -> Handler Acknowledgement
+charge :: VoucherDatabase d => d -> StripeSecretKey -> Charges -> Handler Acknowledgement
 charge d key (Charges token voucher amount currency) = do
   let config = StripeConfig (StripeKey key) Nothing
       tokenId = TokenId token
