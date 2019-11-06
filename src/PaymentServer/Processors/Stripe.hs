@@ -101,8 +101,8 @@ getVoucher (MetaData []) = Nothing
 getVoucher (MetaData (("Voucher", value):xs)) = Just value
 getVoucher (MetaData (x:xs)) = getVoucher (MetaData xs)
 
-stripeServer :: VoucherDatabase d => d -> StripeSecretKey -> Server StripeAPI
-stripeServer d key = webhook d
+stripeServer :: VoucherDatabase d => StripeSecretKey -> d -> Server StripeAPI
+stripeServer key d = webhook d
                      :<|> charge d key
 
 -- | Process charge succeeded events

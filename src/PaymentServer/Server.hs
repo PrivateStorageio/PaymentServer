@@ -42,7 +42,7 @@ type PaymentServerAPI
 -- | Create a server which uses the given database.
 paymentServer :: VoucherDatabase d => ByteString -> Issuer -> d -> Server PaymentServerAPI
 paymentServer key issuer database =
-  stripeServer database key
+  stripeServer key database
   :<|> redemptionServer issuer database
 
 paymentServerAPI :: Proxy PaymentServerAPI
