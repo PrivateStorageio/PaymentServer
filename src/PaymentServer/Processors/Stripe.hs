@@ -131,10 +131,12 @@ webhook d _ =
 type ChargesAPI = "charge" :> ReqBody '[JSON] Charges :> Post '[JSON] Acknowledgement
 
 data Charges = Charges
-  { token :: Text
-  , voucher :: Voucher
-  , amount :: Int
-  , currency :: Text
+  { token :: Text          -- ^ The text of a Stripe tokenized payment method.
+  , voucher :: Voucher     -- ^ The voucher for which this charge will pay.
+  , amount :: Int          -- ^ The amount of the charge in the minimum
+                           -- currency unit of the target currency (eg for
+                           -- USD, cents).
+  , currency :: Text       -- ^ The currency in which the charge will be made.
   } deriving (Show, Eq)
 
 instance FromJSON Charges where
