@@ -24,6 +24,9 @@ import Data.Text
 import Text.Printf
   ( printf
   )
+import Text.Read
+  ( readMaybe
+  )
 import Data.Aeson
   ( ToJSON(toJSON)
   , FromJSON(parseJSON)
@@ -43,7 +46,7 @@ import Servant.API
   , JSON
   , Post
   , (:>)
-  , (:<|>)(..)
+  , (:<|>)((:<|>))
   )
 import Web.Stripe.Event
   ( Event(Event, eventId, eventCreated, eventLiveMode, eventType, eventData, eventObject, eventPendingWebHooks, eventRequest)
@@ -54,6 +57,7 @@ import Web.Stripe.Event
 import Web.Stripe.Types
   ( Charge(Charge, chargeMetaData)
   , MetaData(MetaData)
+  , Currency
   )
 import Web.Stripe.Error
   ( StripeError(..)
@@ -149,8 +153,9 @@ charge :: VoucherDatabase d => d -> StripePrivateKey -> Charges -> Handler Ackno
 charge d key (Charges token voucher amount currency) = do
   let config = StripeConfig (StripeKey key) Nothing
       tokenId = TokenId token
+  currency' <- getCurrency currency
   result <- liftIO $ stripe config $
-    createCharge (Amount amount) (read (unpack currency))
+    createCharge (Amount amount) currency'
       -&- tokenId
       -&- MetaData [("Voucher", voucher)]
   case result of
@@ -167,3 +172,9 @@ charge d key (Charges token voucher amount currency) = do
             throwError err400 { errBody = "Voucher code mismatch" }
         _ -> throwError err400 { errBody = "Voucher code not found" }
     Left StripeError {} -> throwError err400 { errBody = "Stripe charge didn't succeed" }
+    where
+      getCurrency :: Text -> Handler Currency
+      getCurrency maybeCurrency = do
+        case readMaybe (unpack currency) of
+          Just currency' -> return currency'
+          Nothing -> throwError err400 { errBody = "Invalid currency specified" }
