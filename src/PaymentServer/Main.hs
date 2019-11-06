@@ -12,9 +12,6 @@ import Text.Printf
 import Data.Maybe
   ( maybeToList
   )
-import Data.ByteString
-  ( ByteString
-  )
 import Data.Text
   ( Text
   )
@@ -49,6 +46,9 @@ import PaymentServer.Issuer
   )
 import PaymentServer.Server
   ( paymentServerApp
+  )
+import PaymentServer.Processors.Stripe
+  ( StripeSecretKey
   )
 
 import Options.Applicative
@@ -93,7 +93,7 @@ data ServerConfig = ServerConfig
   , database        :: Database
   , databasePath    :: Maybe Text
   , endpoint        :: Endpoint
-  , stripeKey       :: ByteString
+  , stripeKey       :: StripeSecretKey
   }
   deriving (Show, Eq)
 

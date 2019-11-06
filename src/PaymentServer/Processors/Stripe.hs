@@ -6,6 +6,7 @@ module PaymentServer.Processors.Stripe
   ( StripeAPI
   , stripeServer
   , getVoucher
+  , StripeSecretKey
   ) where
 
 import Control.Monad.IO.Class
