@@ -93,7 +93,7 @@ data ServerConfig = ServerConfig
   , database        :: Database
   , databasePath    :: Maybe Text
   , endpoint        :: Endpoint
-  , stripeKey    :: ByteString
+  , stripeKey       :: ByteString
   }
   deriving (Show, Eq)
 
