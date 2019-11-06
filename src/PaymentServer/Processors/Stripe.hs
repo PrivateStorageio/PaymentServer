@@ -38,6 +38,7 @@ import Servant
   ( Server
   , Handler
   , err400
+  , err500
   , ServerError(errBody)
   , throwError
   )
@@ -169,7 +170,7 @@ charge d key (Charges token voucher amount currency) = do
               liftIO $ payForVoucher d voucher
               return Ok
             else
-            throwError err400 { errBody = "Voucher code mismatch" }
+            throwError err500 { errBody = "Voucher code mismatch" }
         _ -> throwError err400 { errBody = "Voucher code not found" }
     Left StripeError {} -> throwError err400 { errBody = "Stripe charge didn't succeed" }
     where
