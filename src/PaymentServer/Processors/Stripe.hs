@@ -22,9 +22,6 @@ import Data.Text
   ( Text
   , unpack
   )
-import Text.Printf
-  ( printf
-  )
 import Text.Read
   ( readMaybe
   )
@@ -51,7 +48,7 @@ import Servant.API
   , (:<|>)((:<|>))
   )
 import Web.Stripe.Event
-  ( Event(Event, eventId, eventCreated, eventLiveMode, eventType, eventData, eventObject, eventPendingWebHooks, eventRequest)
+  ( Event(Event, eventId, eventType, eventData)
   , EventId(EventId)
   , EventType(ChargeSucceededEvent)
   , EventData(ChargeEvent)
