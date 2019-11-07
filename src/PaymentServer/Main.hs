@@ -76,6 +76,7 @@ import System.Exit
   ( exitFailure
   )
 import Data.Semigroup ((<>))
+import qualified Data.Text.IO as TIO
 
 data Issuer =
   Trivial
@@ -89,7 +90,7 @@ data Database =
 
 data ServerConfig = ServerConfig
   { issuer          :: Issuer
-  , signingKey      :: Maybe Text
+  , signingKeyPath  :: Maybe FilePath
   , database        :: Database
   , databasePath    :: Maybe Text
   , endpoint        :: Endpoint
@@ -150,8 +151,8 @@ sample = ServerConfig
     <> showDefault
     <> value Trivial )
   <*> optional (option str
-  ( long "signing-key"
-    <> help "The base64 encoded signing key (ristretto only)"
+  ( long "signing-key-path"
+    <> help "Path to base64 encoded signing key (ristretto only)"
     <> showDefault ) )
   <*> option auto
   ( long "database"
@@ -205,18 +206,21 @@ logEndpoint endpoint =
 getApp :: ServerConfig -> IO Application
 getApp config =
   let
-    getIssuer ServerConfig{ issuer, signingKey } =
-      case (issuer, signingKey) of
-        (Trivial, Nothing) -> Right trivialIssue
-        (Ristretto, Just key) -> Right $ ristrettoIssue key
-        _ -> Left "invalid options"
+    getIssuer ServerConfig{ issuer, signingKeyPath } = do
+      case (issuer, signingKeyPath) of
+        (Trivial, Nothing) -> return $ Right trivialIssue
+        (Ristretto, Just keyPath) -> do
+          key <- TIO.readFile keyPath
+          return $ Right $ ristrettoIssue key
+        _ -> return $ Left "invalid options"
     getDatabase ServerConfig{ database, databasePath } =
       case (database, databasePath) of
         (Memory, Nothing) -> Right memory
         (SQLite3, Just path) -> Right (getDBConnection path)
         _ -> Left "invalid options"
   in do
-    case getIssuer config of
+    issuer <- getIssuer config
+    case issuer of
       Left err -> do
         print err
         exitFailure
