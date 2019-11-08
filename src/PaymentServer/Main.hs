@@ -204,7 +204,7 @@ logEndpoint endpoint =
 getApp :: ServerConfig -> IO Application
 getApp config =
   let
-    getIssuer ServerConfig{ issuer, signingKeyPath } = do
+    getIssuer ServerConfig{ issuer, signingKeyPath } =
       case (issuer, signingKeyPath) of
         (Trivial, Nothing) -> return $ Right trivialIssue
         (Ristretto, Just keyPath) -> do

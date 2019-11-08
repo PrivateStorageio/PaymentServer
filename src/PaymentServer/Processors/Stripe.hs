@@ -174,7 +174,7 @@ charge d key (Charges token voucher amount currency) = do
     Left StripeError {} -> throwError err400 { errBody = "Stripe charge didn't succeed" }
     where
       getCurrency :: Text -> Handler Currency
-      getCurrency maybeCurrency = do
+      getCurrency maybeCurrency =
         case readMaybe (unpack currency) of
           Just currency' -> return currency'
           Nothing -> throwError err400 { errBody = "Invalid currency specified" }
