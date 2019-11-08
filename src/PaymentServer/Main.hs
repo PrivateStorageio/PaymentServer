@@ -47,9 +47,6 @@ import PaymentServer.Issuer
 import PaymentServer.Server
   ( paymentServerApp
   )
-import PaymentServer.Processors.Stripe
-  ( StripeSecretKey
-  )
 
 import Options.Applicative
   ( Parser
@@ -77,6 +74,7 @@ import System.Exit
   )
 import Data.Semigroup ((<>))
 import qualified Data.Text.IO as TIO
+import qualified Data.ByteString as B
 
 data Issuer =
   Trivial
@@ -94,7 +92,7 @@ data ServerConfig = ServerConfig
   , database        :: Database
   , databasePath    :: Maybe Text
   , endpoint        :: Endpoint
-  , stripeKey       :: StripeSecretKey
+  , stripeKeyPath   :: FilePath
   }
   deriving (Show, Eq)
 
@@ -165,8 +163,8 @@ sample = ServerConfig
     <> showDefault ) )
   <*> (http <|> https)
   <*> option str
-  ( long "stripe-key"
-    <> help "Stripe Secret key" )
+  ( long "stripe-key-path"
+    <> help "Path to Stripe Secret key" )
 
 opts :: ParserInfo ServerConfig
 opts = info (sample <**> helper)
@@ -231,7 +229,7 @@ getApp config =
             exitFailure
           Right getDB -> do
             db <- getDB
-            let key = stripeKey config
+            key <- B.readFile (stripeKeyPath config)
             let app = paymentServerApp key issuer db
             logger <- mkRequestLogger (def { outputFormat = Detailed True})
             return $ logger app
