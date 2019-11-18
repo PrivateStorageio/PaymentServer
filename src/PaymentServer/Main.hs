@@ -47,9 +47,6 @@ import PaymentServer.Issuer
 import PaymentServer.Server
   ( paymentServerApp
   )
-import PaymentServer.Processors.Stripe
-  ( StripeSecretKey
-  )
 
 import Options.Applicative
   ( Parser
@@ -76,6 +73,8 @@ import System.Exit
   ( exitFailure
   )
 import Data.Semigroup ((<>))
+import qualified Data.Text.IO as TIO
+import qualified Data.ByteString as B
 
 data Issuer =
   Trivial
@@ -89,11 +88,11 @@ data Database =
 
 data ServerConfig = ServerConfig
   { issuer          :: Issuer
-  , signingKey      :: Maybe Text
+  , signingKeyPath  :: Maybe FilePath
   , database        :: Database
   , databasePath    :: Maybe Text
   , endpoint        :: Endpoint
-  , stripeKey       :: StripeSecretKey
+  , stripeKeyPath   :: FilePath
   }
   deriving (Show, Eq)
 
@@ -150,8 +149,8 @@ sample = ServerConfig
     <> showDefault
     <> value Trivial )
   <*> optional (option str
-  ( long "signing-key"
-    <> help "The base64 encoded signing key (ristretto only)"
+  ( long "signing-key-path"
+    <> help "Path to base64 encoded signing key (ristretto only)"
     <> showDefault ) )
   <*> option auto
   ( long "database"
@@ -164,8 +163,8 @@ sample = ServerConfig
     <> showDefault ) )
   <*> (http <|> https)
   <*> option str
-  ( long "stripe-key"
-    <> help "Stripe Secret key" )
+  ( long "stripe-key-path"
+    <> help "Path to Stripe Secret key" )
 
 opts :: ParserInfo ServerConfig
 opts = info (sample <**> helper)
@@ -205,18 +204,21 @@ logEndpoint endpoint =
 getApp :: ServerConfig -> IO Application
 getApp config =
   let
-    getIssuer ServerConfig{ issuer, signingKey } =
-      case (issuer, signingKey) of
-        (Trivial, Nothing) -> Right trivialIssue
-        (Ristretto, Just key) -> Right $ ristrettoIssue key
-        _ -> Left "invalid options"
+    getIssuer ServerConfig{ issuer, signingKeyPath } =
+      case (issuer, signingKeyPath) of
+        (Trivial, Nothing) -> return $ Right trivialIssue
+        (Ristretto, Just keyPath) -> do
+          key <- TIO.readFile keyPath
+          return $ Right $ ristrettoIssue key
+        _ -> return $ Left "invalid options"
     getDatabase ServerConfig{ database, databasePath } =
       case (database, databasePath) of
         (Memory, Nothing) -> Right memory
         (SQLite3, Just path) -> Right (getDBConnection path)
         _ -> Left "invalid options"
   in do
-    case getIssuer config of
+    issuer <- getIssuer config
+    case issuer of
       Left err -> do
         print err
         exitFailure
@@ -227,7 +229,7 @@ getApp config =
             exitFailure
           Right getDB -> do
             db <- getDB
-            let key = stripeKey config
+            key <- B.readFile (stripeKeyPath config)
             let app = paymentServerApp key issuer db
             logger <- mkRequestLogger (def { outputFormat = Detailed True})
             return $ logger app
