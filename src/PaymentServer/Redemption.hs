@@ -8,7 +8,6 @@
 module PaymentServer.Redemption
   ( RedemptionAPI
   , Redeem(Redeem)
-  , Result(Failed, Succeeded)
   , redemptionServer
   ) where
 
@@ -19,7 +18,8 @@ import Control.Monad.IO.Class
   ( liftIO
   )
 import Data.Text
-  ( pack
+  ( Text
+  , pack
   )
 import qualified Data.Text.IO as TextIO
 import Data.Text.Encoding
@@ -69,7 +69,9 @@ import PaymentServer.Issuer
   )
 
 data Result
-  = Failed
+  = Unpaid -- ^ A voucher has not been paid for.
+  | DoubleSpend -- ^ A voucher has already been redeemed.
+  | OtherFailure Text -- ^ Some other unrecognized failure mode.
   | Succeeded PublicKey [Signature] Proof
   deriving (Show, Eq)
 
@@ -87,7 +89,18 @@ instance ToJSON Redeem where
   toEncoding = genericToEncoding defaultOptions
 
 instance ToJSON Result where
-  toJSON Failed = object [ "success" .= False ]
+  toJSON Unpaid = object
+    [ "success" .= False
+    , "reason" .= ("unpaid" :: Text)
+    ]
+  toJSON DoubleSpend = object
+    [ "success" .= False
+    , "reason" .= ("double-spend" :: Text)
+    ]
+  toJSON (OtherFailure description) = object
+    [ "success" .= False
+    , "reason" .= description
+    ]
   toJSON (Succeeded key signatures proof) = object
     [ "success" .= True
     , "public-key" .= key
@@ -103,13 +116,18 @@ instance FromJSON Result where
         <$> v .: "public-key"
         <*> v .: "signatures"
         <*> v .: "proof"
-      else
-        return Failed
+      else do
+        reason <- v .: "reason"
+        if reason == "unpaid"
+        then return Unpaid
+        else if reason == "double-spend"
+        then return DoubleSpend
+        else return $ OtherFailure reason
 
 type RedemptionAPI = ReqBody '[JSON] Redeem :> Post '[JSON] Result
 
-jsonErr400 = err400
-  { errBody = encode Failed
+jsonErr400 reason = err400
+  { errBody = encode reason
   , errHeaders = [ ("Content-Type", "application/json;charset=utf-8") ]
   }
 
@@ -125,17 +143,14 @@ redeem issue database (Redeem voucher tokens) = do
   result <- liftIO $ PaymentServer.Persistence.redeemVoucher database voucher fingerprint
   case result of
     Left NotPaid -> do
-      liftIO $ putStrLn "Attempt to redeem unpaid voucher"
-      throwError jsonErr400
+      throwError $ jsonErr400 Unpaid
     Left AlreadyRedeemed -> do
-      liftIO $ putStrLn "Attempt to double-spend paid voucher"
-      throwError jsonErr400
+      throwError $ jsonErr400 DoubleSpend
     Right () -> do
       let result = issue tokens
       case result of
         Left reason -> do
-          liftIO $ TextIO.putStrLn reason
-          throwError jsonErr400
+          throwError $ jsonErr400 $ OtherFailure reason
         Right (ChallengeBypass key signatures proof) ->
           return $ Succeeded key signatures proof
 
