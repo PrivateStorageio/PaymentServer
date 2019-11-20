@@ -158,7 +158,7 @@ cors allowedOrigins requestOrigin =
         . noHeader
         . noHeader
   in
-    return $ addHeaders NoContent
+    return $ addHeaders $ addHeader "Origin" NoContent
 
 -- | Process charge succeeded events
 webhook :: VoucherDatabase d => d -> Event -> Handler Acknowledgement
@@ -190,6 +190,7 @@ type CORSResponse = Headers
                      , Header "Access-Control-Allow-Methods" Text
                      , Header "Access-Control-Allow-Headers" Text
                      , Header "Access-Control-Max-Age" Int
+                     , Header "Vary" Text
                      ]
                     NoContent
 
