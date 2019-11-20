@@ -7,6 +7,7 @@ module PaymentServer.Processors.Stripe
   , stripeServer
   , getVoucher
   , StripeSecretKey
+  , Origin
   ) where
 
 import Control.Monad.IO.Class
@@ -42,7 +43,11 @@ import Servant
   , NoContent(NoContent)
   , Headers
   , Header
+  , Header'
+  , Required
+  , Strict
   , addHeader
+  , noHeader
   )
 import Servant.API
   ( ReqBody
@@ -85,6 +90,9 @@ import PaymentServer.Persistence
   , VoucherDatabase(payForVoucher)
   )
 
+-- | The type of an origin value in the context of HTTP / CORS.
+type Origin = Text
+
 -- | OPTIONS is a standard HTTP/1.1 verb and it is used by the CORS mechanism
 -- to exchange information about what cross-origin requests should be allowed.
 -- Here we define it as a verb for use later in the type of our server.
@@ -109,21 +117,48 @@ getVoucher (MetaData []) = Nothing
 getVoucher (MetaData (("Voucher", value):xs)) = Just value
 getVoucher (MetaData (x:xs)) = getVoucher (MetaData xs)
 
-stripeServer :: VoucherDatabase d => StripeSecretKey -> d -> Server StripeAPI
-stripeServer key d =
+-- | stripeServer serves responses to the Stripe portion of the API defined in
+-- this module.
+stripeServer
+  :: VoucherDatabase d
+  => [Origin]            -- ^ A list of origins which are allowed to use the
+                         -- charge endpoint.
+  -> StripeSecretKey
+  -> d
+  -> Server StripeAPI
+stripeServer allowedChargeOrigins key d =
   webhook d
   :<|> charge d key
-  :<|> cors
+  :<|> cors allowedChargeOrigins
 
 -- | Respond to a CORS OPTIONS preflight request for the charge endpoint in
--- such a way as to allow some cross-origin POSTs to that endpoint.
-cors :: Handler CORSResponse
-cors = return
-  $ addHeader "*"
-  $ addHeader "OPTIONS, POST"
-  $ addHeader "Content-Type"
-  $ addHeader (60 * 60 * 24)
-  NoContent
+-- such a way as to allow some cross-origin POSTs to that endpoint.  This is a
+-- partial implementation of the CORS rules only.
+cors
+  :: [Origin]             -- ^ A list of origins which are allowed to use the
+                          -- charge endpoint.
+  -> Origin               -- ^ The value of the Origin header in the request,
+                          -- for comparison against the allowed origins.
+  -> Handler CORSResponse
+cors allowedOrigins requestOrigin =
+  let
+    addHeaders =
+      if any (== requestOrigin) allowedOrigins then
+        -- The origin is allowed.  Return the rest of the information.
+        addHeader requestOrigin
+        . addHeader "OPTIONS, POST"
+        . addHeader "Content-Type"
+        . addHeader (60 * 60 * 24)
+      else
+        -- The origin is not allowed.  Per
+        -- <https://www.w3.org/TR/2014/REC-cors-20140116/#resource-preflight-requests>,
+        -- section 6.2, rule 2, add no further CORS headers to the response.
+        noHeader
+        . noHeader
+        . noHeader
+        . noHeader
+  in
+    return $ addHeaders NoContent
 
 -- | Process charge succeeded events
 webhook :: VoucherDatabase d => d -> Event -> Handler Acknowledgement
@@ -154,7 +189,7 @@ type CORSResponse = Headers
                     '[ Header "Access-Control-Allow-Origin" Text
                      , Header "Access-Control-Allow-Methods" Text
                      , Header "Access-Control-Allow-Headers" Text
-                     , Header "Access-Control-MaxAge" Int
+                     , Header "Access-Control-Max-Age" Int
                      ]
                     NoContent
 
@@ -162,11 +197,9 @@ type CORSResponse = Headers
 -- | Browser facing API that takes token, voucher and a few other information
 -- and calls stripe charges API. If payment succeeds, then the voucher is stored
 -- in the voucher database.
-type ChargesAPI =
-      "charge" :>
-      (    ReqBody '[JSON] Charges :> Post '[JSON] Acknowledgement
-      :<|> Options '[JSON] CORSResponse
-      )
+type ChargesAPI = "charge" :> (CreateChargeAPI :<|> CORSPreflight)
+type CreateChargeAPI = ReqBody '[JSON] Charges :> Post '[JSON] Acknowledgement
+type CORSPreflight = Header' '[Required, Strict] "Origin" Text :> Options '[JSON] CORSResponse
 
 data Charges = Charges
   { token :: Text          -- ^ The text of a Stripe tokenized payment method.
