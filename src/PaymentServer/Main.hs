@@ -168,7 +168,7 @@ sample = ServerConfig
     <> help "Path to Stripe Secret key" )
   <*> option auto
   ( long "allow-origin"
-    <> help "For the charge endpoint, an origin to allow (CORS)."
+    <> help "For the charge endpoint, a list of CORS origins to allow."
     <> showDefault
     <> value [] )
 
