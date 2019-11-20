@@ -16,7 +16,8 @@ import Servant
   , (:<|>)((:<|>))
   )
 import PaymentServer.Processors.Stripe
-  ( StripeAPI
+  ( Origin
+  , StripeAPI
   , StripeSecretKey
   , stripeServer
   )
@@ -37,9 +38,15 @@ type PaymentServerAPI
   :<|> "v1" :> "redeem" :> RedemptionAPI
 
 -- | Create a server which uses the given database.
-paymentServer :: VoucherDatabase d => StripeSecretKey -> Issuer -> d -> Server PaymentServerAPI
-paymentServer key issuer database =
-  stripeServer key database
+paymentServer
+  :: VoucherDatabase d
+  => [Origin]
+  -> StripeSecretKey
+  -> Issuer
+  -> d
+  -> Server PaymentServerAPI
+paymentServer allowedChargeOrigins key issuer database =
+  stripeServer allowedChargeOrigins key database
   :<|> redemptionServer issuer database
 
 paymentServerAPI :: Proxy PaymentServerAPI
@@ -47,5 +54,11 @@ paymentServerAPI = Proxy
 
 -- | Create a Servant Application which serves the payment server API using
 -- the given database.
-paymentServerApp :: VoucherDatabase d => StripeSecretKey -> Issuer -> d -> Application
-paymentServerApp key issuer = serve paymentServerAPI . paymentServer key issuer
+paymentServerApp
+  :: VoucherDatabase d
+  => [Origin]
+  -> StripeSecretKey
+  -> Issuer
+  -> d
+  -> Application
+paymentServerApp allowedChargeOrigins key issuer = serve paymentServerAPI . paymentServer allowedChargeOrigins key issuer

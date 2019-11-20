@@ -53,6 +53,7 @@ import Options.Applicative
   , ParserInfo
   , strOption
   , option
+  , many
   , auto
   , str
   , optional
@@ -87,12 +88,13 @@ data Database =
   deriving (Show, Eq, Ord, Read)
 
 data ServerConfig = ServerConfig
-  { issuer          :: Issuer
-  , signingKeyPath  :: Maybe FilePath
-  , database        :: Database
-  , databasePath    :: Maybe Text
-  , endpoint        :: Endpoint
-  , stripeKeyPath   :: FilePath
+  { issuer               :: Issuer
+  , signingKeyPath       :: Maybe FilePath
+  , database             :: Database
+  , databasePath         :: Maybe Text
+  , endpoint             :: Endpoint
+  , stripeKeyPath        :: FilePath
+  , allowedChargeOrigins :: [Text]
   }
   deriving (Show, Eq)
 
@@ -165,6 +167,13 @@ sample = ServerConfig
   <*> option str
   ( long "stripe-key-path"
     <> help "Path to Stripe Secret key" )
+  <*> many
+  ( option str
+    ( long "allow-origin"
+      <> help "For the charge endpoint, a CORS origin to allow."
+      <> showDefault
+    )
+  )
 
 opts :: ParserInfo ServerConfig
 opts = info (sample <**> helper)
@@ -230,6 +239,6 @@ getApp config =
           Right getDB -> do
             db <- getDB
             key <- B.readFile (stripeKeyPath config)
-            let app = paymentServerApp key issuer db
+            let app = paymentServerApp (allowedChargeOrigins config) key issuer db
             logger <- mkRequestLogger (def { outputFormat = Detailed True})
             return $ logger app
