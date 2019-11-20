@@ -53,6 +53,7 @@ import Options.Applicative
   , ParserInfo
   , strOption
   , option
+  , many
   , auto
   , str
   , optional
@@ -166,11 +167,13 @@ sample = ServerConfig
   <*> option str
   ( long "stripe-key-path"
     <> help "Path to Stripe Secret key" )
-  <*> option auto
-  ( long "allow-origin"
-    <> help "For the charge endpoint, a list of CORS origins to allow."
-    <> showDefault
-    <> value [] )
+  <*> many
+  ( option str
+    ( long "allow-origin"
+      <> help "For the charge endpoint, a CORS origin to allow."
+      <> showDefault
+    )
+  )
 
 opts :: ParserInfo ServerConfig
 opts = info (sample <**> helper)
