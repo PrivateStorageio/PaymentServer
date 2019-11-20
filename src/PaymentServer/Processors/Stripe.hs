@@ -39,11 +39,17 @@ import Servant
   , err500
   , ServerError(errBody)
   , throwError
+  , NoContent(NoContent)
+  , Headers
+  , Header
+  , addHeader
   )
 import Servant.API
   ( ReqBody
+  , StdMethod(OPTIONS)
   , JSON
   , Post
+  , Verb
   , (:>)
   , (:<|>)((:<|>))
   )
@@ -79,6 +85,11 @@ import PaymentServer.Persistence
   , VoucherDatabase(payForVoucher)
   )
 
+-- | OPTIONS is a standard HTTP/1.1 verb and it is used by the CORS mechanism
+-- to exchange information about what cross-origin requests should be allowed.
+-- Here we define it as a verb for use later in the type of our server.
+type Options = Verb 'OPTIONS 204
+
 type StripeSecretKey = ByteString
 
 data Acknowledgement = Ok
@@ -99,8 +110,20 @@ getVoucher (MetaData (("Voucher", value):xs)) = Just value
 getVoucher (MetaData (x:xs)) = getVoucher (MetaData xs)
 
 stripeServer :: VoucherDatabase d => StripeSecretKey -> d -> Server StripeAPI
-stripeServer key d = webhook d
-                     :<|> charge d key
+stripeServer key d =
+  webhook d
+  :<|> charge d key
+  :<|> cors
+
+-- | Respond to a CORS OPTIONS preflight request for the charge endpoint in
+-- such a way as to allow some cross-origin POSTs to that endpoint.
+cors :: Handler CORSResponse
+cors = return
+  $ addHeader "*"
+  $ addHeader "OPTIONS, POST"
+  $ addHeader "Content-Type"
+  $ addHeader (60 * 60 * 24)
+  NoContent
 
 -- | Process charge succeeded events
 webhook :: VoucherDatabase d => d -> Event -> Handler Acknowledgement
@@ -125,10 +148,25 @@ webhook d _ =
   return Ok
 
 
+-- | The type of the response to a CORS OPTIONS preflight request.  It would
+-- be nice to use more expressive types than Text for some of these.
+type CORSResponse = Headers
+                    '[ Header "Access-Control-Allow-Origin" Text
+                     , Header "Access-Control-Allow-Methods" Text
+                     , Header "Access-Control-Allow-Headers" Text
+                     , Header "Access-Control-MaxAge" Int
+                     ]
+                    NoContent
+
+
 -- | Browser facing API that takes token, voucher and a few other information
 -- and calls stripe charges API. If payment succeeds, then the voucher is stored
 -- in the voucher database.
-type ChargesAPI = "charge" :> ReqBody '[JSON] Charges :> Post '[JSON] Acknowledgement
+type ChargesAPI =
+      "charge" :>
+      (    ReqBody '[JSON] Charges :> Post '[JSON] Acknowledgement
+      :<|> Options '[JSON] CORSResponse
+      )
 
 data Charges = Charges
   { token :: Text          -- ^ The text of a Stripe tokenized payment method.
