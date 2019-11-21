@@ -143,7 +143,7 @@ instance FromJSON Charges where
   parseJSON (Object v) = Charges <$>
                          v .: "token" <*>
                          v .: "voucher" <*>
-                         v .: "amount" <*>
+                         (read <$> v .: "amount") <*>
                          v .: "currency"
   parseJSON _ = mzero
 
