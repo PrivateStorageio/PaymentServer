@@ -7,6 +7,9 @@ module PaymentServer.Server
   ( paymentServerApp
   ) where
 
+import Network.Wai.Middleware.Cors
+  ( simpleCors
+  )
 import Servant
   ( Proxy(Proxy)
   , Server
@@ -48,4 +51,9 @@ paymentServerAPI = Proxy
 -- | Create a Servant Application which serves the payment server API using
 -- the given database.
 paymentServerApp :: VoucherDatabase d => StripeSecretKey -> Issuer -> d -> Application
-paymentServerApp key issuer = serve paymentServerAPI . paymentServer key issuer
+paymentServerApp key issuer =
+  let
+    app = serve paymentServerAPI . paymentServer key issuer
+    cors = simpleCors
+  in
+    cors . app

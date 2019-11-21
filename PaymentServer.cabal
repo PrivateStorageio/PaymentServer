@@ -30,6 +30,7 @@ library
                      , servant-server
                      , wai
                      , wai-extra
+                     , wai-cors
                      , data-default
                      , warp
                      , warp-tls
