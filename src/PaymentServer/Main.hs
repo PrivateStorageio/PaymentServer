@@ -30,7 +30,7 @@ import Network.Wai.Handler.Warp
   , setPort
   , setOnException
   , setOnExceptionResponse
-  , run
+  , runSettings
   )
 import Network.Wai.Handler.WarpTLS
   ( runTLS
@@ -201,28 +201,33 @@ main = do
     logEndpoint (endpoint config)
     run app
 
+getPortNumber (TCPEndpoint portNumber) = portNumber
+getPortNumber (TLSEndpoint portNumber _ _ _) = portNumber
+
 getRunner :: Endpoint -> (Application -> IO ())
 getRunner endpoint =
-  case endpoint of
-    (TCPEndpoint portNumber) ->
-      run portNumber
-    (TLSEndpoint portNumber certificatePath chainPath keyPath) ->
-      let
-        tlsSettings = tlsSettingsChain certificatePath (maybeToList chainPath) keyPath
-        onException :: Maybe Request -> SomeException -> IO ()
-        onException _ exc = do
-          print "onException"
-          print exc
-          return ()
-        onExceptionResponse :: SomeException -> Response
-        onExceptionResponse = (responseLBS status500 []) . LBS.fromString . ("exception: " ++) . show
-        settings =
-          setPort portNumber .
-          setOnException onException .
-          setOnExceptionResponse onExceptionResponse $
-          defaultSettings
-      in
-        runTLS tlsSettings settings
+  let
+    onException :: Maybe Request -> SomeException -> IO ()
+    onException _ exc = do
+      print "onException"
+      print exc
+      return ()
+    onExceptionResponse :: SomeException -> Response
+    onExceptionResponse = (responseLBS status500 []) . LBS.fromString . ("exception: " ++) . show
+    settings =
+      setPort (getPortNumber endpoint) .
+      setOnException onException .
+      setOnExceptionResponse onExceptionResponse $
+      defaultSettings
+  in
+    case endpoint of
+      (TCPEndpoint _) ->
+        runSettings settings
+      (TLSEndpoint _ certificatePath chainPath keyPath) ->
+        let
+          tlsSettings = tlsSettingsChain certificatePath (maybeToList chainPath) keyPath
+        in
+          runTLS tlsSettings settings
 
 logEndpoint :: Endpoint -> IO ()
 logEndpoint endpoint =
