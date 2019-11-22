@@ -166,6 +166,7 @@ charge d key (Charges token voucher amount currency) = do
           if v == voucher
             then
             do
+              -- TODO Handle payForVoucher errors
               liftIO $ payForVoucher d voucher
               return Ok
             else
