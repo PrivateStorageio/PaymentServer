@@ -6,6 +6,9 @@ module PaymentServer.Main
   ( main
   ) where
 
+import Control.Exception.Base
+  ( SomeException
+  )
 import Text.Printf
   ( printf
   )
@@ -18,10 +21,15 @@ import Data.Text
 import Data.Default
   ( def
   )
+import Network.HTTP.Types.Status
+  ( status500
+  )
 import Network.Wai.Handler.Warp
   ( Port
   , defaultSettings
   , setPort
+  , setOnException
+  , setOnExceptionResponse
   , run
   )
 import Network.Wai.Handler.WarpTLS
@@ -30,6 +38,9 @@ import Network.Wai.Handler.WarpTLS
   )
 import Network.Wai
   ( Application
+  , Request
+  , Response
+  , responseLBS
   )
 import Network.Wai.Middleware.Cors
   ( Origin
@@ -79,6 +90,7 @@ import System.Exit
 import Data.Semigroup ((<>))
 import qualified Data.Text.IO as TIO
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy.UTF8 as LBS
 
 data Issuer =
   Trivial
@@ -197,7 +209,18 @@ getRunner endpoint =
     (TLSEndpoint portNumber certificatePath chainPath keyPath) ->
       let
         tlsSettings = tlsSettingsChain certificatePath (maybeToList chainPath) keyPath
-        settings = setPort portNumber defaultSettings
+        onException :: Maybe Request -> SomeException -> IO ()
+        onException _ exc = do
+          print "onException"
+          print exc
+          return ()
+        onExceptionResponse :: SomeException -> Response
+        onExceptionResponse = (responseLBS status500 []) . LBS.fromString . ("exception: " ++) . show
+        settings =
+          setPort portNumber .
+          setOnException onException .
+          setOnExceptionResponse onExceptionResponse $
+          defaultSettings
       in
         runTLS tlsSettings settings
 

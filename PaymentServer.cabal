@@ -26,8 +26,10 @@ library
                      , optparse-applicative
                      , aeson
                      , bytestring
+                     , utf8-string
                      , servant
                      , servant-server
+                     , http-types
                      , wai
                      , wai-extra
                      , wai-cors

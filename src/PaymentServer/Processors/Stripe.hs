@@ -37,7 +37,7 @@ import Servant
   , Handler
   , err400
   , err500
-  , ServerError(errBody)
+  , ServerError(errHTTPCode, errBody)
   , throwError
   )
 import Servant.API
@@ -171,7 +171,14 @@ charge d key (Charges token voucher amount currency) = do
             else
             throwError err500 { errBody = "Voucher code mismatch" }
         _ -> throwError err400 { errBody = "Voucher code not found" }
-    Left StripeError {} -> throwError err400 { errBody = "Stripe charge didn't succeed" }
+    Left StripeError {} ->
+      let
+        errCode = (read "foo") :: Int
+      in
+        throwError err400
+        { errHTTPCode = errCode
+        , errBody = "Stripe charge didn't succeed"
+        }
     where
       getCurrency :: Text -> Handler Currency
       getCurrency maybeCurrency =
