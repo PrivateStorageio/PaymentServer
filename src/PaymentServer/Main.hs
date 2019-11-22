@@ -31,6 +31,9 @@ import Network.Wai.Handler.WarpTLS
 import Network.Wai
   ( Application
   )
+import Network.Wai.Middleware.Cors
+  ( Origin
+  )
 import Network.Wai.Middleware.RequestLogger
   ( OutputFormat(Detailed)
   , outputFormat
@@ -55,6 +58,7 @@ import Options.Applicative
   , option
   , auto
   , str
+  , many
   , optional
   , long
   , help
@@ -93,6 +97,7 @@ data ServerConfig = ServerConfig
   , databasePath    :: Maybe Text
   , endpoint        :: Endpoint
   , stripeKeyPath   :: FilePath
+  , corsOrigins     :: [Origin]
   }
   deriving (Show, Eq)
 
@@ -165,6 +170,9 @@ sample = ServerConfig
   <*> option str
   ( long "stripe-key-path"
     <> help "Path to Stripe Secret key" )
+  <*> many ( option str
+             ( long "cors-origin"
+             <> help "An allowed `Origin` for the purposes of CORS (zero or more)." ) )
 
 opts :: ParserInfo ServerConfig
 opts = info (sample <**> helper)
@@ -230,6 +238,8 @@ getApp config =
           Right getDB -> do
             db <- getDB
             key <- B.readFile (stripeKeyPath config)
-            let app = paymentServerApp key issuer db
+            let
+              origins = corsOrigins config
+              app = paymentServerApp origins key issuer db
             logger <- mkRequestLogger (def { outputFormat = Detailed True})
             return $ logger app

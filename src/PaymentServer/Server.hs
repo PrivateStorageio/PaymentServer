@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | This module exposes a Servant-based Network.Wai server for payment
 -- interactions.
@@ -8,7 +9,10 @@ module PaymentServer.Server
   ) where
 
 import Network.Wai.Middleware.Cors
-  ( simpleCors
+  ( Origin
+  , CorsResourcePolicy(corsOrigins, corsMethods, corsRequestHeaders)
+  , simpleCorsResourcePolicy
+  , cors
   )
 import Servant
   ( Proxy(Proxy)
@@ -50,10 +54,22 @@ paymentServerAPI = Proxy
 
 -- | Create a Servant Application which serves the payment server API using
 -- the given database.
-paymentServerApp :: VoucherDatabase d => StripeSecretKey -> Issuer -> d -> Application
-paymentServerApp key issuer =
+paymentServerApp
+  :: VoucherDatabase d
+  => [Origin]              -- ^ A list of CORS Origins to accept.
+  -> StripeSecretKey
+  -> Issuer
+  -> d
+  -> Application
+paymentServerApp corsOrigins key issuer =
   let
     app = serve paymentServerAPI . paymentServer key issuer
-    cors = simpleCors
+    withCredentials = False
+    corsResourcePolicy = simpleCorsResourcePolicy
+                         { corsOrigins = Just (corsOrigins, withCredentials)
+                         , corsMethods = [ "POST" ]
+                         , corsRequestHeaders = [ "Content-Type" ]
+                         }
+    cors' = cors (const $ Just corsResourcePolicy)
   in
-    cors . app
+    cors' . app
