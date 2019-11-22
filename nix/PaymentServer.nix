@@ -58,10 +58,12 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
         depends = [
           (hsPkgs."base" or (buildDepError "base"))
           (hsPkgs."bytestring" or (buildDepError "bytestring"))
+          (hsPkgs."utf8-string" or (buildDepError "utf8-string"))
           (hsPkgs."optparse-applicative" or (buildDepError "optparse-applicative"))
           (hsPkgs."aeson" or (buildDepError "aeson"))
           (hsPkgs."servant" or (buildDepError "servant"))
           (hsPkgs."servant-server" or (buildDepError "servant-server"))
+          (hsPkgs."http-types" or (buildDepError "http-types"))
           (hsPkgs."wai" or (buildDepError "wai"))
           (hsPkgs."wai-extra" or (buildDepError "wai-extra"))
           (hsPkgs."wai-cors" or (buildDepError "wai-cors"))
