@@ -52,19 +52,24 @@ tests = testGroup "Persistence"
   , sqlite3DatabaseVoucherPaymentTests
   ]
 
+-- Some dummy values that should be replaced by the use of QuickCheck.
 voucher = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 fingerprint = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
+-- Mock a successful payment.
 paySuccessfully :: IO ()
 paySuccessfully = return ()
 
+-- Mock a failed payment.
 failPayment :: IO ()
 failPayment = throwIO ArbitraryException
 
+-- | Create a group of tests related to voucher payment and redemption.
 makeVoucherPaymentTests
   :: VoucherDatabase d
-  => Text.Text
-  -> IO d
+  => Text.Text           -- ^ A distinctive identifier for this group's label.
+  -> IO d                -- ^ An operation that creates a new, empty voucher
+                         -- database.
   -> TestTree
 makeVoucherPaymentTests label makeDatabase =
   testGroup ("voucher payments (" ++ Text.unpack label ++ ")")
@@ -109,10 +114,11 @@ makeVoucherPaymentTests label makeDatabase =
       assertEqual "redeeming double-paid voucher" (Right ()) redeemResult
   ]
 
-
+-- | Instantiate the persistence tests for the memory backend.
 memoryDatabaseVoucherPaymentTests :: TestTree
 memoryDatabaseVoucherPaymentTests = makeVoucherPaymentTests "memory" memory
 
+-- | Instantiate the persistence tests for the sqlite3 backend.
 sqlite3DatabaseVoucherPaymentTests :: TestTree
 sqlite3DatabaseVoucherPaymentTests =
   makeVoucherPaymentTests "sqlite3" $
