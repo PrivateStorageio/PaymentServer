@@ -15,6 +15,9 @@ import Control.Monad.IO.Class
 import Control.Monad
   ( mzero
   )
+import Control.Exception
+  ( try
+  )
 import Data.ByteString
   ( ByteString
   )
@@ -77,6 +80,7 @@ import Web.Stripe
 import PaymentServer.Persistence
   ( Voucher
   , VoucherDatabase(payForVoucher)
+  , PaymentError(AlreadyPaid)
   )
 
 type StripeSecretKey = ByteString
@@ -125,12 +129,16 @@ instance FromJSON Charges where
 charge :: VoucherDatabase d => d -> StripeSecretKey -> Charges -> Handler Acknowledgement
 charge d key (Charges token voucher amount currency) = do
   currency' <- getCurrency currency
-  result <- liftIO $ payForVoucher d voucher (completeStripeCharge currency')
+  result <- liftIO (try (payForVoucher d voucher (completeStripeCharge currency')))
   case result of
-    Right Charge { chargeMetaData = metadata } ->
-      checkVoucherMetadata metadata
-    Left StripeError {} ->
-      throwError stripeChargeFailed
+    Left AlreadyPaid ->
+      throwError voucherAlreadyPaid
+    Right stripeResult ->
+      case stripeResult of
+        Right Charge { chargeMetaData = metadata } ->
+          checkVoucherMetadata metadata
+        Left StripeError {} ->
+          throwError stripeChargeFailed
     where
       getCurrency :: Text -> Handler Currency
       getCurrency maybeCurrency =
@@ -170,4 +178,8 @@ charge d key (Charges token voucher amount currency) = do
       stripeChargeFailed =
         err400
         { errBody = "Stripe charge didn't succeed"
+        }
+      voucherAlreadyPaid =
+        err400
+        { errBody = "Payment for voucher already supplied"
         }
