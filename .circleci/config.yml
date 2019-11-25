@@ -146,6 +146,7 @@ jobs:
               --no-terminal \
               --haddock \
               --haddock-internal \
+              --test \
               --no-haddock-deps"
             nix-shell shell.nix --run "$BUILD"
 
