@@ -86,10 +86,7 @@ data Acknowledgement = Ok
 instance ToJSON Acknowledgement where
   toJSON Ok = object []
 
-type StripeAPI = WebhookAPI
-               :<|> ChargesAPI
-
-type WebhookAPI = "webhook" :> ReqBody '[JSON] Event :> Post '[JSON] Acknowledgement
+type StripeAPI = ChargesAPI
 
 -- | getVoucher finds the metadata item with the key `"Voucher"` and returns
 -- the corresponding value, or Nothing.
@@ -99,31 +96,7 @@ getVoucher (MetaData (("Voucher", value):xs)) = Just value
 getVoucher (MetaData (x:xs)) = getVoucher (MetaData xs)
 
 stripeServer :: VoucherDatabase d => StripeSecretKey -> d -> Server StripeAPI
-stripeServer key d = webhook d
-                     :<|> charge d key
-
--- | Process charge succeeded events
-webhook :: VoucherDatabase d => d -> Event -> Handler Acknowledgement
-webhook d Event{eventId=Just (EventId eventId), eventType=ChargeSucceededEvent, eventData=(ChargeEvent charge)} =
-  case getVoucher $ chargeMetaData charge of
-    Nothing ->
-      -- TODO: Record the eventId somewhere.  In all cases where we don't
-      -- associate the value of the charge with something in our system, we
-      -- probably need enough information to issue a refund.  We're early
-      -- enough in the system here that refunds are possible and not even
-      -- particularly difficult.
-      return Ok
-    Just v  -> do
-      -- TODO: What if it is a duplicate payment?  payForVoucher should be
-      -- able to indicate error I guess.
-      () <- liftIO $ payForVoucher d v
-      return Ok
-
--- Disregard anything else - but return success so that Stripe doesn't retry.
-webhook d _ =
-  -- TODO: Record the eventId somewhere.
-  return Ok
-
+stripeServer key d = charge d key
 
 -- | Browser facing API that takes token, voucher and a few other information
 -- and calls stripe charges API. If payment succeeds, then the voucher is stored
@@ -151,38 +124,50 @@ instance FromJSON Charges where
 -- and if the Charge is okay, then set the voucher as "paid" in the database.
 charge :: VoucherDatabase d => d -> StripeSecretKey -> Charges -> Handler Acknowledgement
 charge d key (Charges token voucher amount currency) = do
-  let config = StripeConfig (StripeKey key) Nothing
-      tokenId = TokenId token
   currency' <- getCurrency currency
-  result <- liftIO $ stripe config $
-    createCharge (Amount amount) currency'
-      -&- tokenId
-      -&- MetaData [("Voucher", voucher)]
+  result <- liftIO $ payForVoucher d voucher (completeStripeCharge currency')
   case result of
     Right Charge { chargeMetaData = metadata } ->
-      -- verify that we are getting the same metadata that we sent.
-      case metadata of
-        MetaData [("Voucher", v)] ->
-          if v == voucher
-            then
-            do
-              -- TODO Handle payForVoucher errors
-              liftIO $ payForVoucher d voucher
-              return Ok
-            else
-            throwError err500 { errBody = "Voucher code mismatch" }
-        _ -> throwError err400 { errBody = "Voucher code not found" }
+      checkVoucherMetadata metadata
     Left StripeError {} ->
-      let
-        errCode = (read "foo") :: Int
-      in
-        throwError err400
-        { errHTTPCode = errCode
-        , errBody = "Stripe charge didn't succeed"
-        }
+      throwError stripeChargeFailed
     where
       getCurrency :: Text -> Handler Currency
       getCurrency maybeCurrency =
         case readMaybe (unpack currency) of
           Just currency' -> return currency'
-          Nothing -> throwError err400 { errBody = "Invalid currency specified" }
+          Nothing -> throwError unsupportedCurrency
+
+      config = StripeConfig (StripeKey key) Nothing
+      tokenId = TokenId token
+      completeStripeCharge currency' = stripe config $
+        createCharge (Amount amount) currency'
+        -&- tokenId
+        -&- MetaData [("Voucher", voucher)]
+
+      checkVoucherMetadata :: MetaData -> Handler Acknowledgement
+      checkVoucherMetadata metadata =
+        -- verify that we are getting the same metadata that we sent.
+        case metadata of
+          MetaData [("Voucher", v)] ->
+            if v == voucher
+            then return Ok
+            else throwError voucherCodeMismatch
+          _ -> throwError voucherCodeNotFound
+
+      unsupportedCurrency =
+        err400
+        { errBody = "Invalid currency specified"
+        }
+      voucherCodeNotFound =
+        err400
+        { errBody = "Voucher code not found"
+        }
+      voucherCodeMismatch =
+        err500
+        { errBody = "Voucher code mismatch"
+        }
+      stripeChargeFailed =
+        err400
+        { errBody = "Stripe charge didn't succeed"
+        }

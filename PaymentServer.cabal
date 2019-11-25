@@ -63,6 +63,18 @@ executable PaymentServer-generate-key
                      , PaymentServer
   default-language:    Haskell2010
 
+test-suite PaymentServer-tests
+  type:            exitcode-stdio-1.0
+  hs-source-dirs:  test
+  main-is:         Spec.hs
+  other-modules:   Persistence
+  build-depends:   base
+                 , text
+                 , tasty
+                 , tasty-hunit
+                 , directory
+                 , PaymentServer
+
 source-repository head
   type:     git
   location: https://github.com/privatestorageio/PaymentServer
