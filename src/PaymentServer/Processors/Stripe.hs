@@ -15,6 +15,10 @@ import Control.Monad.IO.Class
 import Control.Monad
   ( mzero
   )
+import Control.Exception
+  ( try
+  , throwIO
+  )
 import Data.ByteString
   ( ByteString
   )
@@ -22,6 +26,7 @@ import Data.Text
   ( Text
   , unpack
   )
+import qualified Data.Map as Map
 import Text.Read
   ( readMaybe
   )
@@ -30,14 +35,16 @@ import Data.Aeson
   , FromJSON(parseJSON)
   , Value(Object)
   , object
+  , encode
   , (.:)
+  , (.=)
   )
 import Servant
   ( Server
   , Handler
   , err400
   , err500
-  , ServerError(errBody)
+  , ServerError(ServerError, errHTTPCode, errBody, errHeaders, errReasonPhrase)
   , throwError
   )
 import Servant.API
@@ -77,6 +84,7 @@ import Web.Stripe
 import PaymentServer.Persistence
   ( Voucher
   , VoucherDatabase(payForVoucher)
+  , PaymentError(AlreadyPaid, PaymentFailed)
   )
 
 type StripeSecretKey = ByteString
@@ -84,12 +92,11 @@ type StripeSecretKey = ByteString
 data Acknowledgement = Ok
 
 instance ToJSON Acknowledgement where
-  toJSON Ok = object []
+  toJSON Ok = object
+    [ "success" .= True
+    ]
 
-type StripeAPI = WebhookAPI
-               :<|> ChargesAPI
-
-type WebhookAPI = "webhook" :> ReqBody '[JSON] Event :> Post '[JSON] Acknowledgement
+type StripeAPI = ChargesAPI
 
 -- | getVoucher finds the metadata item with the key `"Voucher"` and returns
 -- the corresponding value, or Nothing.
@@ -99,31 +106,7 @@ getVoucher (MetaData (("Voucher", value):xs)) = Just value
 getVoucher (MetaData (x:xs)) = getVoucher (MetaData xs)
 
 stripeServer :: VoucherDatabase d => StripeSecretKey -> d -> Server StripeAPI
-stripeServer key d = webhook d
-                     :<|> charge d key
-
--- | Process charge succeeded events
-webhook :: VoucherDatabase d => d -> Event -> Handler Acknowledgement
-webhook d Event{eventId=Just (EventId eventId), eventType=ChargeSucceededEvent, eventData=(ChargeEvent charge)} =
-  case getVoucher $ chargeMetaData charge of
-    Nothing ->
-      -- TODO: Record the eventId somewhere.  In all cases where we don't
-      -- associate the value of the charge with something in our system, we
-      -- probably need enough information to issue a refund.  We're early
-      -- enough in the system here that refunds are possible and not even
-      -- particularly difficult.
-      return Ok
-    Just v  -> do
-      -- TODO: What if it is a duplicate payment?  payForVoucher should be
-      -- able to indicate error I guess.
-      () <- liftIO $ payForVoucher d v
-      return Ok
-
--- Disregard anything else - but return success so that Stripe doesn't retry.
-webhook d _ =
-  -- TODO: Record the eventId somewhere.
-  return Ok
-
+stripeServer key d = charge d key
 
 -- | Browser facing API that takes token, voucher and a few other information
 -- and calls stripe charges API. If payment succeeds, then the voucher is stored
@@ -151,30 +134,63 @@ instance FromJSON Charges where
 -- and if the Charge is okay, then set the voucher as "paid" in the database.
 charge :: VoucherDatabase d => d -> StripeSecretKey -> Charges -> Handler Acknowledgement
 charge d key (Charges token voucher amount currency) = do
-  let config = StripeConfig (StripeKey key) Nothing
-      tokenId = TokenId token
   currency' <- getCurrency currency
-  result <- liftIO $ stripe config $
-    createCharge (Amount amount) currency'
-      -&- tokenId
-      -&- MetaData [("Voucher", voucher)]
+  result <- liftIO (try (payForVoucher d voucher (completeStripeCharge currency')))
   case result of
+    Left AlreadyPaid ->
+      throwError voucherAlreadyPaid
+    Left PaymentFailed ->
+      throwError stripeChargeFailed
     Right Charge { chargeMetaData = metadata } ->
-      -- verify that we are getting the same metadata that we sent.
-      case metadata of
-        MetaData [("Voucher", v)] ->
-          if v == voucher
-            then
-            do
-              liftIO $ payForVoucher d voucher
-              return Ok
-            else
-            throwError err500 { errBody = "Voucher code mismatch" }
-        _ -> throwError err400 { errBody = "Voucher code not found" }
-    Left StripeError {} -> throwError err400 { errBody = "Stripe charge didn't succeed" }
+      checkVoucherMetadata metadata
     where
       getCurrency :: Text -> Handler Currency
       getCurrency maybeCurrency =
         case readMaybe (unpack currency) of
           Just currency' -> return currency'
-          Nothing -> throwError err400 { errBody = "Invalid currency specified" }
+          Nothing -> throwError unsupportedCurrency
+
+      config = StripeConfig (StripeKey key) Nothing
+      tokenId = TokenId token
+      completeStripeCharge currency' = do
+        result <- stripe config $
+          createCharge (Amount amount) currency'
+          -&- tokenId
+          -&- MetaData [("Voucher", voucher)]
+        case result of
+          Left StripeError {} -> throwIO PaymentFailed
+          Right result -> return result
+
+      checkVoucherMetadata :: MetaData -> Handler Acknowledgement
+      checkVoucherMetadata metadata =
+        -- verify that we are getting the same metadata that we sent.
+        case metadata of
+          MetaData [("Voucher", v)] ->
+            if v == voucher
+            then return Ok
+            else throwError voucherCodeMismatch
+          _ -> throwError voucherCodeNotFound
+
+      voucherCodeMismatch = jsonErr 500 "Voucher code mismatch"
+      unsupportedCurrency = jsonErr 400 "Invalid currency specified"
+      voucherCodeNotFound = jsonErr 400 "Voucher code not found"
+      stripeChargeFailed = jsonErr 400 "Stripe charge didn't succeed"
+      voucherAlreadyPaid = jsonErr 400 "Payment for voucher already supplied"
+
+      jsonErr httpCode reason = ServerError
+        { errHTTPCode = httpCode
+        , errReasonPhrase = ""
+        , errBody = encode $ Failure reason
+        , errHeaders = [("content-type", "application/json")]
+        }
+
+
+data Failure = Failure Text
+  deriving (Show, Eq)
+
+
+instance ToJSON Failure where
+  toJSON (Failure reason) = object
+    [ "success" .= False
+    , "reason" .= reason
+    ]

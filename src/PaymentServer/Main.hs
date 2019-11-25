@@ -6,6 +6,9 @@ module PaymentServer.Main
   ( main
   ) where
 
+import Control.Exception.Base
+  ( SomeException
+  )
 import Text.Printf
   ( printf
   )
@@ -18,11 +21,16 @@ import Data.Text
 import Data.Default
   ( def
   )
+import Network.HTTP.Types.Status
+  ( status500
+  )
 import Network.Wai.Handler.Warp
   ( Port
   , defaultSettings
   , setPort
-  , run
+  , setOnException
+  , setOnExceptionResponse
+  , runSettings
   )
 import Network.Wai.Handler.WarpTLS
   ( runTLS
@@ -30,6 +38,12 @@ import Network.Wai.Handler.WarpTLS
   )
 import Network.Wai
   ( Application
+  , Request
+  , Response
+  , responseLBS
+  )
+import Network.Wai.Middleware.Cors
+  ( Origin
   )
 import Network.Wai.Middleware.RequestLogger
   ( OutputFormat(Detailed)
@@ -55,6 +69,7 @@ import Options.Applicative
   , option
   , auto
   , str
+  , many
   , optional
   , long
   , help
@@ -75,6 +90,7 @@ import System.Exit
 import Data.Semigroup ((<>))
 import qualified Data.Text.IO as TIO
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy.UTF8 as LBS
 
 data Issuer =
   Trivial
@@ -93,6 +109,7 @@ data ServerConfig = ServerConfig
   , databasePath    :: Maybe Text
   , endpoint        :: Endpoint
   , stripeKeyPath   :: FilePath
+  , corsOrigins     :: [Origin]
   }
   deriving (Show, Eq)
 
@@ -165,6 +182,9 @@ sample = ServerConfig
   <*> option str
   ( long "stripe-key-path"
     <> help "Path to Stripe Secret key" )
+  <*> many ( option str
+             ( long "cors-origin"
+             <> help "An allowed `Origin` for the purposes of CORS (zero or more)." ) )
 
 opts :: ParserInfo ServerConfig
 opts = info (sample <**> helper)
@@ -181,17 +201,33 @@ main = do
     logEndpoint (endpoint config)
     run app
 
+getPortNumber (TCPEndpoint portNumber) = portNumber
+getPortNumber (TLSEndpoint portNumber _ _ _) = portNumber
+
 getRunner :: Endpoint -> (Application -> IO ())
 getRunner endpoint =
-  case endpoint of
-    (TCPEndpoint portNumber) ->
-      run portNumber
-    (TLSEndpoint portNumber certificatePath chainPath keyPath) ->
-      let
-        tlsSettings = tlsSettingsChain certificatePath (maybeToList chainPath) keyPath
-        settings = setPort portNumber defaultSettings
-      in
-        runTLS tlsSettings settings
+  let
+    onException :: Maybe Request -> SomeException -> IO ()
+    onException _ exc = do
+      print "onException"
+      print exc
+      return ()
+    onExceptionResponse :: SomeException -> Response
+    onExceptionResponse = (responseLBS status500 []) . LBS.fromString . ("exception: " ++) . show
+    settings =
+      setPort (getPortNumber endpoint) .
+      setOnException onException .
+      setOnExceptionResponse onExceptionResponse $
+      defaultSettings
+  in
+    case endpoint of
+      (TCPEndpoint _) ->
+        runSettings settings
+      (TLSEndpoint _ certificatePath chainPath keyPath) ->
+        let
+          tlsSettings = tlsSettingsChain certificatePath (maybeToList chainPath) keyPath
+        in
+          runTLS tlsSettings settings
 
 logEndpoint :: Endpoint -> IO ()
 logEndpoint endpoint =
@@ -230,6 +266,8 @@ getApp config =
           Right getDB -> do
             db <- getDB
             key <- B.readFile (stripeKeyPath config)
-            let app = paymentServerApp key issuer db
+            let
+              origins = corsOrigins config
+              app = paymentServerApp origins key issuer db
             logger <- mkRequestLogger (def { outputFormat = Detailed True})
             return $ logger app
