@@ -15,6 +15,7 @@ import Control.Exception
   ( Exception
   , throwIO
   , catch
+  , try
   )
 
 import Data.Text
@@ -27,6 +28,7 @@ import Data.IORef
   ( IORef
   , newIORef
   , modifyIORef
+  , atomicModifyIORef'
   , readIORef
   )
 import qualified Database.SQLite.Simple as Sqlite
@@ -110,10 +112,18 @@ data VoucherDatabaseState =
   | SQLiteDB { conn :: Sqlite.Connection }
 
 instance VoucherDatabase VoucherDatabaseState where
-  payForVoucher MemoryDB{ paid = paid, redeemed = redeemed } voucher pay = do
-    result <- pay
-    modifyIORef paid (Set.insert voucher)
-    return result
+  payForVoucher MemoryDB{ paid = paidRef, redeemed = redeemed } voucher pay = do
+    -- Surely far from ideal...
+    paid <- readIORef paidRef
+    if Set.member voucher paid
+      -- Avoid processing the payment if the voucher is already paid.
+      then throwIO AlreadyPaid
+      else
+      do
+        result <- pay
+        -- Only modify the paid set if the payment succeeds.
+        modifyIORef paidRef (Set.insert voucher)
+        return result
 
   payForVoucher SQLiteDB{ conn = conn } voucher pay =
     insertVoucher conn voucher pay

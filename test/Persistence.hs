@@ -12,7 +12,7 @@ import qualified Data.Text as Text
 import Control.Exception
   ( Exception
   , throwIO
-  , catch
+  , try
   )
 
 import Test.Tasty
@@ -55,7 +55,10 @@ tests = testGroup "Persistence"
 voucher = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 fingerprint = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
+paySuccessfully :: IO ()
 paySuccessfully = return ()
+
+failPayment :: IO ()
 failPayment = throwIO ArbitraryException
 
 makeVoucherPaymentTests
@@ -92,15 +95,16 @@ makeVoucherPaymentTests label makeDatabase =
       assertEqual "re-redeeming paid voucher" (Left AlreadyRedeemed) second
   , testCase "pay with error" $ do
       db <- makeDatabase
-      payForVoucher db voucher failPayment
-        `catch` assertEqual "failing a payment for a voucher" ArbitraryException
+      payResult <- try $ payForVoucher db voucher failPayment
+      assertEqual "failing a payment for a voucher" (Left ArbitraryException) payResult
       result <- redeemVoucher db voucher fingerprint
       assertEqual "redeeming voucher with failed payment" (Left NotPaid) result
   , testCase "disallowed double payment" $ do
       db <- makeDatabase
       let pay = payForVoucher db voucher paySuccessfully
       () <- pay
-      pay `catch`  assertEqual "double-paying for a voucher" AlreadyPaid
+      payResult <- try pay
+      assertEqual "double-paying for a voucher" (Left AlreadyPaid) payResult
       redeemResult <- redeemVoucher db voucher fingerprint
       assertEqual "redeeming double-paid voucher" (Right ()) redeemResult
   ]
