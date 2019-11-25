@@ -92,7 +92,9 @@ type StripeSecretKey = ByteString
 data Acknowledgement = Ok
 
 instance ToJSON Acknowledgement where
-  toJSON Ok = object []
+  toJSON Ok = object
+    [ "success" .= True
+    ]
 
 type StripeAPI = ChargesAPI
 
