@@ -98,7 +98,7 @@ makeVoucherPaymentTests label makeDatabase =
       second <- redeem (Text.cons 'a' $ Text.tail fingerprint)
       assertEqual "redeeming paid voucher" (Right ()) first
       assertEqual "re-redeeming paid voucher" (Left AlreadyRedeemed) second
-  , testCase "pay with error" $ do
+  , testCase "pay with exception" $ do
       db <- makeDatabase
       payResult <- try $ payForVoucher db voucher failPayment
       assertEqual "failing a payment for a voucher" (Left ArbitraryException) payResult

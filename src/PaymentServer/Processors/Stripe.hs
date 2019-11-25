@@ -17,6 +17,7 @@ import Control.Monad
   )
 import Control.Exception
   ( try
+  , throwIO
   )
 import Data.ByteString
   ( ByteString
@@ -25,6 +26,7 @@ import Data.Text
   ( Text
   , unpack
   )
+import qualified Data.Map as Map
 import Text.Read
   ( readMaybe
   )
@@ -33,14 +35,16 @@ import Data.Aeson
   , FromJSON(parseJSON)
   , Value(Object)
   , object
+  , encode
   , (.:)
+  , (.=)
   )
 import Servant
   ( Server
   , Handler
   , err400
   , err500
-  , ServerError(errHTTPCode, errBody)
+  , ServerError(ServerError, errHTTPCode, errBody, errHeaders, errReasonPhrase)
   , throwError
   )
 import Servant.API
@@ -80,7 +84,7 @@ import Web.Stripe
 import PaymentServer.Persistence
   ( Voucher
   , VoucherDatabase(payForVoucher)
-  , PaymentError(AlreadyPaid)
+  , PaymentError(AlreadyPaid, PaymentFailed)
   )
 
 type StripeSecretKey = ByteString
@@ -133,12 +137,10 @@ charge d key (Charges token voucher amount currency) = do
   case result of
     Left AlreadyPaid ->
       throwError voucherAlreadyPaid
-    Right stripeResult ->
-      case stripeResult of
-        Right Charge { chargeMetaData = metadata } ->
-          checkVoucherMetadata metadata
-        Left StripeError {} ->
-          throwError stripeChargeFailed
+    Left PaymentFailed ->
+      throwError stripeChargeFailed
+    Right Charge { chargeMetaData = metadata } ->
+      checkVoucherMetadata metadata
     where
       getCurrency :: Text -> Handler Currency
       getCurrency maybeCurrency =
@@ -148,10 +150,14 @@ charge d key (Charges token voucher amount currency) = do
 
       config = StripeConfig (StripeKey key) Nothing
       tokenId = TokenId token
-      completeStripeCharge currency' = stripe config $
-        createCharge (Amount amount) currency'
-        -&- tokenId
-        -&- MetaData [("Voucher", voucher)]
+      completeStripeCharge currency' = do
+        result <- stripe config $
+          createCharge (Amount amount) currency'
+          -&- tokenId
+          -&- MetaData [("Voucher", voucher)]
+        case result of
+          Left StripeError {} -> throwIO PaymentFailed
+          Right result -> return result
 
       checkVoucherMetadata :: MetaData -> Handler Acknowledgement
       checkVoucherMetadata metadata =
@@ -163,23 +169,26 @@ charge d key (Charges token voucher amount currency) = do
             else throwError voucherCodeMismatch
           _ -> throwError voucherCodeNotFound
 
-      unsupportedCurrency =
-        err400
-        { errBody = "Invalid currency specified"
+      voucherCodeMismatch = jsonErr 500 "Voucher code mismatch"
+      unsupportedCurrency = jsonErr 400 "Invalid currency specified"
+      voucherCodeNotFound = jsonErr 400 "Voucher code not found"
+      stripeChargeFailed = jsonErr 400 "Stripe charge didn't succeed"
+      voucherAlreadyPaid = jsonErr 400 "Payment for voucher already supplied"
+
+      jsonErr httpCode reason = ServerError
+        { errHTTPCode = httpCode
+        , errReasonPhrase = ""
+        , errBody = encode $ Failure reason
+        , errHeaders = [("content-type", "application/json")]
         }
-      voucherCodeNotFound =
-        err400
-        { errBody = "Voucher code not found"
-        }
-      voucherCodeMismatch =
-        err500
-        { errBody = "Voucher code mismatch"
-        }
-      stripeChargeFailed =
-        err400
-        { errBody = "Stripe charge didn't succeed"
-        }
-      voucherAlreadyPaid =
-        err400
-        { errBody = "Payment for voucher already supplied"
-        }
+
+
+data Failure = Failure Text
+  deriving (Show, Eq)
+
+
+instance ToJSON Failure where
+  toJSON (Failure reason) = object
+    [ "success" .= False
+    , "reason" .= reason
+    ]

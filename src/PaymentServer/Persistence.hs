@@ -4,7 +4,7 @@ module PaymentServer.Persistence
   ( Voucher
   , Fingerprint
   , RedeemError(NotPaid, AlreadyRedeemed)
-  , PaymentError(AlreadyPaid)
+  , PaymentError(AlreadyPaid, PaymentFailed)
   , VoucherDatabase(payForVoucher, redeemVoucher)
   , VoucherDatabaseState(MemoryDB, SQLiteDB)
   , memory
@@ -49,6 +49,8 @@ type Voucher = Text
 data PaymentError =
   -- | The voucher has already been paid for.
   AlreadyPaid
+  -- | The payment transaction has failed.
+  | PaymentFailed
   deriving (Show, Eq)
 
 instance Exception PaymentError
