@@ -154,7 +154,10 @@ charge d stripeConfig (Charges token voucher amount currency) = do
           -&- tokenId
           -&- MetaData [("Voucher", voucher)]
         case result of
-          Left StripeError {} -> throwIO PaymentFailed
+          Left err -> do
+            print "Stripe createCharge failed:"
+            print err
+            throwIO PaymentFailed
           Right result -> return result
 
       checkVoucherMetadata :: MetaData -> Handler Acknowledgement
