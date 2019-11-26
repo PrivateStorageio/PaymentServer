@@ -197,12 +197,12 @@ sample = ServerConfig
   ( long "stripe-key-path"
     <> help "Path to Stripe Secret key" )
   <*> option str
-  ( long "stripe-endpoint-url"
-    <> help "The root endpoint of the Stripe HTTP API"
+  ( long "stripe-endpoint-domain"
+    <> help "The domain name for the Stripe API HTTP endpoint."
     <> value "api.stripe.com"
     <> showDefault )
   <*> option auto
-  ( long "stripe-endpoint-protocol"
+  ( long "stripe-endpoint-scheme"
     <> help "The Stripe HTTP API protocol (HTTP or HTTPS)."
     <> value HTTPS
     <> showDefault )
