@@ -18,6 +18,9 @@ import Data.Maybe
 import Data.Text
   ( Text
   )
+import Data.ByteString
+  ( ByteString
+  )
 import Data.Default
   ( def
   )
@@ -50,6 +53,14 @@ import Network.Wai.Middleware.RequestLogger
   , outputFormat
   , mkRequestLogger
   )
+
+import Web.Stripe.Client
+  ( Protocol(HTTPS)
+  , StripeConfig(StripeConfig)
+  , StripeKey(StripeKey)
+  )
+import qualified Web.Stripe.Client as Stripe
+
 import PaymentServer.Persistence
   ( memory
   , getDBConnection
@@ -103,13 +114,16 @@ data Database =
   deriving (Show, Eq, Ord, Read)
 
 data ServerConfig = ServerConfig
-  { issuer          :: Issuer
-  , signingKeyPath  :: Maybe FilePath
-  , database        :: Database
-  , databasePath    :: Maybe Text
-  , endpoint        :: Endpoint
-  , stripeKeyPath   :: FilePath
-  , corsOrigins     :: [Origin]
+  { issuer                 :: Issuer
+  , signingKeyPath         :: Maybe FilePath
+  , database               :: Database
+  , databasePath           :: Maybe Text
+  , endpoint               :: Endpoint
+  , stripeKeyPath          :: FilePath
+  , stripeEndpointUrl      :: ByteString
+  , stripeEndpointProtocol :: Protocol
+  , stripeEndpointPort     :: Int
+  , corsOrigins            :: [Origin]
   }
   deriving (Show, Eq)
 
@@ -182,6 +196,21 @@ sample = ServerConfig
   <*> option str
   ( long "stripe-key-path"
     <> help "Path to Stripe Secret key" )
+  <*> option str
+  ( long "stripe-endpoint-url"
+    <> help "The root endpoint of the Stripe HTTP API"
+    <> value "api.stripe.com"
+    <> showDefault )
+  <*> option auto
+  ( long "stripe-endpoint-protocol"
+    <> help "The Stripe HTTP API protocol (HTTP or HTTPS)."
+    <> value HTTPS
+    <> showDefault )
+  <*> option auto
+  ( long "stripe-endpoint-port"
+    <> help "The Stripe HTTP API endpoint port number."
+    <> value 443
+    <> showDefault )
   <*> many ( option str
              ( long "cors-origin"
              <> help "An allowed `Origin` for the purposes of CORS (zero or more)." ) )
@@ -252,6 +281,19 @@ getApp config =
         (Memory, Nothing) -> Right memory
         (SQLite3, Just path) -> Right (getDBConnection path)
         _ -> Left "invalid options"
+
+    stripeConfig ServerConfig
+      { stripeKeyPath
+      , stripeEndpointUrl
+      , stripeEndpointProtocol
+      , stripeEndpointPort
+      } =
+      do
+        key <- B.readFile stripeKeyPath
+        return $
+          StripeConfig
+          (StripeKey key)
+          (Just $ Stripe.Endpoint stripeEndpointUrl stripeEndpointProtocol stripeEndpointPort)
   in do
     issuer <- getIssuer config
     case issuer of
@@ -265,9 +307,9 @@ getApp config =
             exitFailure
           Right getDB -> do
             db <- getDB
-            key <- B.readFile (stripeKeyPath config)
+            stripeConfig' <- stripeConfig config
             let
               origins = corsOrigins config
-              app = paymentServerApp origins key issuer db
+              app = paymentServerApp origins stripeConfig' issuer db
             logger <- mkRequestLogger (def { outputFormat = Detailed True})
             return $ logger app
