@@ -22,9 +22,13 @@ import Servant
   , (:>)
   , (:<|>)((:<|>))
   )
+
+import Web.Stripe.Client
+  ( StripeConfig
+  )
+
 import PaymentServer.Processors.Stripe
   ( StripeAPI
-  , StripeSecretKey
   , stripeServer
   )
 import PaymentServer.Redemption
@@ -44,9 +48,9 @@ type PaymentServerAPI
   :<|> "v1" :> "redeem" :> RedemptionAPI
 
 -- | Create a server which uses the given database.
-paymentServer :: VoucherDatabase d => StripeSecretKey -> Issuer -> d -> Server PaymentServerAPI
-paymentServer key issuer database =
-  stripeServer key database
+paymentServer :: VoucherDatabase d => StripeConfig -> Issuer -> d -> Server PaymentServerAPI
+paymentServer stripeConfig issuer database =
+  stripeServer stripeConfig database
   :<|> redemptionServer issuer database
 
 paymentServerAPI :: Proxy PaymentServerAPI
@@ -57,13 +61,13 @@ paymentServerAPI = Proxy
 paymentServerApp
   :: VoucherDatabase d
   => [Origin]              -- ^ A list of CORS Origins to accept.
-  -> StripeSecretKey
+  -> StripeConfig
   -> Issuer
   -> d
   -> Application
-paymentServerApp corsOrigins key issuer =
+paymentServerApp corsOrigins stripeConfig issuer =
   let
-    app = serve paymentServerAPI . paymentServer key issuer
+    app = serve paymentServerAPI . paymentServer stripeConfig issuer
     withCredentials = False
     corsResourcePolicy = simpleCorsResourcePolicy
                          { corsOrigins = Just (corsOrigins, withCredentials)

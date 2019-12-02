@@ -6,7 +6,6 @@ module PaymentServer.Processors.Stripe
   ( StripeAPI
   , stripeServer
   , getVoucher
-  , StripeSecretKey
   ) where
 
 import Control.Monad.IO.Class
@@ -87,8 +86,6 @@ import PaymentServer.Persistence
   , PaymentError(AlreadyPaid, PaymentFailed)
   )
 
-type StripeSecretKey = ByteString
-
 data Acknowledgement = Ok
 
 instance ToJSON Acknowledgement where
@@ -105,8 +102,8 @@ getVoucher (MetaData []) = Nothing
 getVoucher (MetaData (("Voucher", value):xs)) = Just value
 getVoucher (MetaData (x:xs)) = getVoucher (MetaData xs)
 
-stripeServer :: VoucherDatabase d => StripeSecretKey -> d -> Server StripeAPI
-stripeServer key d = charge d key
+stripeServer :: VoucherDatabase d => StripeConfig -> d -> Server StripeAPI
+stripeServer stripeConfig d = charge d stripeConfig
 
 -- | Browser facing API that takes token, voucher and a few other information
 -- and calls stripe charges API. If payment succeeds, then the voucher is stored
@@ -132,8 +129,8 @@ instance FromJSON Charges where
 
 -- | call the stripe Charge API (with token, voucher in metadata, amount, currency etc
 -- and if the Charge is okay, then set the voucher as "paid" in the database.
-charge :: VoucherDatabase d => d -> StripeSecretKey -> Charges -> Handler Acknowledgement
-charge d key (Charges token voucher amount currency) = do
+charge :: VoucherDatabase d => d -> StripeConfig -> Charges -> Handler Acknowledgement
+charge d stripeConfig (Charges token voucher amount currency) = do
   currency' <- getCurrency currency
   result <- liftIO (try (payForVoucher d voucher (completeStripeCharge currency')))
   case result of
@@ -150,15 +147,17 @@ charge d key (Charges token voucher amount currency) = do
           Just currency' -> return currency'
           Nothing -> throwError unsupportedCurrency
 
-      config = StripeConfig (StripeKey key) Nothing
       tokenId = TokenId token
       completeStripeCharge currency' = do
-        result <- stripe config $
+        result <- stripe stripeConfig $
           createCharge (Amount amount) currency'
           -&- tokenId
           -&- MetaData [("Voucher", voucher)]
         case result of
-          Left StripeError {} -> throwIO PaymentFailed
+          Left err -> do
+            print "Stripe createCharge failed:"
+            print err
+            throwIO PaymentFailed
           Right result -> return result
 
       checkVoucherMetadata :: MetaData -> Handler Acknowledgement
