@@ -31,6 +31,7 @@ import Network.Wai.Handler.Warp
   ( Port
   , defaultSettings
   , setPort
+  , setTimeout
   , setOnException
   , setOnExceptionResponse
   , runSettings
@@ -245,6 +246,7 @@ getRunner endpoint =
     onExceptionResponse = (responseLBS status500 []) . LBS.fromString . ("exception: " ++) . show
     settings =
       setPort (getPortNumber endpoint) .
+      setTimeout 300 .
       setOnException onException .
       setOnExceptionResponse onExceptionResponse $
       defaultSettings
