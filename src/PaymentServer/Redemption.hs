@@ -21,7 +21,6 @@ import Data.Text
   ( Text
   , pack
   )
-import qualified Data.Text.IO as TextIO
 import Data.Text.Encoding
   ( encodeUtf8
   )
