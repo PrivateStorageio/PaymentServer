@@ -125,6 +125,19 @@ makeVoucherPaymentTests label makeDatabase =
       assertEqual "double-paying for a voucher" (Left AlreadyPaid) payResult
       redeemResult <- redeemVoucher conn voucher fingerprint
       assertEqual "redeeming double-paid voucher" (Right ()) redeemResult
+  , testCase "concurrent payment" $ do
+      connect <- makeDatabase
+      connA <- connect
+      connB <- connect
+
+      let payment = payForVoucher connA voucher paySuccessfully
+      let anotherPayment = payForVoucher connB anotherVoucher paySuccessfully
+
+      result <- withAsync payment $ \p1 -> do
+        withAsync anotherPayment $ \p2 -> do
+          waitBoth p1 p2
+
+      assertEqual "Both payments should succeed" ((), ()) result
   , testCase "concurrent redemption" $ do
       connect <- makeDatabase
       connA <- connect
