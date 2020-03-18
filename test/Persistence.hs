@@ -43,7 +43,7 @@ import PaymentServer.Persistence
   , PaymentError(AlreadyPaid)
   , VoucherDatabase(payForVoucher, redeemVoucher)
   , memory
-  , getDBConnection
+  , sqlite
   )
 
 data ArbitraryException = ArbitraryException
@@ -159,4 +159,4 @@ sqlite3DatabaseVoucherPaymentTests =
   do
     tempdir <- getTemporaryDirectory
     (path, handle) <- openTempFile tempdir "voucher-.db"
-    return . getDBConnection . Text.pack $ path
+    return . sqlite . Text.pack $ path

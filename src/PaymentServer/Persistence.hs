@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+
 module PaymentServer.Persistence
   ( Voucher
   , Fingerprint
@@ -8,14 +9,14 @@ module PaymentServer.Persistence
   , VoucherDatabase(payForVoucher, redeemVoucher)
   , VoucherDatabaseState(MemoryDB, SQLiteDB)
   , memory
-  , getDBConnection
+  , sqlite
   ) where
 
 import Control.Exception
   ( Exception
   , throwIO
   , catch
-  , try
+  , bracket
   )
 
 import Data.Text
@@ -28,7 +29,6 @@ import Data.IORef
   ( IORef
   , newIORef
   , modifyIORef
-  , atomicModifyIORef'
   , readIORef
   )
 import qualified Database.SQLite.Simple as Sqlite
@@ -111,7 +111,7 @@ data VoucherDatabaseState =
     -- redemption.
   , redeemed :: IORef (Map.Map Voucher Fingerprint)
   }
-  | SQLiteDB { conn :: Sqlite.Connection }
+  | SQLiteDB { connect :: IO Sqlite.Connection }
 
 instance VoucherDatabase VoucherDatabaseState where
   payForVoucher MemoryDB{ paid = paidRef, redeemed = redeemed } voucher pay = do
@@ -127,7 +127,8 @@ instance VoucherDatabase VoucherDatabaseState where
         modifyIORef paidRef (Set.insert voucher)
         return result
 
-  payForVoucher SQLiteDB{ conn = conn } voucher pay =
+  payForVoucher SQLiteDB{ connect = connect } voucher pay =
+    bracket connect Sqlite.close $ \conn ->
     insertVoucher conn voucher pay
 
   redeemVoucher MemoryDB{ paid = paid, redeemed = redeemed } voucher fingerprint = do
@@ -136,11 +137,14 @@ instance VoucherDatabase VoucherDatabaseState where
     let insertFn = (modifyIORef redeemed .) . Map.insert
     redeemVoucherHelper unpaid existingFingerprint voucher fingerprint insertFn
 
-  redeemVoucher SQLiteDB { conn = conn } voucher fingerprint = Sqlite.withExclusiveTransaction conn $ do
-    unpaid <- isVoucherUnpaid conn voucher
-    existingFingerprint <- getVoucherFingerprint conn voucher
-    let insertFn = insertVoucherAndFingerprint conn
-    redeemVoucherHelper unpaid existingFingerprint voucher fingerprint insertFn
+  redeemVoucher SQLiteDB { connect = connect } voucher fingerprint =
+    bracket connect Sqlite.close $ \conn ->
+    Sqlite.withExclusiveTransaction conn $
+    do
+      unpaid <- isVoucherUnpaid conn voucher
+      existingFingerprint <- getVoucherFingerprint conn voucher
+      let insertFn = insertVoucherAndFingerprint conn
+      redeemVoucherHelper unpaid existingFingerprint voucher fingerprint insertFn
 
 -- | Allow a voucher to be redeemed if it has been paid for and not redeemed
 -- before or redeemed with the same fingerprint.
@@ -225,12 +229,18 @@ insertVoucherAndFingerprint :: Sqlite.Connection -> Voucher -> Fingerprint -> IO
 insertVoucherAndFingerprint dbConn voucher fingerprint =
   Sqlite.execute dbConn "INSERT INTO redeemed (voucher_id, fingerprint) VALUES ((SELECT id FROM vouchers WHERE name = ?), ?)" (voucher, fingerprint)
 
--- | Create and open a database with a given `name` and create the `voucher`
--- table and `redeemed` table with the provided schema.
-getDBConnection :: Text -> IO VoucherDatabaseState
-getDBConnection path = do
-  dbConn <- Sqlite.open (unpack path)
-  Sqlite.execute_ dbConn "PRAGMA foreign_keys = ON"
-  Sqlite.execute_ dbConn "CREATE TABLE IF NOT EXISTS vouchers (id INTEGER PRIMARY KEY, name TEXT UNIQUE)"
-  Sqlite.execute_ dbConn "CREATE TABLE IF NOT EXISTS redeemed (id INTEGER PRIMARY KEY, voucher_id INTEGER, fingerprint TEXT, FOREIGN KEY (voucher_id) REFERENCES vouchers(id))"
-  return $ SQLiteDB dbConn
+-- | Open and create (if necessary) a SQLite3 database which can persistently
+-- store all of the relevant information about voucher state.
+sqlite :: Text -> IO VoucherDatabaseState
+sqlite path =
+  let
+    connect :: IO Sqlite.Connection
+    connect = do
+      dbConn <- Sqlite.open (unpack path)
+      let exec = Sqlite.execute_ dbConn
+      exec "PRAGMA foreign_keys = ON"
+      exec "CREATE TABLE IF NOT EXISTS vouchers (id INTEGER PRIMARY KEY, name TEXT UNIQUE)"
+      exec "CREATE TABLE IF NOT EXISTS redeemed (id INTEGER PRIMARY KEY, voucher_id INTEGER, fingerprint TEXT, FOREIGN KEY (voucher_id) REFERENCES vouchers(id))"
+      return dbConn
+  in
+    return . SQLiteDB $ connect

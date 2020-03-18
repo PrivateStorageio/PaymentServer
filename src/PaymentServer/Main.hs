@@ -64,7 +64,7 @@ import qualified Web.Stripe.Client as Stripe
 
 import PaymentServer.Persistence
   ( memory
-  , getDBConnection
+  , sqlite
   )
 import PaymentServer.Issuer
   ( trivialIssue
@@ -281,7 +281,7 @@ getApp config =
     getDatabase ServerConfig{ database, databasePath } =
       case (database, databasePath) of
         (Memory, Nothing) -> Right memory
-        (SQLite3, Just path) -> Right (getDBConnection path)
+        (SQLite3, Just path) -> Right (sqlite path)
         _ -> Left "invalid options"
 
     stripeConfig ServerConfig

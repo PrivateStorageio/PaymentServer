@@ -9,7 +9,6 @@ module PaymentServer.Ristretto
 
 import Control.Exception
   ( bracket
-  , assert
   )
 import System.IO.Unsafe
   ( unsafePerformIO
@@ -26,7 +25,6 @@ import Foreign.Ptr
   )
 import Foreign.C.String
   ( CString
-  , withCString
   , newCString
   , peekCString
   )
