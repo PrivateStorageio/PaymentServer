@@ -73,8 +73,7 @@ import Web.Stripe.Charge
   , TokenId(TokenId)
   )
 import Web.Stripe.Client
-  ( StripeConfig(StripeConfig)
-  , StripeKey(StripeKey)
+  ( StripeConfig
   )
 import Web.Stripe
   ( stripe

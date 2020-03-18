@@ -73,6 +73,7 @@ test-suite PaymentServer-tests
                      , tasty
                      , tasty-hunit
                      , directory
+                     , async
                      , PaymentServer
   default-language: Haskell2010
 

@@ -15,6 +15,11 @@ import Control.Exception
   , try
   )
 
+import Control.Concurrent.Async
+  ( withAsync
+  , waitBoth
+  )
+
 import Test.Tasty
   ( TestTree
   , testGroup
@@ -38,7 +43,7 @@ import PaymentServer.Persistence
   , PaymentError(AlreadyPaid)
   , VoucherDatabase(payForVoucher, redeemVoucher)
   , memory
-  , getDBConnection
+  , sqlite
   )
 
 data ArbitraryException = ArbitraryException
@@ -54,6 +59,7 @@ tests = testGroup "Persistence"
 
 -- Some dummy values that should be replaced by the use of QuickCheck.
 voucher = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+anotherVoucher = "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
 fingerprint = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
 -- Mock a successful payment.
@@ -68,55 +74,96 @@ failPayment = throwIO ArbitraryException
 makeVoucherPaymentTests
   :: VoucherDatabase d
   => Text.Text           -- ^ A distinctive identifier for this group's label.
-  -> IO d                -- ^ An operation that creates a new, empty voucher
-                         -- database.
+  -> IO (IO d)           -- ^ An operation that creates a new, empty voucher
+                         -- database and results in an operation that creates
+                         -- a new connection to that database.
   -> TestTree
 makeVoucherPaymentTests label makeDatabase =
   testGroup ("voucher payments (" ++ Text.unpack label ++ ")")
   [ testCase "not paid for" $ do
-      db <- makeDatabase
-      result <- redeemVoucher db voucher fingerprint
+      connect <- makeDatabase
+      conn <- connect
+      result <- redeemVoucher conn voucher fingerprint
       assertEqual "redeeming unpaid voucher" (Left NotPaid) result
   , testCase "paid for" $ do
-      db <- makeDatabase
-      () <- payForVoucher db voucher paySuccessfully
-      result <- redeemVoucher db voucher fingerprint
+      connect <- makeDatabase
+      conn <- connect
+      () <- payForVoucher conn voucher paySuccessfully
+      result <- redeemVoucher conn voucher fingerprint
       assertEqual "redeeming paid voucher" (Right ()) result
   , testCase "allowed double redemption" $ do
-      db <- makeDatabase
-      () <- payForVoucher db voucher paySuccessfully
-      let redeem = redeemVoucher db voucher fingerprint
+      connect <- makeDatabase
+      conn <- connect
+      () <- payForVoucher conn voucher paySuccessfully
+      let redeem = redeemVoucher conn voucher fingerprint
       first <- redeem
       second <- redeem
       assertEqual "redeeming paid voucher" (Right ()) first
       assertEqual "re-redeeming paid voucher" (Right ()) second
   , testCase "disallowed double redemption" $ do
-      db <- makeDatabase
-      () <- payForVoucher db voucher paySuccessfully
-      let redeem = redeemVoucher db voucher
+      connect <- makeDatabase
+      conn <- connect
+      () <- payForVoucher conn voucher paySuccessfully
+      let redeem = redeemVoucher conn voucher
       first <- redeem fingerprint
       second <- redeem (Text.cons 'a' $ Text.tail fingerprint)
       assertEqual "redeeming paid voucher" (Right ()) first
       assertEqual "re-redeeming paid voucher" (Left AlreadyRedeemed) second
   , testCase "pay with exception" $ do
-      db <- makeDatabase
-      payResult <- try $ payForVoucher db voucher failPayment
+      connect <- makeDatabase
+      conn <- connect
+      payResult <- try $ payForVoucher conn voucher failPayment
       assertEqual "failing a payment for a voucher" (Left ArbitraryException) payResult
-      result <- redeemVoucher db voucher fingerprint
+      result <- redeemVoucher conn voucher fingerprint
       assertEqual "redeeming voucher with failed payment" (Left NotPaid) result
   , testCase "disallowed double payment" $ do
-      db <- makeDatabase
-      let pay = payForVoucher db voucher paySuccessfully
+      connect <- makeDatabase
+      conn <- connect
+      let pay = payForVoucher conn voucher paySuccessfully
       () <- pay
       payResult <- try pay
       assertEqual "double-paying for a voucher" (Left AlreadyPaid) payResult
-      redeemResult <- redeemVoucher db voucher fingerprint
+      redeemResult <- redeemVoucher conn voucher fingerprint
       assertEqual "redeeming double-paid voucher" (Right ()) redeemResult
+  , testCase "concurrent payment" $ do
+      connect <- makeDatabase
+      connA <- connect
+      connB <- connect
+
+      let payment = payForVoucher connA voucher paySuccessfully
+      let anotherPayment = payForVoucher connB anotherVoucher paySuccessfully
+
+      result <- withAsync payment $ \p1 -> do
+        withAsync anotherPayment $ \p2 -> do
+          waitBoth p1 p2
+
+      assertEqual "Both payments should succeed" ((), ()) result
+  , testCase "concurrent redemption" $ do
+      connect <- makeDatabase
+      connA <- connect
+      connB <- connect
+      -- It doesn't matter which connection pays for the vouchers.  They
+      -- payments are concurrent and the connections are to the same database.
+      () <- payForVoucher connA voucher paySuccessfully
+      () <- payForVoucher connA anotherVoucher paySuccessfully
+
+      -- It does matter which connection is used to redeem the voucher.  A
+      -- connection can only do one thing at a time.
+      let redeem = redeemVoucher connA voucher fingerprint
+      let anotherRedeem = redeemVoucher connB anotherVoucher fingerprint
+
+      result <- withAsync redeem $ \r1 -> do
+        withAsync anotherRedeem $ \r2 -> do
+          waitBoth r1 r2
+
+      assertEqual "Both redemptions should succeed" (Right (), Right ()) result
   ]
 
 -- | Instantiate the persistence tests for the memory backend.
 memoryDatabaseVoucherPaymentTests :: TestTree
-memoryDatabaseVoucherPaymentTests = makeVoucherPaymentTests "memory" memory
+memoryDatabaseVoucherPaymentTests = makeVoucherPaymentTests "memory" $ do
+  db <- memory
+  return $ return db
 
 -- | Instantiate the persistence tests for the sqlite3 backend.
 sqlite3DatabaseVoucherPaymentTests :: TestTree
@@ -125,4 +172,4 @@ sqlite3DatabaseVoucherPaymentTests =
   do
     tempdir <- getTemporaryDirectory
     (path, handle) <- openTempFile tempdir "voucher-.db"
-    getDBConnection $ Text.pack path
+    return . sqlite . Text.pack $ path
