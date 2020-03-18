@@ -15,6 +15,11 @@ import Control.Exception
   , try
   )
 
+import Control.Concurrent.Async
+  ( withAsync
+  , waitBoth
+  )
+
 import Test.Tasty
   ( TestTree
   , testGroup
@@ -54,6 +59,7 @@ tests = testGroup "Persistence"
 
 -- Some dummy values that should be replaced by the use of QuickCheck.
 voucher = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+anotherVoucher = "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
 fingerprint = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
 -- Mock a successful payment.
@@ -112,6 +118,19 @@ makeVoucherPaymentTests label makeDatabase =
       assertEqual "double-paying for a voucher" (Left AlreadyPaid) payResult
       redeemResult <- redeemVoucher db voucher fingerprint
       assertEqual "redeeming double-paid voucher" (Right ()) redeemResult
+  , testCase "concurrent redemption" $ do
+      db <- makeDatabase
+      () <- payForVoucher db voucher paySuccessfully
+      () <- payForVoucher db anotherVoucher paySuccessfully
+
+      let redeem = redeemVoucher db voucher fingerprint
+      let anotherRedeem = redeemVoucher db anotherVoucher fingerprint
+
+      result <- withAsync redeem $ \r1 -> do
+        withAsync anotherRedeem $ \r2 -> do
+          waitBoth r1 r2
+
+      assertEqual "Both redemptions should succeed" (Right (), Right ()) result
   ]
 
 -- | Instantiate the persistence tests for the memory backend.
