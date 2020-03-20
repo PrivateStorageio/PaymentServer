@@ -1,3 +1,3 @@
 self: super: {
-  ristretto = super.callPackage ./ristretto.nix { };
+  challenge-bypass-ristretto = super.callPackage ./challenge-bypass-ristretto.nix { };
 }
