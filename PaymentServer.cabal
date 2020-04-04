@@ -44,7 +44,7 @@ library
                      , sqlite-simple
   default-language:    Haskell2010
   ghc-options:       -Wmissing-import-lists -Wunused-imports
-  pkgconfig-depends: libchallenge_bypass_ristretto
+  pkgconfig-depends: libchallenge_bypass_ristretto_ffi
 
 executable PaymentServer-exe
   hs-source-dirs:      app

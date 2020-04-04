@@ -78,7 +78,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
           (hsPkgs."sqlite-simple" or (buildDepError "sqlite-simple"))
           ];
         pkgconfig = [
-          (pkgconfPkgs."libchallenge_bypass_ristretto" or (pkgConfDepError "libchallenge_bypass_ristretto"))
+          (pkgconfPkgs."libchallenge_bypass_ristretto_ffi" or (pkgConfDepError "libchallenge_bypass_ristretto_ffi"))
           ];
         };
       exes = {
