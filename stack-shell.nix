@@ -4,7 +4,7 @@
 let
   pkgs = import <nixpkgs> { };
   # Get our Ristretto bindings.
-  ristretto = pkgs.callPackage ./ristretto.nix { };
+  libchallenge_bypass_ristretto = pkgs.callPackage ./nix/challenge-bypass-ristretto.nix { };
 in
   # This is what you're supposed to call in a stack shell-file.  I don't
   # *really* know what it does but I know it works...
@@ -13,5 +13,5 @@ in
     name = "PrivacyPass";
     # zlib is a common dependency of many of our dependencies.  and we put our
     # ristretto library in as well.
-    buildInputs = [ pkgs.zlib ristretto ];
+    buildInputs = [ pkgs.zlib libchallenge_bypass_ristretto ];
   }
