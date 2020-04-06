@@ -47,7 +47,7 @@ jobs:
           name: "Set up Cachix"
           command: |
             nix-env -iA cachix -f https://cachix.org/api/v1/install
-            cachix use iohk
+            USER=root cachix use iohk
 
       # Get *our* source code.
       - "checkout"
