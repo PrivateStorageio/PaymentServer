@@ -72,17 +72,17 @@ jobs:
           name: "Restore Nix Store Paths"
           keys:
             # Construct cache keys that allow sharing as long as nixpkgs and
-            # the Ristretto library are the same.
+            # the python-challenge-bypass-ristretto library are the same.
             #
-            # If the Ristretto library changes, we have to rebuild it so we
-            # may as well throw away the part of the cache with the old build
-            # and make a new one with the new build so we don't have to
-            # rebuild it *again* next time.
+            # If python-challenge-bypass-ristretto changes, we have to rebuild
+            # it so we may as well throw away the part of the cache with the
+            # old build and make a new one with the new build so we don't have
+            # to rebuild it *again* next time.
             #
             # If nixpkgs changes then potentially a lot of cached packages for
             # the base system will be invalidated so we may as well drop them
             # and make a new cache with the new packages.
-            - paymentserver-nix-store-v2-{{ checksum "nixpkgs.rev" }}-{{ checksum "ristretto.nix" }}
+            - paymentserver-nix-store-v2-{{ checksum "nixpkgs.rev" }}-{{ checksum "nix/challenge-bypass-ristretto-repo.nix" }}
             - paymentserver-nix-store-v2-{{ checksum "nixpkgs.rev" }}-
             - paymentserver-nix-store-v2-
 
