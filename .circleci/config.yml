@@ -42,6 +42,13 @@ jobs:
           command: |
             echo "export NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/$NIXPKGS_REV.tar.gz" >> $BASH_ENV
 
+      - run:
+          # Set up cachix to get access to binary caches for Haskell infrastructure
+          name: "Set up Cachix"
+          command: |
+            nix-env -iA cachix -f https://cachix.org/api/v1/install
+            cachix use iohk
+
       # Get *our* source code.
       - "checkout"
 
