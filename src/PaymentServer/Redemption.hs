@@ -29,6 +29,8 @@ import Data.Aeson
   , FromJSON(parseJSON)
   , withObject
   , (.:)
+  , (.:?)
+  , (.!=)
   , genericToEncoding
   , defaultOptions
   , encode
@@ -80,9 +82,15 @@ data Redeem
   = Redeem
   { redeemVoucher :: Voucher        -- ^ The voucher being redeemed.
   , redeemTokens :: [BlindedToken]  -- ^ Tokens to be signed as part of this redemption.
+  , redeemCounter :: Integer        -- ^ Counter tag on this redemption.
   } deriving (Show, Eq, Generic)
 
-instance FromJSON Redeem
+instance FromJSON Redeem where
+  parseJSON = withObject "redeem" $ \o -> do
+    voucher <- o .: "redeemVoucher"
+    tokens <- o .: "redeemTokens"
+    counter <- o .:? "redeemCounter" .!= 0
+    return $ Redeem voucher tokens counter
 
 instance ToJSON Redeem where
   toEncoding = genericToEncoding defaultOptions
