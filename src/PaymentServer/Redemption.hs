@@ -55,8 +55,8 @@ import Crypto.Hash
   , hashWith
   )
 import PaymentServer.Persistence
-  ( VoucherDatabase(redeemVoucher)
-  , RedeemError(NotPaid, AlreadyRedeemed)
+  ( VoucherDatabase(redeemVoucherWithCounter)
+  , RedeemError(NotPaid, AlreadyRedeemed, DuplicateFingerprint)
   , Fingerprint
   , Voucher
   )
@@ -164,12 +164,14 @@ redeem issue database (Redeem voucher tokens counter) =
     throwError $ jsonErr400 (CounterOutOfBounds 0 maxCounter counter)
   else do
     let fingerprint = fingerprintFromTokens tokens
-    result <- liftIO $ PaymentServer.Persistence.redeemVoucher database voucher fingerprint
+    result <- liftIO $ redeemVoucherWithCounter database voucher fingerprint counter
     case result of
       Left NotPaid -> do
         throwError $ jsonErr400 Unpaid
       Left AlreadyRedeemed -> do
         throwError $ jsonErr400 DoubleSpend
+      Left DuplicateFingerprint -> do
+        throwError $ jsonErr400 $ OtherFailure "fingerprint already used"
       Right () -> do
         let result = issue tokens
         case result of

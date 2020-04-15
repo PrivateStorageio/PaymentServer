@@ -1,12 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module PaymentServer.Persistence
   ( Voucher
   , Fingerprint
-  , RedeemError(NotPaid, AlreadyRedeemed)
+  , RedeemError(NotPaid, AlreadyRedeemed, DuplicateFingerprint)
   , PaymentError(AlreadyPaid, PaymentFailed)
-  , VoucherDatabase(payForVoucher, redeemVoucher)
+  , VoucherDatabase(payForVoucher, redeemVoucherWithCounter)
+  , redeemVoucher
   , VoucherDatabaseState(MemoryDB, SQLiteDB)
   , memory
   , sqlite
@@ -61,6 +63,8 @@ data RedeemError =
   NotPaid
   -- | The voucher has already been redeemed.
   | AlreadyRedeemed
+  -- | The fingerprint given has already been seen.
+  | DuplicateFingerprint
   deriving (Show, Eq)
 
 -- | A fingerprint cryptographically identifies a redemption of a voucher.
@@ -73,6 +77,8 @@ data RedeemError =
 -- along with the voucher state and checked on possibly-duplicate redemption
 -- to support this case.
 type Fingerprint = Text
+
+type RedemptionKey = (Voucher, Integer)
 
 -- | A VoucherDatabase provides persistence for state related to vouchers.
 class VoucherDatabase d where
@@ -96,6 +102,18 @@ class VoucherDatabase d where
     -> Voucher                    -- ^ A voucher to consider for redemption
     -> Fingerprint                -- ^ The retry-enabling fingerprint for this redemption
     -> IO (Either RedeemError ()) -- ^ Left indicating the redemption is not allowed or Right indicating it is.
+  redeemVoucher d v f = redeemVoucherWithCounter d v f 0
+
+  -- | Attempt to redeem a voucher.  If it has not been redeemed before or it
+  -- has been redeemed with the same counter and fingerprint, the redemption
+  -- succeeds.  Otherwise, it fails.
+  redeemVoucherWithCounter
+    :: d                          -- ^ The database
+    -> Voucher                    -- ^ A voucher to consider for redemption
+    -> Fingerprint                -- ^ The retry-enabling fingerprint for this redemption
+    -> Integer                    -- ^ The counter for this redemption
+    -> IO (Either RedeemError ()) -- ^ Left indicating the redemption is not allowed or Right indicating it is.
+
 
 -- | VoucherDatabaseState is a type that captures whether we are using an
 -- in-memory voucher database that only persists state in-memory or
@@ -107,9 +125,12 @@ data VoucherDatabaseState =
   MemoryDB {
     -- | A set of vouchers which have been paid for.
     paid :: IORef (Set.Set Voucher)
-    -- | A mapping from redeemed vouchers to fingerprints associated with the
-    -- redemption.
-  , redeemed :: IORef (Map.Map Voucher Fingerprint)
+    -- | A mapping from redeemed (voucher, counter) pairs to fingerprints
+    -- associated with the redemption.
+  , redeemed :: IORef (Map.Map RedemptionKey Fingerprint)
+    -- | A map from fingerprints to redemption details for successful
+    -- redemptions.
+  , fingerprints :: IORef (Map.Map Fingerprint RedemptionKey)
   }
   | SQLiteDB { connect :: IO Sqlite.Connection }
 
@@ -131,69 +152,124 @@ instance VoucherDatabase VoucherDatabaseState where
     bracket connect Sqlite.close $ \conn ->
     insertVoucher conn voucher pay
 
-  redeemVoucher MemoryDB{ paid = paid, redeemed = redeemed } voucher fingerprint = do
-    unpaid <- Set.notMember voucher <$> readIORef paid
-    existingFingerprint <- Map.lookup voucher <$> readIORef redeemed
-    let insertFn = (modifyIORef redeemed .) . Map.insert
-    redeemVoucherHelper unpaid existingFingerprint voucher fingerprint insertFn
+  redeemVoucherWithCounter MemoryDB{ paid, redeemed, fingerprints } voucher fingerprint counter =
+    let
+      isVoucherPaid paid voucher = Set.member voucher <$> readIORef paid
+      lookupFingerprint redeemed key = Map.lookup key <$> readIORef redeemed
+      lookupVoucherCounter fingerprints fingerprint =
+        Map.lookup fingerprint <$> readIORef fingerprints
+      markVoucherRedeemed redeemed fingerprints key fingerprint = do
+        modifyIORef redeemed $ Map.insert key fingerprint
+        modifyIORef fingerprints $ Map.insert fingerprint key
+    in
+      redeemVoucherHelper
+      (isVoucherPaid paid)
+      (lookupFingerprint redeemed)
+      (lookupVoucherCounter fingerprints)
+      (markVoucherRedeemed redeemed fingerprints)
+      voucher
+      counter
+      fingerprint
 
-  redeemVoucher SQLiteDB { connect = connect } voucher fingerprint =
+  redeemVoucherWithCounter SQLiteDB { connect = connect } voucher fingerprint counter =
     bracket connect Sqlite.close $ \conn ->
     Sqlite.withExclusiveTransaction conn $
-    do
-      unpaid <- isVoucherUnpaid conn voucher
-      existingFingerprint <- getVoucherFingerprint conn voucher
-      let insertFn = insertVoucherAndFingerprint conn
-      redeemVoucherHelper unpaid existingFingerprint voucher fingerprint insertFn
+    redeemVoucherHelper
+    (isVoucherPaid conn)
+    (getVoucherFingerprint conn)
+    (getVoucherCounterForFingerprint conn)
+    (insertVoucherAndFingerprint conn)
+    voucher
+    counter
+    fingerprint
+
+
+-- | Look up the voucher, counter tuple which previously performed a
+-- redemption using the given fingerprint.
+getVoucherCounterForFingerprint :: Sqlite.Connection -> Fingerprint -> IO (Maybe RedemptionKey)
+getVoucherCounterForFingerprint dbConn fingerprint =
+  let
+    sql = "SELECT vouchers.name, redeemed.counter \
+          \FROM vouchers \
+          \INNER JOIN redeemed \
+          \ON vouchers.id = redeemed.voucher_id \
+          \AND redeemed.fingerprint = ?"
+  in
+    listToMaybe <$> Sqlite.query dbConn sql (Sqlite.Only fingerprint)
+
 
 -- | Allow a voucher to be redeemed if it has been paid for and not redeemed
 -- before or redeemed with the same fingerprint.
 redeemVoucherHelper
-  :: Bool                                -- ^ Has the voucher been paid for?
-  -> Maybe Fingerprint                   -- ^ If it has been redeemed before,
-                                         -- with what fingerprint?
-  -> Voucher                             -- ^ The voucher in question.
-  -> Fingerprint                         -- ^ The fingerprint associated with
-                                         -- the new redemption attempt.
-  -> (Voucher -> Fingerprint -> IO ())   -- ^ A function to mark the voucher
-                                         -- as redeemed if this redemption
-                                         -- should succeed.
-  -> IO (Either RedeemError ())          -- ^ Right for successful redemption,
-                                         -- left with details about why it
-                                         -- failed.
-redeemVoucherHelper unpaid existingFingerprint voucher fingerprint insertFn =
-  case (unpaid, existingFingerprint) of
-    (True, _) ->
-      return $ Left NotPaid
-    (False, Nothing) -> do
-      insertFn voucher fingerprint
-      return $ Right ()
-    (False, Just fingerprint') ->
-      if fingerprint == fingerprint' then
-        return $ Right ()
-      else
-        return $ Left AlreadyRedeemed
+  :: (Voucher -> IO Bool)                      -- ^ Has the given voucher been
+                                               -- paid for?
+  -> (RedemptionKey -> IO (Maybe Fingerprint)) -- ^ If it has been redeemed,
+                                               -- with what fingerprint?
+  -> (Fingerprint -> IO (Maybe RedemptionKey)) -- ^ What redemption attempt
+                                               -- has the given fingerprint
+                                               -- been used with before, if
+                                               -- any?
+  -> (RedemptionKey -> Fingerprint -> IO ())   -- ^ Mark the redemption as
+                                               -- successful.
+  -> Voucher                                   -- ^ The voucher being used in
+                                               -- this attempt.
+  -> Integer                                   -- ^ The counter being used in
+                                               -- this account.
+  -> Fingerprint                               -- ^ The fingerprint of the
+                                               -- this attempt.
+  -> IO (Either RedeemError ())                -- ^ Right for successful
+                                               -- redemption, left with
+                                               -- details about why it failed.
+redeemVoucherHelper isVoucherPaid lookupFingerprint lookupVoucherCounter markVoucherRedeemed voucher counter fingerprint = do
+  paid <- isVoucherPaid voucher
+  priorUse <- lookupVoucherCounter fingerprint
+  if (priorUse /= Just (voucher, counter)) && (priorUse /= Nothing)
+    then return $ Left DuplicateFingerprint
+    else
+    do
+      existingFingerprint <- lookupFingerprint (voucher, counter)
+      case (paid, existingFingerprint) of
+        (False, _) ->
+          return $ Left NotPaid
+        (True, Nothing) -> do
+          markVoucherRedeemed (voucher, counter) fingerprint
+          return $ Right ()
+        (True, Just fingerprint') ->
+          if fingerprint == fingerprint' then
+            return $ Right ()
+          else
+            return $ Left AlreadyRedeemed
+
 
 -- | Create a new, empty MemoryVoucherDatabase.
 memory :: IO VoucherDatabaseState
 memory = do
   paid <- newIORef mempty
   redeemed <- newIORef mempty
-  return $ MemoryDB paid redeemed
+  fingerprints <- newIORef mempty
+  return $ MemoryDB paid redeemed fingerprints
 
 instance FromRow Fingerprint where
   fromRow = Sqlite.field
 
--- | Checks if the given `voucher` is unpaid.
-isVoucherUnpaid :: Sqlite.Connection -> Voucher -> IO Bool
-isVoucherUnpaid dbConn voucher =
-  null <$> (Sqlite.query dbConn "SELECT 1 FROM vouchers WHERE vouchers.name = ? LIMIT 1" (Sqlite.Only voucher) :: IO [Sqlite.Only Int])
+-- | Checks if the given `voucher` is paid.
+isVoucherPaid :: Sqlite.Connection -> Voucher -> IO Bool
+isVoucherPaid dbConn voucher =
+  not . null <$> (Sqlite.query dbConn "SELECT 1 FROM vouchers WHERE vouchers.name = ? LIMIT 1" (Sqlite.Only voucher) :: IO [Sqlite.Only Int])
 
--- | Retrieve an existing redemption fingerprint for the given voucher, if
--- there is one.
-getVoucherFingerprint :: Sqlite.Connection -> Voucher -> IO (Maybe Fingerprint)
-getVoucherFingerprint dbConn voucher =
-  listToMaybe <$> Sqlite.query dbConn "SELECT redeemed.fingerprint FROM vouchers INNER JOIN redeemed ON vouchers.id = redeemed.voucher_id AND vouchers.name = ?" (Sqlite.Only voucher)
+-- | Retrieve an existing redemption fingerprint for the given voucher and
+-- counter, if there is one.
+getVoucherFingerprint :: Sqlite.Connection -> RedemptionKey -> IO (Maybe Fingerprint)
+getVoucherFingerprint dbConn (voucher, counter) =
+  let
+    sql = "SELECT redeemed.fingerprint \
+          \FROM vouchers \
+          \INNER JOIN redeemed \
+          \ON vouchers.id = redeemed.voucher_id \
+          \AND vouchers.name = ? \
+          \AND redeemed.counter = ?"
+  in
+    listToMaybe <$> Sqlite.query dbConn sql ((voucher :: Text), (counter :: Integer))
 
 -- | Mark the given voucher as paid in the database.
 insertVoucher :: Sqlite.Connection -> Voucher -> IO a -> IO a
@@ -225,9 +301,13 @@ insertVoucher dbConn voucher pay =
 
 -- | Mark the given voucher as having been redeemed (with the given
 -- fingerprint) in the database.
-insertVoucherAndFingerprint :: Sqlite.Connection -> Voucher -> Fingerprint -> IO ()
-insertVoucherAndFingerprint dbConn voucher fingerprint =
-  Sqlite.execute dbConn "INSERT INTO redeemed (voucher_id, fingerprint) VALUES ((SELECT id FROM vouchers WHERE name = ?), ?)" (voucher, fingerprint)
+insertVoucherAndFingerprint :: Sqlite.Connection -> RedemptionKey -> Fingerprint -> IO ()
+insertVoucherAndFingerprint dbConn (voucher, counter) fingerprint =
+  let
+    sql = "INSERT INTO redeemed (voucher_id, counter, fingerprint) \
+          \VALUES ((SELECT id FROM vouchers WHERE name = ?), ?, ?)"
+  in
+    Sqlite.execute dbConn sql (voucher, counter, fingerprint)
 
 -- | Open and create (if necessary) a SQLite3 database which can persistently
 -- store all of the relevant information about voucher state.
@@ -240,7 +320,7 @@ sqlite path =
       let exec = Sqlite.execute_ dbConn
       exec "PRAGMA foreign_keys = ON"
       exec "CREATE TABLE IF NOT EXISTS vouchers (id INTEGER PRIMARY KEY, name TEXT UNIQUE)"
-      exec "CREATE TABLE IF NOT EXISTS redeemed (id INTEGER PRIMARY KEY, voucher_id INTEGER, fingerprint TEXT, FOREIGN KEY (voucher_id) REFERENCES vouchers(id))"
+      exec "CREATE TABLE IF NOT EXISTS redeemed (id INTEGER PRIMARY KEY, voucher_id INTEGER, counter INTEGER, fingerprint TEXT, FOREIGN KEY (voucher_id) REFERENCES vouchers(id))"
       return dbConn
   in
     return . SQLiteDB $ connect
