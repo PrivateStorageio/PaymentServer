@@ -29,6 +29,8 @@ import Data.Aeson
   , FromJSON(parseJSON)
   , withObject
   , (.:)
+  , (.:?)
+  , (.!=)
   , genericToEncoding
   , defaultOptions
   , encode
@@ -71,6 +73,8 @@ data Result
   = Unpaid -- ^ A voucher has not been paid for.
   | DoubleSpend -- ^ A voucher has already been redeemed.
   | OtherFailure Text -- ^ Some other unrecognized failure mode.
+  -- | Given counter was not in the expected range
+  | CounterOutOfBounds Integer Integer Integer
   | Succeeded PublicKey [Signature] Proof
   deriving (Show, Eq)
 
@@ -80,9 +84,15 @@ data Redeem
   = Redeem
   { redeemVoucher :: Voucher        -- ^ The voucher being redeemed.
   , redeemTokens :: [BlindedToken]  -- ^ Tokens to be signed as part of this redemption.
+  , redeemCounter :: Integer        -- ^ Counter tag on this redemption.
   } deriving (Show, Eq, Generic)
 
-instance FromJSON Redeem
+instance FromJSON Redeem where
+  parseJSON = withObject "redeem" $ \o -> do
+    voucher <- o .: "redeemVoucher"
+    tokens <- o .: "redeemTokens"
+    counter <- o .:? "redeemCounter" .!= 0
+    return $ Redeem voucher tokens counter
 
 instance ToJSON Redeem where
   toEncoding = genericToEncoding defaultOptions
@@ -95,6 +105,13 @@ instance ToJSON Result where
   toJSON DoubleSpend = object
     [ "success" .= False
     , "reason" .= ("double-spend" :: Text)
+    ]
+  toJSON (CounterOutOfBounds min max received) = object
+    [ "success" .= False
+    , "reason" .= ("counter-out-of-bounds" :: Text)
+    , "min" .= min
+    , "max" .= max
+    , "received" .= received
     ]
   toJSON (OtherFailure description) = object
     [ "success" .= False
@@ -123,6 +140,11 @@ instance FromJSON Result where
         then return DoubleSpend
         else return $ OtherFailure reason
 
+-- | Limit the value for the counter value supplied during a voucher
+-- redemption attempt.  A counter in the range [0..maxCounter) is allowed.
+maxCounter :: Integer
+maxCounter = 16
+
 type RedemptionAPI = ReqBody '[JSON] Redeem :> Post '[JSON] Result
 
 jsonErr400 reason = err400
@@ -137,21 +159,24 @@ redemptionServer = redeem
 -- voucher and return signatures.  Return a failure if this is not possible
 -- (eg because the voucher was already redeemed).
 redeem :: VoucherDatabase d => Issuer -> d -> Redeem -> Handler Result
-redeem issue database (Redeem voucher tokens) = do
-  let fingerprint = fingerprintFromTokens tokens
-  result <- liftIO $ PaymentServer.Persistence.redeemVoucher database voucher fingerprint
-  case result of
-    Left NotPaid -> do
-      throwError $ jsonErr400 Unpaid
-    Left AlreadyRedeemed -> do
-      throwError $ jsonErr400 DoubleSpend
-    Right () -> do
-      let result = issue tokens
-      case result of
-        Left reason -> do
-          throwError $ jsonErr400 $ OtherFailure reason
-        Right (ChallengeBypass key signatures proof) ->
-          return $ Succeeded key signatures proof
+redeem issue database (Redeem voucher tokens counter) =
+  if counter < 0 || counter >= maxCounter then
+    throwError $ jsonErr400 (CounterOutOfBounds 0 maxCounter counter)
+  else do
+    let fingerprint = fingerprintFromTokens tokens
+    result <- liftIO $ PaymentServer.Persistence.redeemVoucher database voucher fingerprint
+    case result of
+      Left NotPaid -> do
+        throwError $ jsonErr400 Unpaid
+      Left AlreadyRedeemed -> do
+        throwError $ jsonErr400 DoubleSpend
+      Right () -> do
+        let result = issue tokens
+        case result of
+          Left reason -> do
+            throwError $ jsonErr400 $ OtherFailure reason
+          Right (ChallengeBypass key signatures proof) ->
+            return $ Succeeded key signatures proof
 
 -- | Compute a cryptographic hash (fingerprint) of a list of tokens which can
 -- be used as an identifier for this exact sequence of tokens.
