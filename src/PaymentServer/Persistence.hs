@@ -201,23 +201,25 @@ getVoucherCounterForFingerprint dbConn fingerprint =
 -- | Allow a voucher to be redeemed if it has been paid for and not redeemed
 -- before or redeemed with the same fingerprint.
 redeemVoucherHelper
-  -- | Has the given voucher been paid for?
-  :: (Voucher -> IO Bool)
-  -- | If it has been redeemed, with what fingerprint?
-  -> (RedemptionKey -> IO (Maybe Fingerprint))
-  -- | What redemption attempt has the given fingerprint been used with
-  -- before, if any?
-  -> (Fingerprint -> IO (Maybe RedemptionKey))
-  -- | Mark the redemption as successful.
-  -> (RedemptionKey -> Fingerprint -> IO ())
-  -- | The voucher being used in this attempt.
-  -> Voucher
-  -- | The counter being used in this account.
-  -> Integer
-  -- | The fingerprint of the this attempt.
-  -> Fingerprint
-  -- | Right for successful redemption, left with details about why it failed.
-  -> IO (Either RedeemError ())
+  :: (Voucher -> IO Bool)                      -- ^ Has the given voucher been
+                                               -- paid for?
+  -> (RedemptionKey -> IO (Maybe Fingerprint)) -- ^ If it has been redeemed,
+                                               -- with what fingerprint?
+  -> (Fingerprint -> IO (Maybe RedemptionKey)) -- ^ What redemption attempt
+                                               -- has the given fingerprint
+                                               -- been used with before, if
+                                               -- any?
+  -> (RedemptionKey -> Fingerprint -> IO ())   -- ^ Mark the redemption as
+                                               -- successful.
+  -> Voucher                                   -- ^ The voucher being used in
+                                               -- this attempt.
+  -> Integer                                   -- ^ The counter being used in
+                                               -- this account.
+  -> Fingerprint                               -- ^ The fingerprint of the
+                                               -- this attempt.
+  -> IO (Either RedeemError ())                -- ^ Right for successful
+                                               -- redemption, left with
+                                               -- details about why it failed.
 redeemVoucherHelper isVoucherPaid lookupFingerprint lookupVoucherCounter markVoucherRedeemed voucher counter fingerprint = do
   paid <- isVoucherPaid voucher
   priorUse <- lookupVoucherCounter fingerprint
