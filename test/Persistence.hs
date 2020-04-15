@@ -39,9 +39,9 @@ import System.Directory
 import PaymentServer.Persistence
   ( Voucher
   , Fingerprint
-  , RedeemError(NotPaid, AlreadyRedeemed)
+  , RedeemError(NotPaid, AlreadyRedeemed, DuplicateFingerprint)
   , PaymentError(AlreadyPaid)
-  , VoucherDatabase(payForVoucher, redeemVoucher)
+  , VoucherDatabase(payForVoucher, redeemVoucher, redeemVoucherWithCounter)
   , memory
   , sqlite
   )
@@ -61,6 +61,7 @@ tests = testGroup "Persistence"
 voucher = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 anotherVoucher = "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
 fingerprint = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+anotherFingerprint = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 
 -- Mock a successful payment.
 paySuccessfully :: IO ()
@@ -109,6 +110,24 @@ makeVoucherPaymentTests label makeDatabase =
       second <- redeem (Text.cons 'a' $ Text.tail fingerprint)
       assertEqual "redeeming paid voucher" (Right ()) first
       assertEqual "re-redeeming paid voucher" (Left AlreadyRedeemed) second
+  , testCase "allowed redemption varying by counter" $ do
+      connect <- makeDatabase
+      conn <- connect
+      () <- payForVoucher conn voucher paySuccessfully
+      let redeem = redeemVoucherWithCounter conn voucher
+      first <- redeem fingerprint 0
+      second <- redeem anotherFingerprint 1
+      assertEqual "redeemed with counter 0" (Right ()) first
+      assertEqual "redeemed with counter 1" (Right ()) second
+  , testCase "disallowed redemption varying by counter but not fingerprint" $ do
+      connect <- makeDatabase
+      conn <- connect
+      () <- payForVoucher conn voucher paySuccessfully
+      let redeem = redeemVoucherWithCounter conn voucher
+      first <- redeem fingerprint 0
+      second <- redeem fingerprint 1
+      assertEqual "redeemed with counter 0" (Right ()) first
+      assertEqual "redeemed with counter 1" (Left DuplicateFingerprint) second
   , testCase "pay with exception" $ do
       connect <- makeDatabase
       conn <- connect
@@ -150,7 +169,7 @@ makeVoucherPaymentTests label makeDatabase =
       -- It does matter which connection is used to redeem the voucher.  A
       -- connection can only do one thing at a time.
       let redeem = redeemVoucher connA voucher fingerprint
-      let anotherRedeem = redeemVoucher connB anotherVoucher fingerprint
+      let anotherRedeem = redeemVoucher connB anotherVoucher anotherFingerprint
 
       result <- withAsync redeem $ \r1 -> do
         withAsync anotherRedeem $ \r2 -> do
