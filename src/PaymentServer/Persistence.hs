@@ -7,8 +7,7 @@ module PaymentServer.Persistence
   , Fingerprint
   , RedeemError(NotPaid, AlreadyRedeemed, DuplicateFingerprint)
   , PaymentError(AlreadyPaid, PaymentFailed)
-  , VoucherDatabase(payForVoucher, redeemVoucherWithCounter)
-  , redeemVoucher
+  , VoucherDatabase(payForVoucher, redeemVoucher, redeemVoucherWithCounter)
   , VoucherDatabaseState(MemoryDB, SQLiteDB)
   , memory
   , sqlite
@@ -63,7 +62,14 @@ data RedeemError =
   NotPaid
   -- | The voucher has already been redeemed.
   | AlreadyRedeemed
-  -- | The fingerprint given has already been seen.
+  -- | The fingerprint given has already been seen.  Redemption with a
+  -- duplicate fingerprint is disallowed.  Even though tokens could be issued
+  -- in this case, they would be the same as tokens already issued for a
+  -- different redemption attempt.  The re-issued tokens are not distinct from
+  -- the originals and attempts to spend them will lead to double-spend
+  -- errors.  A well-behaved client will never request tokens with a duplicate
+  -- fingerprint.  We check for this case to prevent a misbehaving client from
+  -- accidentally creating worthless tokens.
   | DuplicateFingerprint
   deriving (Show, Eq)
 
@@ -78,6 +84,13 @@ data RedeemError =
 -- to support this case.
 type Fingerprint = Text
 
+-- | A RedemptionKey is a unique key that identifies an attempt to redeem a
+-- voucher for some tokens.  It includes a counter value distinct from the
+-- voucher value to allow one voucher to be redeemed for more than one batch
+-- of tokens.  This allows partial progress on redemption when a voucher is
+-- worth many, many tokens.  Redemption is restricted to a single successful
+-- attempt per RedemptionKey (with retries using the same Fingerprint
+-- allowed).
 type RedemptionKey = (Voucher, Integer)
 
 -- | A VoucherDatabase provides persistence for state related to vouchers.
@@ -97,6 +110,9 @@ class VoucherDatabase d where
   -- | Attempt to redeem a voucher.  If it has not been redeemed before or it
   -- has been redeemed with the same fingerprint, the redemption succeeds.
   -- Otherwise, it fails.
+  --
+  -- This is a backwards compatibility API.  Callers should prefer
+  -- redeemVoucherWithCounter.
   redeemVoucher
     :: d                          -- ^ The database
     -> Voucher                    -- ^ A voucher to consider for redemption
@@ -128,8 +144,10 @@ data VoucherDatabaseState =
     -- | A mapping from redeemed (voucher, counter) pairs to fingerprints
     -- associated with the redemption.
   , redeemed :: IORef (Map.Map RedemptionKey Fingerprint)
-    -- | A map from fingerprints to redemption details for successful
-    -- redemptions.
+    -- | A mapping from fingerprints to redemption details for successful
+    -- redemptions.  This is the logical reverse of `redeemed` and should
+    -- always contain the same values as `redeemed`, but reversed.  It is
+    -- maintained separately for efficient lookup by fingerprint.
   , fingerprints :: IORef (Map.Map Fingerprint RedemptionKey)
   }
   | SQLiteDB { connect :: IO Sqlite.Connection }
