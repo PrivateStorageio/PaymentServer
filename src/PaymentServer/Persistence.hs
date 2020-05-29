@@ -336,6 +336,7 @@ sqlite path =
     connect = do
       dbConn <- Sqlite.open (unpack path)
       let exec = Sqlite.execute_ dbConn
+      exec "PRAGMA busy_timeout = 1000"
       exec "PRAGMA foreign_keys = ON"
       Sqlite.withExclusiveTransaction dbConn $ do
         exec "CREATE TABLE IF NOT EXISTS vouchers (id INTEGER PRIMARY KEY, name TEXT UNIQUE)"
