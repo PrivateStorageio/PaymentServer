@@ -177,7 +177,7 @@ retry op =
     -- Time to delay between each try in milliseconds.
     perRetryDelay = 500
     -- Limit on the number of retries.
-    numRetries = totalRetryDuration `div` totalRetryDuration
+    numRetries = totalRetryDuration `div` perRetryDelay
 
     policy = constantDelay (perRetryDelay * 1000) <> limitRetries numRetries
     shouldRetry status value =
