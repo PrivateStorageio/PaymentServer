@@ -76,6 +76,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
           (hsPkgs."containers" or (buildDepError "containers"))
           (hsPkgs."cryptonite" or (buildDepError "cryptonite"))
           (hsPkgs."sqlite-simple" or (buildDepError "sqlite-simple"))
+          (hsPkgs."retry" or (buildDepError "retry"))
           ];
         pkgconfig = [
           (pkgconfPkgs."libchallenge_bypass_ristretto_ffi" or (pkgConfDepError "libchallenge_bypass_ristretto_ffi"))

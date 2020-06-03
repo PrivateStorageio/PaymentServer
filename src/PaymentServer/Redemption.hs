@@ -14,6 +14,13 @@ module PaymentServer.Redemption
 import GHC.Generics
   ( Generic
   )
+
+import Control.Retry
+  ( retrying
+  , constantDelay
+  , limitRetries
+  )
+
 import Control.Monad.IO.Class
   ( liftIO
   )
@@ -155,6 +162,25 @@ jsonErr400 reason = err400
 redemptionServer :: VoucherDatabase d => Issuer -> d -> Server RedemptionAPI
 redemptionServer = redeem
 
+-- | Try an operation repeatedly for several minutes with a brief delay
+-- between tries.
+retry :: IO (Either RedeemError()) -> IO (Either RedeemError())
+retry op =
+  retrying policy shouldRetry (\_ -> op)
+  where
+    -- Total duration for which to retry in milliseconds.
+    totalRetryDuration = 3 * 60 * 1000
+    -- Time to delay between each try in milliseconds.
+    perRetryDelay = 500
+    -- Limit on the number of retries.
+    numRetries = totalRetryDuration `div` totalRetryDuration
+
+    policy = constantDelay (perRetryDelay * 1000) <> limitRetries numRetries
+    shouldRetry status value =
+      case value of
+        Left NotPaid -> return True
+        _ -> return False
+
 -- | Handler for redemption requests.  Use the database to try to redeem the
 -- voucher and return signatures.  Return a failure if this is not possible
 -- (eg because the voucher was already redeemed).
@@ -163,8 +189,9 @@ redeem issue database (Redeem voucher tokens counter) =
   if counter < 0 || counter >= maxCounter then
     throwError $ jsonErr400 (CounterOutOfBounds 0 maxCounter counter)
   else do
+
     let fingerprint = fingerprintFromTokens tokens
-    result <- liftIO $ redeemVoucherWithCounter database voucher fingerprint counter
+    result <- liftIO . retry $ redeemVoucherWithCounter database voucher fingerprint counter
     case result of
       Left NotPaid -> do
         throwError $ jsonErr400 Unpaid
