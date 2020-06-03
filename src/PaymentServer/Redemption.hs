@@ -168,7 +168,9 @@ retry :: IO (Either RedeemError()) -> IO (Either RedeemError())
 retry op =
   retrying policy shouldRetry $ \_ -> do
   putStrLn "Trying now"
-  op
+  result <- op
+  putStrLn $ "Result is " ++ (show result)
+  return result
   where
     -- Total duration for which to retry in milliseconds.
     totalRetryDuration = 3 * 60 * 1000
