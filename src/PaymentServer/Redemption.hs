@@ -169,7 +169,7 @@ retry op =
   retrying policy shouldRetry $ \_ -> op
   where
     -- Total duration for which to retry in milliseconds.
-    totalRetryDuration = 3 * 60 * 1000
+    totalRetryDuration = 10 * 60 * 1000
     -- Time to delay between each try in milliseconds.
     perRetryDelay = 500
     -- Limit on the number of retries.
