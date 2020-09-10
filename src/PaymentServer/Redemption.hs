@@ -11,6 +11,10 @@ module PaymentServer.Redemption
   , redemptionServer
   ) where
 
+import Prelude hiding
+  ( concat
+  )
+
 import GHC.Generics
   ( Generic
   )
@@ -27,6 +31,7 @@ import Control.Monad.IO.Class
 import Data.Text
   ( Text
   , pack
+  , concat
   )
 import Data.Text.Encoding
   ( encodeUtf8
@@ -211,7 +216,4 @@ redeem issue database (Redeem voucher tokens counter) =
 -- be used as an identifier for this exact sequence of tokens.
 fingerprintFromTokens :: [BlindedToken] -> Fingerprint
 fingerprintFromTokens =
-  let
-    hash = pack . show . hashWith SHA3_512 . encodeUtf8
-  in
-    foldl (\b a -> hash $ a `mappend` b) "" . map hash
+  pack . show . hashWith SHA3_512 . encodeUtf8 . concat
