@@ -13,12 +13,25 @@
 #
 #   $ for n in $(seq 0 30); do sqlite3 vouchers.db "insert into vouchers (name) values ('aaa$n')"; done
 #
-# Then the test can be run as many times as necessary.  Repeated redemptions
-# are allowed since the same tokens are used on every run.
+# Then the test can be run as many times as necessary.
+#
+# The `redeemed` table must be cleared before each test run.  Random tokens
+# are generated for each test run and the server will reject tokens from a new
+# run if tokens from an old run are still present.
+#
+#  $ sqlite3 vouchers.db "delete from redeemed"
 #
 # Originally written for https://github.com/PrivateStorageio/PaymentServer/issues/60
 
 from __future__ import division
+
+from os import (
+    urandom,
+)
+
+from base64 import (
+    b64encode,
+)
 
 from time import (
     time,
@@ -45,18 +58,39 @@ from twisted.internet.defer import (
     returnValue,
 )
 
-PARALLELISM = 30
+PARALLELISM = 50
+NUM_TOKENS = 5000
+
+
+def a_random_token():
+    return b64encode(urandom(32))
+
+
+def tokens_for_voucher(key, cache={}):
+    if key not in cache:
+        print("Generating tokens for {}".format(key))
+        cache[key] = list(
+            a_random_token()
+            for _
+            in range(NUM_TOKENS)
+        )
+    else:
+        print("Using cached tokens for {}".format(key))
+    return cache[key]
+
 
 @inlineCallbacks
 def redeem(client, index):
     times = []
+    voucher = "aaa{}".format(index)
     for i in range(16):
+        tokens = tokens_for_voucher((voucher, i))
         before = time()
         response = yield client.post(
             url="http://127.0.0.1:8080/v1/redeem",
             data=dumps({
-                "redeemVoucher": "aaa{}".format(index),
-                "redeemTokens": ["foo-{}-{}".format(index, i)],
+                "redeemVoucher": voucher,
+                "redeemTokens": tokens,
                 "redeemCounter": i,
             }),
             headers={"content-type": "application/json"},
