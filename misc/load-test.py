@@ -39,6 +39,7 @@ from time import (
 
 from json import (
     dumps,
+    loads,
 )
 
 from treq.client import (
@@ -59,6 +60,7 @@ from twisted.internet.defer import (
 )
 
 PARALLELISM = 50
+ITERATIONS = 16
 NUM_TOKENS = 5000
 
 
@@ -80,14 +82,46 @@ def tokens_for_voucher(key, cache={}):
 
 
 @inlineCallbacks
-def redeem(client, index):
-    times = []
-    voucher = "aaa{}".format(index)
-    for i in range(16):
-        tokens = tokens_for_voucher((voucher, i))
+def redeem_with_retry(client, data, headers):
+    """
+    Attempt a redemption.  Retry if it fails.
+
+    :return: A ``Deferred`` that fires with (duration of successful request,
+        number of failed requests).
+    """
+    errors = 0
+    while True:
         before = time()
         response = yield client.post(
             url="http://127.0.0.1:8080/v1/redeem",
+            data=data,
+            headers=headers,
+        )
+        after = time()
+        duration = int((after - before) * 1000)
+        body = yield readBody(response)
+        if response.code == 200:
+            print("Request complete in {}ms".format(duration))
+            returnValue((duration, errors))
+
+        errors += 1
+        try:
+            reason = loads(body)["reason"]
+        except ValueError:
+            reason = body
+
+        print("Request failed: {} {}".format(response.code, reason))
+
+
+@inlineCallbacks
+def redeem(client, index):
+    times = []
+    total_errors = 0
+    voucher = "aaa{}".format(index)
+    for i in range(ITERATIONS):
+        tokens = tokens_for_voucher((voucher, i))
+        duration, errors = yield redeem_with_retry(
+            client,
             data=dumps({
                 "redeemVoucher": voucher,
                 "redeemTokens": tokens,
@@ -95,13 +129,9 @@ def redeem(client, index):
             }),
             headers={"content-type": "application/json"},
         )
-        after = time()
-        duration = int((after - before) * 1000)
-        print("Request complete in {}ms".format(duration))
-        body = yield readBody(response)
-        assert response.code == 200, (voucher, response.code, body)
         times.append(duration)
-    returnValue(times)
+        total_errors += errors
+    returnValue((times, total_errors))
 
 
 def mean(xs):
@@ -128,11 +158,17 @@ def main(reactor):
     )
 
     times = []
-    for result in (yield gatherResults(ds)):
+    total_errors = 0
+    for (result, errors) in (yield gatherResults(ds)):
         times.extend(result)
+        total_errors += errors
 
     print("min: {}".format(min(times)))
     print("max: {}".format(max(times)))
     print("mean: {}".format(mean(times)))
     print("median: {}".format(median(times)))
     print("95th: {}".format(percentile(95, times)))
+    print("errors: {}".format(total_errors))
+    print("error rate: {}".format(
+        total_errors / (total_errors + PARALLELISM * ITERATIONS),
+    ))
