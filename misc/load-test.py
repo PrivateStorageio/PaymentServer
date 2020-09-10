@@ -65,7 +65,7 @@ def redeem(client, index):
         duration = int((after - before) * 1000)
         print("Request complete in {}ms".format(duration))
         body = yield readBody(response)
-        assert response.code == 200, (response.code, body)
+        assert response.code == 200, (voucher, response.code, body)
         times.append(duration)
     returnValue(times)
 
