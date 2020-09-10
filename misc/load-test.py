@@ -75,7 +75,7 @@ def mean(xs):
 
 
 def percentile(n, xs):
-    return sorted(xs)[int(len(xs) / 100 * 95)]
+    return sorted(xs)[int(len(xs) / 100 * n)]
 
 
 def median(xs):
