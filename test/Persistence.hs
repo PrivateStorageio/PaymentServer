@@ -36,12 +36,15 @@ import System.Directory
   ( getTemporaryDirectory
   )
 
+import qualified Database.SQLite.Simple as Sqlite
+
 import PaymentServer.Persistence
   ( Voucher
   , Fingerprint
-  , RedeemError(NotPaid, AlreadyRedeemed, DuplicateFingerprint)
+  , RedeemError(NotPaid, AlreadyRedeemed, DuplicateFingerprint, DatabaseUnavailable)
   , PaymentError(AlreadyPaid)
   , VoucherDatabase(payForVoucher, redeemVoucher, redeemVoucherWithCounter)
+  , VoucherDatabaseState(SQLiteDB)
   , memory
   , sqlite
   )
@@ -187,8 +190,31 @@ memoryDatabaseVoucherPaymentTests = makeVoucherPaymentTests "memory" $ do
 -- | Instantiate the persistence tests for the sqlite3 backend.
 sqlite3DatabaseVoucherPaymentTests :: TestTree
 sqlite3DatabaseVoucherPaymentTests =
-  makeVoucherPaymentTests "sqlite3" $
-  do
-    tempdir <- getTemporaryDirectory
-    (path, handle) <- openTempFile tempdir "voucher-.db"
-    return . sqlite . Text.pack $ path
+  testGroup ""
+  [ genericTests
+  , sqlite3Tests
+  ]
+  where
+    makeDatabase = do
+      tempdir <- getTemporaryDirectory
+      (path, handle) <- openTempFile tempdir "voucher-.db"
+      return . sqlite . Text.pack $ path
+
+    genericTests = makeVoucherPaymentTests "sqlite3" makeDatabase
+
+    sqlite3Tests =
+      testGroup "SQLite3-specific voucher"
+      [ testCase "database is busy" $ do
+          getDB <- makeDatabase
+          db <- getDB
+          case db of
+            (SQLiteDB connect) -> do
+              conn <- connect
+              -- Tweak the timeout down so the test completes quickly
+              Sqlite.execute_ conn "PRAGMA busy_timeout = 0"
+              -- Acquire a write lock before letting the application code run so that
+              -- the application code is denied the write lock.
+              Sqlite.withExclusiveTransaction conn $ do
+                result <- redeemVoucher db voucher fingerprint
+                assertEqual "Redeeming voucher while database busy" result $ Left DatabaseUnavailable
+      ]

@@ -5,7 +5,7 @@
 module PaymentServer.Persistence
   ( Voucher
   , Fingerprint
-  , RedeemError(NotPaid, AlreadyRedeemed, DuplicateFingerprint)
+  , RedeemError(NotPaid, AlreadyRedeemed, DuplicateFingerprint, DatabaseUnavailable)
   , PaymentError(AlreadyPaid, PaymentFailed)
   , VoucherDatabase(payForVoucher, redeemVoucher, redeemVoucherWithCounter)
   , VoucherDatabaseState(MemoryDB, SQLiteDB)
@@ -72,6 +72,8 @@ data RedeemError =
   -- fingerprint.  We check for this case to prevent a misbehaving client from
   -- accidentally creating worthless tokens.
   | DuplicateFingerprint
+  -- | The database is too busy right now.  Try again later.
+  | DatabaseUnavailable
   deriving (Show, Eq)
 
 -- | A fingerprint cryptographically identifies a redemption of a voucher.
@@ -191,16 +193,21 @@ instance VoucherDatabase VoucherDatabaseState where
       fingerprint
 
   redeemVoucherWithCounter SQLiteDB { connect = connect } voucher fingerprint counter =
-    bracket connect Sqlite.close $ \conn ->
-    Sqlite.withExclusiveTransaction conn $
-    redeemVoucherHelper
-    (isVoucherPaid conn)
-    (getVoucherFingerprint conn)
-    (getVoucherCounterForFingerprint conn)
-    (insertVoucherAndFingerprint conn)
-    voucher
-    counter
-    fingerprint
+    bracket connect Sqlite.close redeemIt `catch` transformBusy
+    where
+      redeemIt conn =
+        Sqlite.withExclusiveTransaction conn $
+        redeemVoucherHelper
+        (isVoucherPaid conn)
+        (getVoucherFingerprint conn)
+        (getVoucherCounterForFingerprint conn)
+        (insertVoucherAndFingerprint conn)
+        voucher
+        counter
+        fingerprint
+
+      transformBusy (Sqlite.SQLError Sqlite.ErrorBusy _ _) =
+        return . Left $ DatabaseUnavailable
 
 
 -- | Look up the voucher, counter tuple which previously performed a
