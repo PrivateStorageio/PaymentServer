@@ -61,7 +61,7 @@ from twisted.internet.defer import (
 
 PARALLELISM = 50
 ITERATIONS = 16
-NUM_TOKENS = 5000
+NUM_TOKENS = 100000
 
 
 def a_random_token():

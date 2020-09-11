@@ -54,6 +54,7 @@ import Servant
   , Handler
   , ServerError(errBody, errHeaders)
   , err400
+  , err500
   , throwError
   )
 import Servant.API
@@ -68,7 +69,7 @@ import Crypto.Hash
   )
 import PaymentServer.Persistence
   ( VoucherDatabase(redeemVoucherWithCounter)
-  , RedeemError(NotPaid, AlreadyRedeemed, DuplicateFingerprint)
+  , RedeemError(NotPaid, AlreadyRedeemed, DuplicateFingerprint, DatabaseUnavailable)
   , Fingerprint
   , Voucher
   )
@@ -159,7 +160,7 @@ maxCounter = 16
 
 type RedemptionAPI = ReqBody '[JSON] Redeem :> Post '[JSON] Result
 
-jsonErr400 reason = err400
+jsonErr err reason = err
   { errBody = encode reason
   , errHeaders = [ ("Content-Type", "application/json;charset=utf-8") ]
   }
@@ -192,23 +193,25 @@ retry op =
 redeem :: VoucherDatabase d => Issuer -> d -> Redeem -> Handler Result
 redeem issue database (Redeem voucher tokens counter) =
   if counter < 0 || counter >= maxCounter then
-    throwError $ jsonErr400 (CounterOutOfBounds 0 maxCounter counter)
+    throwError $ jsonErr err400 (CounterOutOfBounds 0 maxCounter counter)
   else do
 
     let fingerprint = fingerprintFromTokens tokens
     result <- liftIO . retry $ redeemVoucherWithCounter database voucher fingerprint counter
     case result of
       Left NotPaid -> do
-        throwError $ jsonErr400 Unpaid
+        throwError $ jsonErr err400 Unpaid
       Left AlreadyRedeemed -> do
-        throwError $ jsonErr400 DoubleSpend
+        throwError $ jsonErr err400 DoubleSpend
       Left DuplicateFingerprint -> do
-        throwError $ jsonErr400 $ OtherFailure "fingerprint already used"
+        throwError $ jsonErr err400 $ OtherFailure "fingerprint already used"
+      Left DatabaseUnavailable -> do
+        throwError $ jsonErr err500 $ OtherFailure "database temporarily unavailable"
       Right () -> do
         let result = issue tokens
         case result of
           Left reason -> do
-            throwError $ jsonErr400 $ OtherFailure reason
+            throwError $ jsonErr err400 $ OtherFailure reason
           Right (ChallengeBypass key signatures proof) ->
             return $ Succeeded key signatures proof
 
