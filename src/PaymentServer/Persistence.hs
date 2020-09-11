@@ -18,6 +18,7 @@ import Control.Exception
   , throwIO
   , catch
   , bracket
+  , bracketOnError
   )
 
 import Data.Text
@@ -332,15 +333,18 @@ insertVoucherAndFingerprint dbConn (voucher, counter) fingerprint =
 sqlite :: Text -> IO VoucherDatabaseState
 sqlite path =
   let
-    connect :: IO Sqlite.Connection
-    connect = do
-      dbConn <- Sqlite.open (unpack path)
+    initialize :: Sqlite.Connection -> IO Sqlite.Connection
+    initialize dbConn = do
       let exec = Sqlite.execute_ dbConn
       exec "PRAGMA busy_timeout = 1000"
       exec "PRAGMA foreign_keys = ON"
       Sqlite.withExclusiveTransaction dbConn $ do
         exec "CREATE TABLE IF NOT EXISTS vouchers (id INTEGER PRIMARY KEY, name TEXT UNIQUE)"
         exec "CREATE TABLE IF NOT EXISTS redeemed (id INTEGER PRIMARY KEY, voucher_id INTEGER, counter INTEGER, fingerprint TEXT, FOREIGN KEY (voucher_id) REFERENCES vouchers(id))"
-        return dbConn
+      return dbConn
+
+    connect :: IO Sqlite.Connection
+    connect =
+      bracketOnError (Sqlite.open . unpack $ path) Sqlite.close initialize
   in
     return . SQLiteDB $ connect
