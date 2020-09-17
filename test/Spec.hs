@@ -11,10 +11,12 @@ import Test.Tasty
   )
 
 import qualified Persistence
+import qualified Metrics
 
 tests :: TestTree
 tests = testGroup "Tests"
   [ Persistence.tests
+  , Metrics.tests
   ]
 
 main = defaultMain tests
