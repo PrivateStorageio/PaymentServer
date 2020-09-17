@@ -65,6 +65,7 @@ import PaymentServer.Persistence
 tests :: TestTree
 tests = testGroup "Metrics"
   [ metricsTests
+  , serverTests
   ]
 
 readMetrics :: Session SResponse
@@ -96,3 +97,15 @@ metricsTests =
           , "# TYPE a_counter counter"
           , "a_counter 1.0"
           ]
+
+-- | The metrics endpoint is hooked up to the overall application server.
+serverTests :: TestTree
+serverTests =
+  testCase "metrics endpoint" $
+  let
+    app :: Application
+    app = paymentServerApp mempty undefined undefined (undefined :: VoucherDatabaseState)
+  in
+    flip runSession app $ do
+      response <- readMetrics
+      assertStatus 200 response

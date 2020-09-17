@@ -2,8 +2,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeOperators #-}
 
+-- | A module which provides Prometheus metrics publishing.  Individual
+-- metrics are defined elsewhere in the codebase but they'll all be published
+-- by this module.
+
 module PaymentServer.Metrics
-  ( metricsAPI
+  ( MetricsAPI
+  , metricsAPI
   , metricsServer
   ) where
 
