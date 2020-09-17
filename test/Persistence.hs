@@ -205,16 +205,24 @@ sqlite3DatabaseVoucherPaymentTests =
     sqlite3Tests =
       testGroup "SQLite3-specific voucher"
       [ testCase "database is busy" $ do
-          getDB <- makeDatabase
-          db <- getDB
-          case db of
+          aDatabase <- makeDatabase
+          normalConnection <- aDatabase
+          case normalConnection of
             (SQLiteDB connect) -> do
-              conn <- connect
-              -- Tweak the timeout down so the test completes quickly
-              Sqlite.execute_ conn "PRAGMA busy_timeout = 0"
-              -- Acquire a write lock before letting the application code run so that
-              -- the application code is denied the write lock.
-              Sqlite.withExclusiveTransaction conn $ do
-                result <- redeemVoucher db voucher fingerprint
+              -- Acquire a write lock before letting the application code run
+              -- so that the application code is denied the write lock.
+              normalConn <- connect
+              fastBusyConn <- fastBusyConnection connect
+              Sqlite.withExclusiveTransaction normalConn $ do
+                result <- redeemVoucher fastBusyConn voucher fingerprint
                 assertEqual "Redeeming voucher while database busy" result $ Left DatabaseUnavailable
       ]
+      where
+        fastBusyConnection
+          :: IO Sqlite.Connection
+          -> IO VoucherDatabaseState
+        fastBusyConnection connect = do
+          conn <- connect
+          -- Tweak the timeout down so the test completes quickly
+          Sqlite.execute_ conn "PRAGMA busy_timeout = 0"
+          return . SQLiteDB . return $ conn
