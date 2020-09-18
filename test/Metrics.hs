@@ -44,8 +44,7 @@ import Servant
   )
 
 import Prometheus
-  ( Metric
-  , Info(Info)
+  ( Info(Info)
   , unsafeRegister
   , counter
   , incCounter
