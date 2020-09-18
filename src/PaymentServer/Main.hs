@@ -72,6 +72,7 @@ import PaymentServer.Issuer
   )
 import PaymentServer.Server
   ( paymentServerApp
+  , makeMetricsMiddleware
   )
 
 import Options.Applicative
@@ -313,5 +314,6 @@ getApp config =
             let
               origins = corsOrigins config
               app = paymentServerApp origins stripeConfig' issuer db
+            metricsMiddleware <- makeMetricsMiddleware
             logger <- mkRequestLogger (def { outputFormat = Detailed True})
-            return $ logger app
+            return . logger . metricsMiddleware $ app

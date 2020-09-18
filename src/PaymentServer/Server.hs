@@ -6,6 +6,7 @@
 -- interactions.
 module PaymentServer.Server
   ( paymentServerApp
+  , makeMetricsMiddleware
   ) where
 
 import Network.Wai.Middleware.Cors
@@ -21,6 +22,11 @@ import Servant
   , serve
   , (:>)
   , (:<|>)((:<|>))
+  )
+import Servant.Prometheus
+  ( MeasureQuantiles(WithQuantiles)
+  , monitorServant
+  , makeMeters
   )
 
 import Web.Stripe.Client
@@ -83,3 +89,10 @@ paymentServerApp corsOrigins stripeConfig issuer =
     cors' = cors (const $ Just corsResourcePolicy)
   in
     cors' . app
+
+
+-- | Create middleware which captures metrics for the payment server app.
+makeMetricsMiddleware :: IO (Application -> Application)
+makeMetricsMiddleware = do
+  meters <- makeMeters paymentServerAPI WithQuantiles
+  return $ monitorServant paymentServerAPI meters
