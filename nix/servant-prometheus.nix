@@ -2,19 +2,19 @@ let
   buildDepError = pkg:
     builtins.throw ''
       The Haskell package set does not contain the package: ${pkg} (build dependency).
-
+      
       If you are using Stackage, make sure that you are using a snapshot that contains the package. Otherwise you may need to update the Hackage snapshot you are using, usually by updating haskell.nix.
       '';
   sysDepError = pkg:
     builtins.throw ''
       The Nixpkgs package set does not contain the package: ${pkg} (system dependency).
-
+      
       You may need to augment the system package mapping in haskell.nix so that it can be found.
       '';
   pkgConfDepError = pkg:
     builtins.throw ''
       The pkg-conf packages does not contain the package: ${pkg} (pkg-conf dependency).
-
+      
       You may need to augment the pkg-conf package mapping in haskell.nix so that it can be found.
       '';
   exeDepError = pkg:
@@ -24,16 +24,16 @@ let
   legacyExeDepError = pkg:
     builtins.throw ''
       The Haskell package set does not contain the package: ${pkg} (executable dependency).
-
+      
       If you are using Stackage, make sure that you are using a snapshot that contains the package. Otherwise you may need to update the Hackage snapshot you are using, usually by updating haskell.nix.
       '';
   buildToolDepError = pkg:
     builtins.throw ''
       Neither the Haskell package set or the Nixpkgs package set contain the package: ${pkg} (build tool dependency).
-
+      
       If this is a system dependency:
       You may need to augment the system package mapping in haskell.nix so that it can be found.
-
+      
       If this is a Haskell dependency:
       If you are using Stackage, make sure that you are using a snapshot that contains the package. Otherwise you may need to update the Hackage snapshot you are using, usually by updating haskell.nix.
       '';
@@ -42,62 +42,71 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
     flags = {};
     package = {
       specVersion = "1.10";
-      identifier = { name = "PaymentServer"; version = "0.1.0.0"; };
-      license = "Apache-2.0";
-      copyright = "2019 Private Storage.io, LLC.";
-      maintainer = "support@privatestorage.io";
-      author = "Jean-Paul Calderone";
-      homepage = "https://github.com/privatestorageio/PaymentServer#readme";
+      identifier = { name = "servant-prometheus"; version = "0.1.0.0"; };
+      license = "BSD-3-Clause";
+      copyright = "";
+      maintainer = "Alex Mason <axman6@gmail.com>, Jack Kelly <jack.kelly@data61.csiro.au>";
+      author = "Alex Mason <axman6@gmail.com>, Anchor Engineering <engineering@lists.anchor.net.au>, Servant Contributors";
+      homepage = "";
       url = "";
-      synopsis = "Coordinate entities for the purchase of PrivateStorage.io vouchers.";
-      description = "";
+      synopsis = "Helpers for using prometheus with servant";
+      description = "Helpers for using prometheus with servant. Each endpoint has its own metrics allowing more detailed monitoring than wai-middleware-prometheus allows";
       buildType = "Simple";
       };
     components = {
       "library" = {
         depends = [
           (hsPkgs."base" or (buildDepError "base"))
-          (hsPkgs."bytestring" or (buildDepError "bytestring"))
-          (hsPkgs."utf8-string" or (buildDepError "utf8-string"))
-          (hsPkgs."optparse-applicative" or (buildDepError "optparse-applicative"))
-          (hsPkgs."aeson" or (buildDepError "aeson"))
-          (hsPkgs."servant" or (buildDepError "servant"))
-          (hsPkgs."servant-server" or (buildDepError "servant-server"))
-          (hsPkgs."http-types" or (buildDepError "http-types"))
-          (hsPkgs."wai" or (buildDepError "wai"))
-          (hsPkgs."wai-extra" or (buildDepError "wai-extra"))
-          (hsPkgs."wai-cors" or (buildDepError "wai-cors"))
-          (hsPkgs."data-default" or (buildDepError "data-default"))
-          (hsPkgs."warp" or (buildDepError "warp"))
-          (hsPkgs."warp-tls" or (buildDepError "warp-tls"))
-          (hsPkgs."stripe-core" or (buildDepError "stripe-core"))
-          (hsPkgs."stripe-haskell" or (buildDepError "stripe-haskell"))
-          (hsPkgs."text" or (buildDepError "text"))
-          (hsPkgs."containers" or (buildDepError "containers"))
-          (hsPkgs."cryptonite" or (buildDepError "cryptonite"))
-          (hsPkgs."sqlite-simple" or (buildDepError "sqlite-simple"))
-          (hsPkgs."retry" or (buildDepError "retry"))
           (hsPkgs."prometheus-client" or (buildDepError "prometheus-client"))
-          (hsPkgs."servant-prometheus" or (buildDepError "servant-prometheus"))
-          ];
-        pkgconfig = [
-          (pkgconfPkgs."libchallenge_bypass_ristretto_ffi" or (pkgConfDepError "libchallenge_bypass_ristretto_ffi"))
+          (hsPkgs."servant" or (buildDepError "servant"))
+          (hsPkgs."http-types" or (buildDepError "http-types"))
+          (hsPkgs."text" or (buildDepError "text"))
+          (hsPkgs."time" or (buildDepError "time"))
+          (hsPkgs."unordered-containers" or (buildDepError "unordered-containers"))
+          (hsPkgs."wai" or (buildDepError "wai"))
+          (hsPkgs."bytestring" or (buildDepError "bytestring"))
           ];
         };
       exes = {
-        "PaymentServer-exe" = {
+        "bench" = {
           depends = [
             (hsPkgs."base" or (buildDepError "base"))
-            (hsPkgs."PaymentServer" or (buildDepError "PaymentServer"))
+            (hsPkgs."aeson" or (buildDepError "aeson"))
+            (hsPkgs."servant-prometheus" or (buildDepError "servant-prometheus"))
+            (hsPkgs."servant-server" or (buildDepError "servant-server"))
+            (hsPkgs."prometheus-client" or (buildDepError "prometheus-client"))
+            (hsPkgs."text" or (buildDepError "text"))
+            (hsPkgs."wai" or (buildDepError "wai"))
+            (hsPkgs."warp" or (buildDepError "warp"))
+            (hsPkgs."process" or (buildDepError "process"))
             ];
           };
-        "PaymentServer-generate-key" = {
+        };
+      tests = {
+        "spec" = {
           depends = [
             (hsPkgs."base" or (buildDepError "base"))
+            (hsPkgs."aeson" or (buildDepError "aeson"))
+            (hsPkgs."servant-prometheus" or (buildDepError "servant-prometheus"))
+            (hsPkgs."servant-server" or (buildDepError "servant-server"))
+            (hsPkgs."servant-client" or (buildDepError "servant-client"))
+            (hsPkgs."servant" or (buildDepError "servant"))
+            (hsPkgs."prometheus-client" or (buildDepError "prometheus-client"))
+            (hsPkgs."http-client" or (buildDepError "http-client"))
             (hsPkgs."text" or (buildDepError "text"))
-            (hsPkgs."PaymentServer" or (buildDepError "PaymentServer"))
+            (hsPkgs."wai" or (buildDepError "wai"))
+            (hsPkgs."warp" or (buildDepError "warp"))
+            (hsPkgs."hspec" or (buildDepError "hspec"))
+            (hsPkgs."unordered-containers" or (buildDepError "unordered-containers"))
+            (hsPkgs."transformers" or (buildDepError "transformers"))
             ];
           };
         };
       };
-    } // rec { src = (pkgs.lib).mkDefault ../.; }
+    } // {
+    src = (pkgs.lib).mkDefault (pkgs.fetchgit {
+      url = "https://github.com/PrivateStorageio/servant-prometheus.git";
+      rev = "ec21c5ed50e6f6f8e52916ce71cd68fcd0166cad";
+      sha256 = "0lswszfs52x5rpf7lj46iv77zghcbr4d05dwssi63yzjll1ixizd";
+      });
+    }
