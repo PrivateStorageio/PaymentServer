@@ -89,7 +89,8 @@ getVoucher (MetaData (("Voucher", value):xs)) = Just value
 getVoucher (MetaData (x:xs)) = getVoucher (MetaData xs)
 
 stripeServer :: VoucherDatabase d => StripeConfig -> d -> Server StripeAPI
-stripeServer = charge
+stripeServer stripeConfig d =
+  withSuccessFailureMetrics chargeAttempts chargeSuccesses . charge stripeConfig d
 
 -- | Browser facing API that takes token, voucher and a few other information
 -- and calls stripe charges API. If payment succeeds, then the voucher is stored
@@ -113,19 +114,40 @@ instance FromJSON Charges where
                          v .: "currency"
   parseJSON _ = mzero
 
+
+metricName :: Text -> Text
+metricName name = mappend ("processors.stripe.charge_") name
+
 chargeAttempts :: P.Counter
 chargeAttempts
   = P.unsafeRegister
   $ P.counter
-  $ P.Info "charge_attempts" "The number of attempted charge requests received."
+  $ P.Info (metricName "attempts")
+  "The number of attempted charge requests received."
+
+
+chargeSuccesses :: P.Counter
+chargeSuccesses
+  = P.unsafeRegister
+  $ P.counter
+  $ P.Info (metricName "successes")
+  "The number of charge requests successfully processed."
+
+
+-- | run a Servant Handler, recording the attempt and whether or not it
+-- succeeds using the given counters.
+withSuccessFailureMetrics :: P.Counter -> P.Counter -> Handler a -> Handler a
+withSuccessFailureMetrics attemptCount successCount op = do
+  liftIO $ P.incCounter attemptCount
+  result <- op
+  liftIO $ P.incCounter successCount
+  return result
+
 
 -- | call the stripe Charge API (with token, voucher in metadata, amount, currency etc
 -- and if the Charge is okay, then set the voucher as "paid" in the database.
 charge :: VoucherDatabase d => StripeConfig -> d -> Charges -> Handler Acknowledgement
 charge stripeConfig d (Charges token voucher amount currency) = do
-
-  liftIO $ P.incCounter chargeAttempts
-
   currency' <- getCurrency currency
   result <- liftIO (try (payForVoucher d voucher (completeStripeCharge currency')))
   case result of
