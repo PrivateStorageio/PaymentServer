@@ -24,7 +24,9 @@ import Control.Retry
   , constantDelay
   , limitRetries
   )
-
+import Control.Monad
+  ( when
+  )
 import Control.Monad.IO.Class
   ( liftIO
   )
@@ -67,6 +69,7 @@ import Crypto.Hash
   ( SHA3_512(SHA3_512)
   , hashWith
   )
+import qualified Prometheus as P
 import PaymentServer.Persistence
   ( VoucherDatabase(redeemVoucherWithCounter)
   , RedeemError(NotPaid, AlreadyRedeemed, DuplicateFingerprint, DatabaseUnavailable)
@@ -195,10 +198,8 @@ redeem issue database (Redeem voucher tokens counter) =
   if counter < 0 || counter >= maxCounter then
     throwError $ jsonErr err400 (CounterOutOfBounds 0 maxCounter counter)
   else do
-
-    let fingerprint = fingerprintFromTokens tokens
-    result <- liftIO . retry $ redeemVoucherWithCounter database voucher fingerprint counter
-    case result of
+    redeemResult <- liftIO . retry $ redeem
+    case redeemResult of
       Left NotPaid -> do
         throwError $ jsonErr err400 Unpaid
       Left AlreadyRedeemed -> do
@@ -212,8 +213,30 @@ redeem issue database (Redeem voucher tokens counter) =
         case result of
           Left reason -> do
             throwError $ jsonErr err400 $ OtherFailure reason
-          Right (ChallengeBypass key signatures proof) ->
+          Right (ChallengeBypass key signatures proof) -> do
+            let count = fromInteger . toInteger . length $ signatures
+            -- addCounter returns bool indicating whether its argument was
+            -- greater than or equal to zero or not.  We don't care.  length
+            -- is greater than or equal to zero.
+            liftIO . when fresh $ (P.addCounter signaturesIssued count >>= \_ -> return ())
             return $ Succeeded key signatures proof
+    where
+      fingerprint = fingerprintFromTokens tokens
+      redeem :: IO (Either RedeemError Bool)
+      redeem = redeemVoucherWithCounter database voucher fingerprint counter
+
+
+metricName :: Text -> Text
+metricName name = mappend "redemption." name
+
+
+signaturesIssued :: P.Counter
+signaturesIssued
+  = P.unsafeRegister
+  $ P.counter
+  $ P.Info (metricName "signatures_issued")
+  "The number of unique signatures which have been issued to clients."
+
 
 -- | Compute a cryptographic hash (fingerprint) of a list of tokens which can
 -- be used as an identifier for this exact sequence of tokens.
