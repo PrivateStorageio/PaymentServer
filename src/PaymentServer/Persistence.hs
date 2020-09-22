@@ -37,6 +37,9 @@ import qualified Database.SQLite.Simple as Sqlite
 import           Database.SQLite.Simple.FromRow
   ( FromRow(fromRow)
   )
+
+import qualified Prometheus as P
+
 import Data.Maybe
   ( listToMaybe
   )
@@ -259,12 +262,25 @@ redeemVoucherHelper isVoucherPaid lookupFingerprint lookupVoucherCounter markVou
           return $ Left NotPaid
         (True, Nothing) -> do
           markVoucherRedeemed (voucher, counter) fingerprint
+          P.incCounter voucherRedeemed
           return $ Right ()
         (True, Just fingerprint') ->
           if fingerprint == fingerprint' then
             return $ Right ()
           else
             return $ Left AlreadyRedeemed
+
+
+metricName :: Text -> Text
+metricName name = mappend "redemption." name
+
+
+voucherRedeemed :: P.Counter
+voucherRedeemed
+  = P.unsafeRegister
+  $ P.counter
+  $ P.Info (metricName "voucher_redeemed")
+  "The number of unique (voucher, counter) pairs which have been redeemed."
 
 
 -- | Create a new, empty MemoryVoucherDatabase.
