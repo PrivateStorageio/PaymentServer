@@ -35,7 +35,7 @@ import Network.Wai.Test
   , request
   , assertStatus
   , assertContentType
-  , assertBody
+  , assertBodyContains
   )
 
 import Servant
@@ -89,7 +89,7 @@ metricsTests =
       response <- readMetrics
       assertStatus 200 response
       assertContentType "text/plain" response
-      assertBody expectedMetrics response
+      assertBodyContains expectedMetrics response
       where
         expectedMetrics = pack . unlines $
           [ "# HELP a_counter A test counter."
