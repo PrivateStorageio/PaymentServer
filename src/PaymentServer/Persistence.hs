@@ -64,6 +64,11 @@ data PaymentError =
 
 instance Exception PaymentError
 
+instance Eq PaymentError where
+  AlreadyPaid == AlreadyPaid = True
+  PaymentFailed self == PaymentFailed other = show self == show other
+  self == other = False
+
 -- | Reasons that a voucher cannot be redeemed.
 data RedeemError =
   -- | The voucher has not been paid for.
