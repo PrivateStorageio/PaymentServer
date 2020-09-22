@@ -44,6 +44,10 @@ import Data.Maybe
   ( listToMaybe
   )
 
+import Web.Stripe.Error
+  ( StripeError
+  )
+
 -- | A voucher is a unique identifier which can be associated with a payment.
 -- A paid voucher can be redeemed for ZKAPs which can themselves be exchanged
 -- for service elsewhere with better privacy-preserving properties than the
@@ -55,10 +59,15 @@ data PaymentError =
   -- | The voucher has already been paid for.
   AlreadyPaid
   -- | The payment transaction has failed.
-  | PaymentFailed
-  deriving (Show, Eq)
+  | PaymentFailed StripeError
+  deriving (Show)
 
 instance Exception PaymentError
+
+instance Eq PaymentError where
+  AlreadyPaid == AlreadyPaid = True
+  PaymentFailed self == PaymentFailed other = show self == show other
+  self == other = False
 
 -- | Reasons that a voucher cannot be redeemed.
 data RedeemError =

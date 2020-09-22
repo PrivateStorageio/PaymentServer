@@ -14,10 +14,6 @@ import Control.Monad.IO.Class
 import Control.Monad
   ( mzero
   )
-import Control.Exception
-  ( try
-  , throwIO
-  )
 import Data.Text
   ( Text
   , unpack
@@ -45,6 +41,10 @@ import Servant.API
   , JSON
   , Post
   , (:>)
+  )
+import Web.Stripe.Error
+  ( StripeError(StripeError, errorType, errorMsg)
+  , StripeErrorType(InvalidRequest, APIError, ConnectionFailure, CardError)
   )
 import Web.Stripe.Types
   ( Charge(Charge, chargeMetaData)
@@ -149,12 +149,14 @@ withSuccessFailureMetrics attemptCount successCount op = do
 charge :: VoucherDatabase d => StripeConfig -> d -> Charges -> Handler Acknowledgement
 charge stripeConfig d (Charges token voucher amount currency) = do
   currency' <- getCurrency currency
-  result <- liftIO (try (payForVoucher d voucher (completeStripeCharge currency')))
+  result <- liftIO ((payForVoucher d voucher (completeStripeCharge currency')) :: IO (Either PaymentError Charge))
   case result of
     Left AlreadyPaid ->
       throwError voucherAlreadyPaid
-    Left PaymentFailed ->
-      throwError stripeChargeFailed
+    Left (PaymentFailed (StripeError { errorType = errorType, errorMsg = msg })) -> do
+      liftIO $ print "Stripe createCharge failed:"
+      liftIO $ print msg
+      throwError . errorForStripeType $ errorType
     Right Charge { chargeMetaData = metadata } ->
       checkVoucherMetadata metadata
     where
@@ -165,17 +167,19 @@ charge stripeConfig d (Charges token voucher amount currency) = do
           Nothing -> throwError unsupportedCurrency
 
       tokenId = TokenId token
+      completeStripeCharge :: Currency -> IO (Either PaymentError Charge)
       completeStripeCharge currency' = do
-        result <- stripe stripeConfig $
-          createCharge (Amount amount) currency'
-          -&- tokenId
-          -&- MetaData [("Voucher", voucher)]
+        result <- (stripe stripeConfig charge) :: IO (Either StripeError Charge)
         case result of
-          Left err -> do
-            print "Stripe createCharge failed:"
-            print err
-            throwIO PaymentFailed
-          Right result -> return result
+          Left any ->
+            return . Left $ PaymentFailed any
+          Right any ->
+            return . Right $ any
+          where
+          charge =
+            createCharge (Amount amount) currency'
+            -&- tokenId
+            -&- MetaData [("Voucher", voucher)]
 
       checkVoucherMetadata :: MetaData -> Handler Acknowledgement
       checkVoucherMetadata metadata =
@@ -187,11 +191,31 @@ charge stripeConfig d (Charges token voucher amount currency) = do
             else throwError voucherCodeMismatch
           _ -> throwError voucherCodeNotFound
 
+      -- "Invalid request errors arise when your request has invalid parameters."
+      errorForStripeType InvalidRequest    = internalServerError
+
+      -- "API errors cover any other type of problem (e.g., a temporary
+      -- problem with Stripe's servers), and are extremely uncommon."
+      errorForStripeType APIError          = serviceUnavailable
+
+      -- "Failure to connect to Stripe's API."
+      errorForStripeType ConnectionFailure = serviceUnavailable
+
+      -- "Card errors are the most common type of error you should expect to
+      -- handle. They result when the user enters a card that can't be charged
+      -- for some reason."
+      errorForStripeType CardError         = stripeChargeFailed
+
+      -- Something else we don't know about...
+      errorForStripeType _                 = internalServerError
+
+      serviceUnavailable  = jsonErr 503 "Service temporarily unavailable"
+      internalServerError = jsonErr 500 "Internal server error"
       voucherCodeMismatch = jsonErr 500 "Voucher code mismatch"
       unsupportedCurrency = jsonErr 400 "Invalid currency specified"
       voucherCodeNotFound = jsonErr 400 "Voucher code not found"
-      stripeChargeFailed = jsonErr 400 "Stripe charge didn't succeed"
-      voucherAlreadyPaid = jsonErr 400 "Payment for voucher already supplied"
+      stripeChargeFailed  = jsonErr 400 "Stripe charge didn't succeed"
+      voucherAlreadyPaid  = jsonErr 400 "Payment for voucher already supplied"
 
       jsonErr httpCode reason = ServerError
         { errHTTPCode = httpCode
