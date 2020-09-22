@@ -120,21 +120,21 @@ class VoucherDatabase d where
   -- This is a backwards compatibility API.  Callers should prefer
   -- redeemVoucherWithCounter.
   redeemVoucher
-    :: d                          -- ^ The database
-    -> Voucher                    -- ^ A voucher to consider for redemption
-    -> Fingerprint                -- ^ The retry-enabling fingerprint for this redemption
-    -> IO (Either RedeemError ()) -- ^ Left indicating the redemption is not allowed or Right indicating it is.
+    :: d                            -- ^ The database
+    -> Voucher                      -- ^ A voucher to consider for redemption
+    -> Fingerprint                  -- ^ The retry-enabling fingerprint for this redemption
+    -> IO (Either RedeemError Bool) -- ^ Left indicating the redemption is not allowed or Right indicating it is.
   redeemVoucher d v f = redeemVoucherWithCounter d v f 0
 
   -- | Attempt to redeem a voucher.  If it has not been redeemed before or it
   -- has been redeemed with the same counter and fingerprint, the redemption
   -- succeeds.  Otherwise, it fails.
   redeemVoucherWithCounter
-    :: d                          -- ^ The database
-    -> Voucher                    -- ^ A voucher to consider for redemption
-    -> Fingerprint                -- ^ The retry-enabling fingerprint for this redemption
-    -> Integer                    -- ^ The counter for this redemption
-    -> IO (Either RedeemError ()) -- ^ Left indicating the redemption is not allowed or Right indicating it is.
+    :: d                            -- ^ The database
+    -> Voucher                      -- ^ A voucher to consider for redemption
+    -> Fingerprint                  -- ^ The retry-enabling fingerprint for this redemption
+    -> Integer                      -- ^ The counter for this redemption
+    -> IO (Either RedeemError Bool) -- ^ Left indicating the redemption is not allowed or Right indicating it is.
 
 
 -- | VoucherDatabaseState is a type that captures whether we are using an
@@ -246,9 +246,12 @@ redeemVoucherHelper
                                                -- this account.
   -> Fingerprint                               -- ^ The fingerprint of the
                                                -- this attempt.
-  -> IO (Either RedeemError ())                -- ^ Right for successful
-                                               -- redemption, left with
-                                               -- details about why it failed.
+  -> IO (Either RedeemError Bool)              -- ^ Right True for a new
+                                               -- successful redemption, Right
+                                               -- False for a retried
+                                               -- successful redemption, left
+                                               -- with details about why it
+                                               -- failed.
 redeemVoucherHelper isVoucherPaid lookupFingerprint lookupVoucherCounter markVoucherRedeemed voucher counter fingerprint = do
   paid <- isVoucherPaid voucher
   priorUse <- lookupVoucherCounter fingerprint
@@ -263,10 +266,10 @@ redeemVoucherHelper isVoucherPaid lookupFingerprint lookupVoucherCounter markVou
         (True, Nothing) -> do
           markVoucherRedeemed (voucher, counter) fingerprint
           P.incCounter voucherRedeemed
-          return $ Right ()
+          return $ Right True
         (True, Just fingerprint') ->
           if fingerprint == fingerprint' then
-            return $ Right ()
+            return $ Right False
           else
             return $ Left AlreadyRedeemed
 
