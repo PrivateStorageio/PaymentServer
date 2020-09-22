@@ -94,7 +94,7 @@ makeVoucherPaymentTests label makeDatabase =
       conn <- connect
       () <- payForVoucher conn voucher paySuccessfully
       result <- redeemVoucher conn voucher fingerprint
-      assertEqual "redeeming paid voucher" (Right ()) result
+      assertEqual "redeeming paid voucher" (Right True) result
   , testCase "allowed double redemption" $ do
       connect <- makeDatabase
       conn <- connect
@@ -102,8 +102,8 @@ makeVoucherPaymentTests label makeDatabase =
       let redeem = redeemVoucher conn voucher fingerprint
       first <- redeem
       second <- redeem
-      assertEqual "redeeming paid voucher" (Right ()) first
-      assertEqual "re-redeeming paid voucher" (Right ()) second
+      assertEqual "redeeming paid voucher" (Right True) first
+      assertEqual "re-redeeming paid voucher" (Right False) second
   , testCase "disallowed double redemption" $ do
       connect <- makeDatabase
       conn <- connect
@@ -111,7 +111,7 @@ makeVoucherPaymentTests label makeDatabase =
       let redeem = redeemVoucher conn voucher
       first <- redeem fingerprint
       second <- redeem (Text.cons 'a' $ Text.tail fingerprint)
-      assertEqual "redeeming paid voucher" (Right ()) first
+      assertEqual "redeeming paid voucher" (Right True) first
       assertEqual "re-redeeming paid voucher" (Left AlreadyRedeemed) second
   , testCase "allowed redemption varying by counter" $ do
       connect <- makeDatabase
@@ -120,8 +120,8 @@ makeVoucherPaymentTests label makeDatabase =
       let redeem = redeemVoucherWithCounter conn voucher
       first <- redeem fingerprint 0
       second <- redeem anotherFingerprint 1
-      assertEqual "redeemed with counter 0" (Right ()) first
-      assertEqual "redeemed with counter 1" (Right ()) second
+      assertEqual "redeemed with counter 0" (Right True) first
+      assertEqual "redeemed with counter 1" (Right True) second
   , testCase "disallowed redemption varying by counter but not fingerprint" $ do
       connect <- makeDatabase
       conn <- connect
@@ -129,7 +129,7 @@ makeVoucherPaymentTests label makeDatabase =
       let redeem = redeemVoucherWithCounter conn voucher
       first <- redeem fingerprint 0
       second <- redeem fingerprint 1
-      assertEqual "redeemed with counter 0" (Right ()) first
+      assertEqual "redeemed with counter 0" (Right True) first
       assertEqual "redeemed with counter 1" (Left DuplicateFingerprint) second
   , testCase "pay with exception" $ do
       connect <- makeDatabase
@@ -146,7 +146,7 @@ makeVoucherPaymentTests label makeDatabase =
       payResult <- try pay
       assertEqual "double-paying for a voucher" (Left AlreadyPaid) payResult
       redeemResult <- redeemVoucher conn voucher fingerprint
-      assertEqual "redeeming double-paid voucher" (Right ()) redeemResult
+      assertEqual "redeeming double-paid voucher" (Right True) redeemResult
   , testCase "concurrent payment" $ do
       connect <- makeDatabase
       connA <- connect
@@ -178,7 +178,7 @@ makeVoucherPaymentTests label makeDatabase =
         withAsync anotherRedeem $ \r2 -> do
           waitBoth r1 r2
 
-      assertEqual "Both redemptions should succeed" (Right (), Right ()) result
+      assertEqual "Both redemptions should succeed" (Right True, Right True) result
   ]
 
 -- | Instantiate the persistence tests for the memory backend.

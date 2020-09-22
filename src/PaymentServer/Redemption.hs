@@ -170,7 +170,7 @@ redemptionServer = redeem
 
 -- | Try an operation repeatedly for several minutes with a brief delay
 -- between tries.
-retry :: IO (Either RedeemError()) -> IO (Either RedeemError())
+retry :: IO (Either RedeemError a) -> IO (Either RedeemError a)
 retry op =
   retrying policy shouldRetry $ \_ -> op
   where
@@ -207,7 +207,7 @@ redeem issue database (Redeem voucher tokens counter) =
         throwError $ jsonErr err400 $ OtherFailure "fingerprint already used"
       Left DatabaseUnavailable -> do
         throwError $ jsonErr err500 $ OtherFailure "database temporarily unavailable"
-      Right () -> do
+      Right fresh -> do
         let result = issue tokens
         case result of
           Left reason -> do
