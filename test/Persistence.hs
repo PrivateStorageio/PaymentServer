@@ -47,6 +47,9 @@ import PaymentServer.Persistence
   , VoucherDatabaseState(SQLiteDB)
   , memory
   , sqlite
+  , upgradeSchema
+  , latestVersion
+  , readVersion
   )
 
 data ArbitraryException = ArbitraryException
@@ -58,6 +61,7 @@ tests :: TestTree
 tests = testGroup "Persistence"
   [ memoryDatabaseVoucherPaymentTests
   , sqlite3DatabaseVoucherPaymentTests
+  , sqlite3DatabaseSchemaTests
   ]
 
 -- Some dummy values that should be replaced by the use of QuickCheck.
@@ -214,8 +218,9 @@ sqlite3DatabaseVoucherPaymentTests =
               normalConn <- connect
               fastBusyConn <- fastBusyConnection connect
               Sqlite.withExclusiveTransaction normalConn $ do
+                let expected = Left DatabaseUnavailable
                 result <- redeemVoucher fastBusyConn voucher fingerprint
-                assertEqual "Redeeming voucher while database busy" result $ Left DatabaseUnavailable
+                assertEqual "Redeeming voucher while database busy" expected result
       ]
       where
         fastBusyConnection
@@ -226,3 +231,20 @@ sqlite3DatabaseVoucherPaymentTests =
           -- Tweak the timeout down so the test completes quickly
           Sqlite.execute_ conn "PRAGMA busy_timeout = 0"
           return . SQLiteDB . return $ conn
+
+
+sqlite3DatabaseSchemaTests :: TestTree
+sqlite3DatabaseSchemaTests =
+  testGroup "SQLite3 schema"
+  [ testCase "initialize empty database" $
+    -- upgradeSchema can start from nothing and upgrade the database to any
+    -- defined schema version.  We upgrade to the latest version because that
+    -- implies upgrading all the intermediate versions.  It probably wouldn't
+    -- hurt to target every intermediate version specifically, though.  I
+    -- think that's what SmallCheck is for?
+    Sqlite.withConnection ":memory:" $ \conn -> do
+      upgradeSchema latestVersion conn
+      let expected = Right latestVersion
+      actual <- readVersion conn
+      assertEqual "The recorded schema version should be the latest value" expected actual
+  ]

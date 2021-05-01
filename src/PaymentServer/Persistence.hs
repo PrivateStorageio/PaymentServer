@@ -11,6 +11,9 @@ module PaymentServer.Persistence
   , VoucherDatabaseState(MemoryDB, SQLiteDB)
   , memory
   , sqlite
+  , upgradeSchema
+  , latestVersion
+  , readVersion
   ) where
 
 import Control.Exception
@@ -373,9 +376,7 @@ sqlite path =
       let exec = Sqlite.execute_ dbConn
       exec "PRAGMA busy_timeout = 60000"
       exec "PRAGMA foreign_keys = ON"
-      Sqlite.withExclusiveTransaction dbConn $ do
-        exec "CREATE TABLE IF NOT EXISTS vouchers (id INTEGER PRIMARY KEY, name TEXT UNIQUE)"
-        exec "CREATE TABLE IF NOT EXISTS redeemed (id INTEGER PRIMARY KEY, voucher_id INTEGER, counter INTEGER, fingerprint TEXT, FOREIGN KEY (voucher_id) REFERENCES vouchers(id))"
+      Sqlite.withExclusiveTransaction dbConn (upgradeSchema latestVersion dbConn)
       return dbConn
 
     connect :: IO Sqlite.Connection
@@ -383,3 +384,100 @@ sqlite path =
       bracketOnError (Sqlite.open . unpack $ path) Sqlite.close initialize
   in
     return . SQLiteDB $ connect
+
+
+-- | updateVersions gives the SQL statements necessary to initialize the
+-- database schema at each version that has ever existed.  The first element
+-- is a list of SQL statements that modify an empty schema to create the first
+-- version.  The second element is a list of SQL statements that modify the
+-- first version to create the second version.  etc.
+updateVersions :: [[Sqlite.Query]]
+updateVersions =
+  [ [ "CREATE TABLE vouchers (id INTEGER PRIMARY KEY, name TEXT UNIQUE)"
+    , "CREATE TABLE redeemed (id INTEGER PRIMARY KEY, voucher_id INTEGER, counter INTEGER, fingerprint TEXT, FOREIGN KEY (voucher_id) REFERENCES vouchers(id))"
+    ]
+  , [ "CREATE TABLE version AS SELECT 2 AS version"
+    , "ALTER TABLE vouchers ADD COLUMN charge_id"
+    ]
+  ]
+
+latestVersion :: Int
+latestVersion = length updateVersions
+
+-- | readVersion reads the schema version out of a database using the given
+-- query function.  Since not all versions of the schema had an explicit
+-- version marker, it digs around a little bit to find the answer.
+readVersion :: Sqlite.Connection -> IO (Either UpgradeError Int)
+readVersion conn = do
+  versionExists <- doesTableExist "version"
+  if versionExists
+    -- If there is a version table then it knows the answer.
+    then
+    do
+      versions <- Sqlite.query_ conn "SELECT version FROM version" :: IO [Sqlite.Only Int]
+      case versions of
+        [] -> return $ Left VersionMissing
+        (Sqlite.Only v):[] -> return $ Right v
+        vs -> return $ Left $ ExcessVersions (map Sqlite.fromOnly vs)
+    else
+    do
+      vouchersExists <- doesTableExist "vouchers"
+      if vouchersExists
+        -- If there is a vouchers table then we have version 1
+        then return $ Right 1
+        -- Otherwise we have version 0
+        else return $ Right 0
+
+  where
+    doesTableExist :: Text -> IO Bool
+    doesTableExist name = do
+      (Sqlite.Only count):[] <-
+        Sqlite.query
+        conn
+        "SELECT COUNT(*) FROM [sqlite_master] WHERE [type] = 'table' AND [name] = ?"
+        (Sqlite.Only name) :: IO [Sqlite.Only Int]
+      return $ count > 0
+
+
+
+-- | upgradeSchema determines what schema changes need to be applied to the
+-- database associated with a connection to make the schema match the
+-- requested version.
+upgradeSchema :: Int -> Sqlite.Connection -> IO (Either UpgradeError ())
+upgradeSchema targetVersion conn = do
+  errOrCurrentVersion <- readVersion conn
+  case errOrCurrentVersion of
+    Left err -> return $ Left err
+    Right currentVersion ->
+      case compareVersion targetVersion currentVersion of
+        Lesser -> return $ Left DatabaseSchemaTooNew
+        Equal -> return $ Right ()
+        Greater -> runUpgrades currentVersion
+
+  where
+    runUpgrades :: Int -> IO (Either UpgradeError ())
+    runUpgrades currentVersion =
+      let
+        upgrades :: [[Sqlite.Query]]
+        upgrades = drop currentVersion updateVersions
+
+        oneStep :: [Sqlite.Query] -> IO [()]
+        oneStep = mapM $ Sqlite.execute_ conn
+      in do
+        mapM oneStep upgrades
+        return $ Right ()
+
+
+data UpgradeError
+  = VersionMissing
+  | ExcessVersions [Int]
+  | DatabaseSchemaTooNew
+  deriving (Show, Eq)
+
+data ComparisonResult = Lesser | Equal | Greater
+
+compareVersion :: Int -> Int -> ComparisonResult
+compareVersion a b
+  | a < b     = Lesser
+  | a == b    = Equal
+  | otherwise = Greater
