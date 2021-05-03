@@ -452,14 +452,14 @@ upgradeSchema targetVersion conn = do
       case compareVersion targetVersion currentVersion of
         Lesser -> return $ Left DatabaseSchemaTooNew
         Equal -> return $ Right ()
-        Greater -> runUpgrades currentVersion
+        Greater -> runUpgrades currentVersion targetVersion
 
   where
-    runUpgrades :: Int -> IO (Either UpgradeError ())
-    runUpgrades currentVersion =
+    runUpgrades :: Int -> Int -> IO (Either UpgradeError ())
+    runUpgrades currentVersion targetVersion =
       let
         upgrades :: [[Sqlite.Query]]
-        upgrades = drop currentVersion updateVersions
+        upgrades = drop currentVersion $ take targetVersion updateVersions
 
         oneStep :: [Sqlite.Query] -> IO [()]
         oneStep = mapM $ Sqlite.execute_ conn

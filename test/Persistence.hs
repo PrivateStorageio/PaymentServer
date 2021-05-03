@@ -247,4 +247,28 @@ sqlite3DatabaseSchemaTests =
       let expected = Right latestVersion
       actual <- readVersion conn
       assertEqual "The recorded schema version should be the latest value" expected actual
+
+  , testCase "identify version 0" $
+    -- readVersion identifies an empty database schema as version 0
+    Sqlite.withConnection ":memory:" $ \conn -> do
+      let expected = Right 0
+      actual <- readVersion conn
+      assertEqual "An empty database schema is version 0" expected actual
+
+  , testCase "identify version 1" $
+    -- readVersion identifies schema version 1
+    Sqlite.withConnection ":memory:" $ \conn -> do
+      upgradeSchema 1 conn
+      let expected = Right 1
+      actual <- readVersion conn
+      assertEqual "readVersion identifies database schema version 1" expected actual
+
+  , testCase "identify version 2" $
+    -- readVersion identifies schema version 1
+    Sqlite.withConnection ":memory:" $ \conn -> do
+      upgradeSchema 2 conn
+      let expected = Right 2
+      actual <- readVersion conn
+      assertEqual "readVersion identifies database schema version 2" expected actual
+
   ]
