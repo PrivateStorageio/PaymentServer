@@ -99,5 +99,25 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
             ];
           };
         };
+      tests = {
+        "PaymentServer-tests" = {
+          depends = [
+            (hsPkgs."base" or (buildDepError "base"))
+            (hsPkgs."bytestring" or (buildDepError "bytestring"))
+            (hsPkgs."text" or (buildDepError "text"))
+            (hsPkgs."tasty" or (buildDepError "tasty"))
+            (hsPkgs."tasty-hunit" or (buildDepError "tasty-hunit"))
+            (hsPkgs."directory" or (buildDepError "directory"))
+            (hsPkgs."async" or (buildDepError "async"))
+            (hsPkgs."sqlite-simple" or (buildDepError "sqlite-simple"))
+            (hsPkgs."http-types" or (buildDepError "http-types"))
+            (hsPkgs."wai" or (buildDepError "wai"))
+            (hsPkgs."wai-extra" or (buildDepError "wai-extra"))
+            (hsPkgs."servant-server" or (buildDepError "servant-server"))
+            (hsPkgs."prometheus-client" or (buildDepError "prometheus-client"))
+            (hsPkgs."PaymentServer" or (buildDepError "PaymentServer"))
+            ];
+          };
+        };
       };
     } // rec { src = (pkgs.lib).mkDefault ../.; }
