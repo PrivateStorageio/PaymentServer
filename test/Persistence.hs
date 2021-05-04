@@ -38,15 +38,27 @@ import System.Directory
 
 import qualified Database.SQLite.Simple as Sqlite
 
+import Web.Stripe.Types
+  ( ChargeId(ChargeId)
+  )
+import Web.Stripe.Error
+  ( StripeErrorType(CardError)
+  , StripeError(StripeError)
+  )
+
 import PaymentServer.Persistence
   ( Voucher
   , Fingerprint
   , RedeemError(NotPaid, AlreadyRedeemed, DuplicateFingerprint, DatabaseUnavailable)
-  , PaymentError(AlreadyPaid)
+  , PaymentError(AlreadyPaid, PaymentFailed)
   , VoucherDatabase(payForVoucher, redeemVoucher, redeemVoucherWithCounter)
   , VoucherDatabaseState(SQLiteDB)
+  , ProcessorResult
   , memory
   , sqlite
+  , upgradeSchema
+  , latestVersion
+  , readVersion
   )
 
 data ArbitraryException = ArbitraryException
@@ -58,6 +70,7 @@ tests :: TestTree
 tests = testGroup "Persistence"
   [ memoryDatabaseVoucherPaymentTests
   , sqlite3DatabaseVoucherPaymentTests
+  , sqlite3DatabaseSchemaTests
   ]
 
 -- Some dummy values that should be replaced by the use of QuickCheck.
@@ -66,13 +79,23 @@ anotherVoucher = "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
 fingerprint = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 anotherFingerprint = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 
+aChargeId :: ChargeId
+aChargeId = ChargeId "abc"
+
 -- Mock a successful payment.
-paySuccessfully :: IO ()
-paySuccessfully = return ()
+paySuccessfully :: IO ProcessorResult
+paySuccessfully = return . Right $ aChargeId
 
 -- Mock a failed payment.
-failPayment :: IO ()
+failPayment :: IO ProcessorResult
 failPayment = throwIO ArbitraryException
+
+-- Mock a payment that fails at the processor rather than with an IO
+-- exception.
+aStripeError :: StripeError
+aStripeError = StripeError CardError "Card rejected because reasons" Nothing Nothing Nothing
+failPaymentProcessing :: IO ProcessorResult
+failPaymentProcessing = return $ Left $ PaymentFailed aStripeError
 
 -- | Create a group of tests related to voucher payment and redemption.
 makeVoucherPaymentTests
@@ -92,13 +115,13 @@ makeVoucherPaymentTests label makeDatabase =
   , testCase "paid for" $ do
       connect <- makeDatabase
       conn <- connect
-      () <- payForVoucher conn voucher paySuccessfully
+      Right _ <- payForVoucher conn voucher paySuccessfully
       result <- redeemVoucher conn voucher fingerprint
       assertEqual "redeeming paid voucher" (Right True) result
   , testCase "allowed double redemption" $ do
       connect <- makeDatabase
       conn <- connect
-      () <- payForVoucher conn voucher paySuccessfully
+      Right _ <- payForVoucher conn voucher paySuccessfully
       let redeem = redeemVoucher conn voucher fingerprint
       first <- redeem
       second <- redeem
@@ -107,7 +130,7 @@ makeVoucherPaymentTests label makeDatabase =
   , testCase "disallowed double redemption" $ do
       connect <- makeDatabase
       conn <- connect
-      () <- payForVoucher conn voucher paySuccessfully
+      Right _ <- payForVoucher conn voucher paySuccessfully
       let redeem = redeemVoucher conn voucher
       first <- redeem fingerprint
       second <- redeem (Text.cons 'a' $ Text.tail fingerprint)
@@ -116,7 +139,7 @@ makeVoucherPaymentTests label makeDatabase =
   , testCase "allowed redemption varying by counter" $ do
       connect <- makeDatabase
       conn <- connect
-      () <- payForVoucher conn voucher paySuccessfully
+      Right _ <- payForVoucher conn voucher paySuccessfully
       let redeem = redeemVoucherWithCounter conn voucher
       first <- redeem fingerprint 0
       second <- redeem anotherFingerprint 1
@@ -125,12 +148,20 @@ makeVoucherPaymentTests label makeDatabase =
   , testCase "disallowed redemption varying by counter but not fingerprint" $ do
       connect <- makeDatabase
       conn <- connect
-      () <- payForVoucher conn voucher paySuccessfully
+      Right _ <- payForVoucher conn voucher paySuccessfully
       let redeem = redeemVoucherWithCounter conn voucher
       first <- redeem fingerprint 0
       second <- redeem fingerprint 1
       assertEqual "redeemed with counter 0" (Right True) first
       assertEqual "redeemed with counter 1" (Left DuplicateFingerprint) second
+  , testCase "pay with processor error" $ do
+      connect <- makeDatabase
+      conn <- connect
+      actual <- payForVoucher conn voucher failPaymentProcessing
+      let expected = Left $ PaymentFailed aStripeError
+      assertEqual "failing payment processing for a voucher" expected actual
+      result <- redeemVoucher conn voucher fingerprint
+      assertEqual "redeeming voucher with failed payment" (Left NotPaid) result
   , testCase "pay with exception" $ do
       connect <- makeDatabase
       conn <- connect
@@ -142,7 +173,7 @@ makeVoucherPaymentTests label makeDatabase =
       connect <- makeDatabase
       conn <- connect
       let pay = payForVoucher conn voucher paySuccessfully
-      () <- pay
+      Right _ <- pay
       payResult <- try pay
       assertEqual "double-paying for a voucher" (Left AlreadyPaid) payResult
       redeemResult <- redeemVoucher conn voucher fingerprint
@@ -159,15 +190,15 @@ makeVoucherPaymentTests label makeDatabase =
         withAsync anotherPayment $ \p2 -> do
           waitBoth p1 p2
 
-      assertEqual "Both payments should succeed" ((), ()) result
+      assertEqual "Both payments should succeed" (Right aChargeId, Right aChargeId) result
   , testCase "concurrent redemption" $ do
       connect <- makeDatabase
       connA <- connect
       connB <- connect
       -- It doesn't matter which connection pays for the vouchers.  They
       -- payments are concurrent and the connections are to the same database.
-      () <- payForVoucher connA voucher paySuccessfully
-      () <- payForVoucher connA anotherVoucher paySuccessfully
+      Right _ <- payForVoucher connA voucher paySuccessfully
+      Right _ <- payForVoucher connA anotherVoucher paySuccessfully
 
       -- It does matter which connection is used to redeem the voucher.  A
       -- connection can only do one thing at a time.
@@ -214,8 +245,9 @@ sqlite3DatabaseVoucherPaymentTests =
               normalConn <- connect
               fastBusyConn <- fastBusyConnection connect
               Sqlite.withExclusiveTransaction normalConn $ do
+                let expected = Left DatabaseUnavailable
                 result <- redeemVoucher fastBusyConn voucher fingerprint
-                assertEqual "Redeeming voucher while database busy" result $ Left DatabaseUnavailable
+                assertEqual "Redeeming voucher while database busy" expected result
       ]
       where
         fastBusyConnection
@@ -226,3 +258,44 @@ sqlite3DatabaseVoucherPaymentTests =
           -- Tweak the timeout down so the test completes quickly
           Sqlite.execute_ conn "PRAGMA busy_timeout = 0"
           return . SQLiteDB . return $ conn
+
+
+sqlite3DatabaseSchemaTests :: TestTree
+sqlite3DatabaseSchemaTests =
+  testGroup "SQLite3 schema"
+  [ testCase "initialize empty database" $
+    -- upgradeSchema can start from nothing and upgrade the database to any
+    -- defined schema version.  We upgrade to the latest version because that
+    -- implies upgrading all the intermediate versions.  It probably wouldn't
+    -- hurt to target every intermediate version specifically, though.  I
+    -- think that's what SmallCheck is for?
+    Sqlite.withConnection ":memory:" $ \conn -> do
+      upgradeSchema latestVersion conn
+      let expected = Right latestVersion
+      actual <- readVersion conn
+      assertEqual "The recorded schema version should be the latest value" expected actual
+
+  , testCase "identify version 0" $
+    -- readVersion identifies an empty database schema as version 0
+    Sqlite.withConnection ":memory:" $ \conn -> do
+      let expected = Right 0
+      actual <- readVersion conn
+      assertEqual "An empty database schema is version 0" expected actual
+
+  , testCase "identify version 1" $
+    -- readVersion identifies schema version 1
+    Sqlite.withConnection ":memory:" $ \conn -> do
+      upgradeSchema 1 conn
+      let expected = Right 1
+      actual <- readVersion conn
+      assertEqual "readVersion identifies database schema version 1" expected actual
+
+  , testCase "identify version 2" $
+    -- readVersion identifies schema version 1
+    Sqlite.withConnection ":memory:" $ \conn -> do
+      upgradeSchema 2 conn
+      let expected = Right 2
+      actual <- readVersion conn
+      assertEqual "readVersion identifies database schema version 2" expected actual
+
+  ]

@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module PaymentServer.Processors.Stripe
   ( StripeAPI
@@ -47,7 +48,7 @@ import Web.Stripe.Error
   , StripeErrorType(InvalidRequest, APIError, ConnectionFailure, CardError)
   )
 import Web.Stripe.Types
-  ( Charge(Charge, chargeMetaData)
+  ( Charge(Charge, chargeId)
   , MetaData(MetaData)
   , Currency
   )
@@ -70,6 +71,7 @@ import PaymentServer.Persistence
   ( Voucher
   , VoucherDatabase(payForVoucher)
   , PaymentError(AlreadyPaid, PaymentFailed)
+  , ProcessorResult
   )
 
 data Acknowledgement = Ok
@@ -149,7 +151,7 @@ withSuccessFailureMetrics attemptCount successCount op = do
 charge :: VoucherDatabase d => StripeConfig -> d -> Charges -> Handler Acknowledgement
 charge stripeConfig d (Charges token voucher amount currency) = do
   currency' <- getCurrency currency
-  result <- liftIO ((payForVoucher d voucher (completeStripeCharge currency')) :: IO (Either PaymentError Charge))
+  result <- liftIO ((payForVoucher d voucher (completeStripeCharge currency')) :: IO ProcessorResult)
   case result of
     Left AlreadyPaid ->
       throwError voucherAlreadyPaid
@@ -157,8 +159,7 @@ charge stripeConfig d (Charges token voucher amount currency) = do
       liftIO $ print "Stripe createCharge failed:"
       liftIO $ print msg
       throwError . errorForStripeType $ errorType
-    Right Charge { chargeMetaData = metadata } ->
-      checkVoucherMetadata metadata
+    Right chargeId -> return Ok
     where
       getCurrency :: Text -> Handler Currency
       getCurrency maybeCurrency =
@@ -167,29 +168,19 @@ charge stripeConfig d (Charges token voucher amount currency) = do
           Nothing -> throwError unsupportedCurrency
 
       tokenId = TokenId token
-      completeStripeCharge :: Currency -> IO (Either PaymentError Charge)
+      completeStripeCharge :: Currency -> IO ProcessorResult
       completeStripeCharge currency' = do
-        result <- (stripe stripeConfig charge) :: IO (Either StripeError Charge)
+        result <- stripe stripeConfig charge
         case result of
           Left any ->
             return . Left $ PaymentFailed any
-          Right any ->
-            return . Right $ any
+          Right (Charge { chargeId }) ->
+            return . Right $ chargeId
           where
           charge =
             createCharge (Amount amount) currency'
             -&- tokenId
             -&- MetaData [("Voucher", voucher)]
-
-      checkVoucherMetadata :: MetaData -> Handler Acknowledgement
-      checkVoucherMetadata metadata =
-        -- verify that we are getting the same metadata that we sent.
-        case metadata of
-          MetaData [("Voucher", v)] ->
-            if v == voucher
-            then return Ok
-            else throwError voucherCodeMismatch
-          _ -> throwError voucherCodeNotFound
 
       -- "Invalid request errors arise when your request has invalid parameters."
       errorForStripeType InvalidRequest    = internalServerError
@@ -211,7 +202,6 @@ charge stripeConfig d (Charges token voucher amount currency) = do
 
       serviceUnavailable  = jsonErr 503 "Service temporarily unavailable"
       internalServerError = jsonErr 500 "Internal server error"
-      voucherCodeMismatch = jsonErr 500 "Voucher code mismatch"
       unsupportedCurrency = jsonErr 400 "Invalid currency specified"
       voucherCodeNotFound = jsonErr 400 "Voucher code not found"
       stripeChargeFailed  = jsonErr 400 "Stripe charge didn't succeed"

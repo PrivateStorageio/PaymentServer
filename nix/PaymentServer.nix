@@ -115,6 +115,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
             (hsPkgs."wai-extra" or (buildDepError "wai-extra"))
             (hsPkgs."servant-server" or (buildDepError "servant-server"))
             (hsPkgs."prometheus-client" or (buildDepError "prometheus-client"))
+            (hsPkgs."stripe-core" or (buildDepError "stripe-core"))
             (hsPkgs."PaymentServer" or (buildDepError "PaymentServer"))
             ];
           };
