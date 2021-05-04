@@ -467,13 +467,16 @@ upgradeSchema targetVersion conn = do
   errOrCurrentVersion <- readVersion conn
   case errOrCurrentVersion of
     Left err -> return $ Left err
-    Right currentVersion ->
+    Right currentVersion -> perhapsUpgrade targetVersion currentVersion
+
+  where
+    perhapsUpgrade :: Int -> Int -> IO (Either UpgradeError ())
+    perhapsUpgrade targetVersion currentVersion =
       case compareVersion targetVersion currentVersion of
         Lesser -> return $ Left DatabaseSchemaTooNew
         Equal -> return $ Right ()
         Greater -> runUpgrades currentVersion targetVersion
 
-  where
     runUpgrades :: Int -> Int -> IO (Either UpgradeError ())
     runUpgrades currentVersion targetVersion =
       let
