@@ -7,6 +7,7 @@ module PaymentServer.Persistence
   , Fingerprint
   , RedeemError(NotPaid, AlreadyRedeemed, DuplicateFingerprint, DatabaseUnavailable)
   , PaymentError(AlreadyPaid, PaymentFailed)
+  , ProcessorResult
   , VoucherDatabase(payForVoucher, redeemVoucher, redeemVoucherWithCounter)
   , VoucherDatabaseState(MemoryDB, SQLiteDB)
   , memory
@@ -49,6 +50,9 @@ import Data.Maybe
 
 import Web.Stripe.Error
   ( StripeError
+  )
+import Web.Stripe.Types
+  ( ChargeId(ChargeId)
   )
 
 -- | A voucher is a unique identifier which can be associated with a payment.
@@ -111,19 +115,28 @@ type Fingerprint = Text
 -- allowed).
 type RedemptionKey = (Voucher, Integer)
 
+-- | The result of completing payment processing.  This is either an error
+-- indicating that the payment has *not* been completed (funds will not move)
+-- or a payment processor-specific identifier for the completed transaction
+-- (funds will move).
+type ProcessorResult = Either PaymentError ChargeId
+
 -- | A VoucherDatabase provides persistence for state related to vouchers.
 class VoucherDatabase d where
   -- | Change the state of the given voucher to indicate that it has been paid.
   payForVoucher
-    :: d             -- ^ The database in which to record the change
-    -> Voucher       -- ^ A voucher which should be considered paid
-    -> IO a          -- ^ An operation which completes the payment.  This is
-                     -- evaluated in the context of a database transaction so
-                     -- that if it fails the voucher is not marked as paid in
-                     -- the database but if it succeeds the database state is
-                     -- not confused by a competing transaction run around the
-                     -- same time.
-    -> IO a
+    :: d
+    -- ^ The database in which to record the change
+    -> Voucher
+    -- ^ A voucher which should be considered paid
+    -> IO ProcessorResult
+    -- ^ An operation which completes the payment.  This is evaluated in the
+    -- context of a database transaction so that if it fails the voucher is
+    -- not marked as paid in the database but if it succeeds the database
+    -- state is not confused by a competing transaction run around the same
+    -- time.
+    -> IO ProcessorResult
+    -- ^ The result of the attempt to complete payment processing.
 
   -- | Attempt to redeem a voucher.  If it has not been redeemed before or it
   -- has been redeemed with the same fingerprint, the redemption succeeds.
@@ -180,8 +193,12 @@ instance VoucherDatabase VoucherDatabaseState where
       else
       do
         result <- pay
-        -- Only modify the paid set if the payment succeeds.
-        modifyIORef paidRef (Set.insert voucher)
+        case result of
+          Right chargeId ->
+            -- Only modify the paid set if the payment succeeds.
+            modifyIORef paidRef (Set.insert voucher)
+
+          Left _ -> return ()
         return result
 
   payForVoucher SQLiteDB{ connect = connect } voucher pay =
@@ -329,32 +346,34 @@ getVoucherFingerprint dbConn (voucher, counter) =
     listToMaybe <$> Sqlite.query dbConn sql ((voucher :: Text), (counter :: Integer))
 
 -- | Mark the given voucher as paid in the database.
-insertVoucher :: Sqlite.Connection -> Voucher -> IO a -> IO a
+insertVoucher :: Sqlite.Connection -> Voucher -> IO ProcessorResult -> IO ProcessorResult
 insertVoucher dbConn voucher pay =
-  -- Begin an immediate transaction so that it includes the IO.  The first
-  -- thing we do is execute our one and only statement so the transaction is
-  -- immediate anyway but it doesn't hurt to be explicit.
-  Sqlite.withImmediateTransaction dbConn $
+  -- Begin an immediate transaction so that it includes the IO.  The
+  -- transaction is immediate so that we can first check that the voucher is
+  -- unique and then proceed to do the IO without worrying that another
+  -- request will concurrently begin operating on the same voucher.
+  Sqlite.withExclusiveTransaction dbConn $
   do
-    -- Vouchers must be unique in this table.  This might fail if someone is
-    -- trying to double-pay for a voucher.  In this case, we won't ever
-    -- finalize the payment.
-    Sqlite.execute dbConn "INSERT INTO vouchers (name) VALUES (?)" (Sqlite.Only voucher)
-      `catch` handleConstraintError
-    -- If we managed to insert the voucher, try to finalize the payment.  If
-    -- this succeeds, the transaction is committed and we expect the payment
-    -- system to actually be moving money around.  If it fails, we expect the
-    -- payment system *not* to move money around and the voucher should not be
-    -- marked as paid.  The transaction will be rolled back so, indeed, it
-    -- won't be marked thus.
-    pay
-
-  where
-    handleConstraintError Sqlite.SQLError { Sqlite.sqlError = Sqlite.ErrorConstraint } =
-      throwIO AlreadyPaid
-    handleConstraintError e =
-      throwIO e
-
+    -- Vouchers must be unique in this table.  Check to see if this one
+    -- already exists.
+    rows <- Sqlite.query dbConn "SELECT 1 FROM vouchers WHERE name = ?" (Sqlite.Only voucher) :: IO [Sqlite.Only Int]
+    if length rows /= 0
+      then throwIO AlreadyPaid
+      else
+      do
+        -- If the voucher isn't present yet, try to finalize the payment.  If
+        -- this succeeds, the transaction is committed and we expect the
+        -- payment system to actually be moving money around.  If it fails, we
+        -- expect the payment system *not* to move money around and the
+        -- voucher should not be marked as paid.  The transaction will be
+        -- rolled back so, indeed, it won't be marked thus.
+        result <- pay
+        case result of
+          Right (ChargeId chargeId) -> do
+            Sqlite.execute dbConn "INSERT INTO vouchers (name, charge_id) VALUES (?, ?)" (voucher, chargeId)
+            return result
+          Left err ->
+            return result
 
 -- | Mark the given voucher as having been redeemed (with the given
 -- fingerprint) in the database.
