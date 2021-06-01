@@ -105,7 +105,7 @@ data Charges = Charges
   , amount :: Int          -- ^ The amount of the charge in the minimum
                            -- currency unit of the target currency (eg for
                            -- USD, cents).
-  , currency :: Text       -- ^ The currency in which the charge will be made.
+  , currency :: Currency   -- ^ The currency in which the charge will be made.
   } deriving (Show, Eq)
 
 instance FromJSON Charges where
@@ -113,7 +113,7 @@ instance FromJSON Charges where
                          v .: "token" <*>
                          v .: "voucher" <*>
                          (read <$> v .: "amount") <*>
-                         v .: "currency"
+                         (read <$> v .: "currency")
   parseJSON _ = mzero
 
 
@@ -150,8 +150,7 @@ withSuccessFailureMetrics attemptCount successCount op = do
 -- and if the Charge is okay, then set the voucher as "paid" in the database.
 charge :: VoucherDatabase d => StripeConfig -> d -> Charges -> Handler Acknowledgement
 charge stripeConfig d (Charges token voucher amount currency) = do
-  currency' <- getCurrency currency
-  result <- liftIO ((payForVoucher d voucher (completeStripeCharge currency')) :: IO ProcessorResult)
+  result <- liftIO ((payForVoucher d voucher (completeStripeCharge currency)) :: IO ProcessorResult)
   case result of
     Left AlreadyPaid ->
       throwError voucherAlreadyPaid
@@ -161,15 +160,9 @@ charge stripeConfig d (Charges token voucher amount currency) = do
       throwError . errorForStripeType $ errorType
     Right chargeId -> return Ok
     where
-      getCurrency :: Text -> Handler Currency
-      getCurrency maybeCurrency =
-        case readMaybe (unpack currency) of
-          Just currency' -> return currency'
-          Nothing -> throwError unsupportedCurrency
-
       tokenId = TokenId token
       completeStripeCharge :: Currency -> IO ProcessorResult
-      completeStripeCharge currency' = do
+      completeStripeCharge currency = do
         result <- stripe stripeConfig charge
         case result of
           Left any ->
@@ -178,7 +171,7 @@ charge stripeConfig d (Charges token voucher amount currency) = do
             return . Right $ chargeId
           where
           charge =
-            createCharge (Amount amount) currency'
+            createCharge (Amount amount) currency
             -&- tokenId
             -&- MetaData [("Voucher", voucher)]
 
@@ -202,7 +195,6 @@ charge stripeConfig d (Charges token voucher amount currency) = do
 
       serviceUnavailable  = jsonErr 503 "Service temporarily unavailable"
       internalServerError = jsonErr 500 "Internal server error"
-      unsupportedCurrency = jsonErr 400 "Invalid currency specified"
       voucherCodeNotFound = jsonErr 400 "Voucher code not found"
       stripeChargeFailed  = jsonErr 400 "Stripe charge didn't succeed"
       voucherAlreadyPaid  = jsonErr 400 "Payment for voucher already supplied"
