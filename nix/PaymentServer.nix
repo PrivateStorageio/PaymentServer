@@ -57,10 +57,10 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
       "library" = {
         depends = [
           (hsPkgs."base" or (buildDepError "base"))
-          (hsPkgs."bytestring" or (buildDepError "bytestring"))
-          (hsPkgs."utf8-string" or (buildDepError "utf8-string"))
           (hsPkgs."optparse-applicative" or (buildDepError "optparse-applicative"))
           (hsPkgs."aeson" or (buildDepError "aeson"))
+          (hsPkgs."bytestring" or (buildDepError "bytestring"))
+          (hsPkgs."utf8-string" or (buildDepError "utf8-string"))
           (hsPkgs."servant" or (buildDepError "servant"))
           (hsPkgs."servant-server" or (buildDepError "servant-server"))
           (hsPkgs."http-types" or (buildDepError "http-types"))
@@ -70,8 +70,8 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
           (hsPkgs."data-default" or (buildDepError "data-default"))
           (hsPkgs."warp" or (buildDepError "warp"))
           (hsPkgs."warp-tls" or (buildDepError "warp-tls"))
-          (hsPkgs."stripe-core" or (buildDepError "stripe-core"))
           (hsPkgs."stripe-haskell" or (buildDepError "stripe-haskell"))
+          (hsPkgs."stripe-core" or (buildDepError "stripe-core"))
           (hsPkgs."text" or (buildDepError "text"))
           (hsPkgs."containers" or (buildDepError "containers"))
           (hsPkgs."cryptonite" or (buildDepError "cryptonite"))
@@ -105,6 +105,9 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
             (hsPkgs."base" or (buildDepError "base"))
             (hsPkgs."bytestring" or (buildDepError "bytestring"))
             (hsPkgs."text" or (buildDepError "text"))
+            (hsPkgs."transformers" or (buildDepError "transformers"))
+            (hsPkgs."raw-strings-qq" or (buildDepError "raw-strings-qq"))
+            (hsPkgs."time" or (buildDepError "time"))
             (hsPkgs."tasty" or (buildDepError "tasty"))
             (hsPkgs."tasty-hunit" or (buildDepError "tasty-hunit"))
             (hsPkgs."directory" or (buildDepError "directory"))
@@ -113,6 +116,8 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
             (hsPkgs."http-types" or (buildDepError "http-types"))
             (hsPkgs."wai" or (buildDepError "wai"))
             (hsPkgs."wai-extra" or (buildDepError "wai-extra"))
+            (hsPkgs."warp" or (buildDepError "warp"))
+            (hsPkgs."http-types" or (buildDepError "http-types"))
             (hsPkgs."servant-server" or (buildDepError "servant-server"))
             (hsPkgs."prometheus-client" or (buildDepError "prometheus-client"))
             (hsPkgs."stripe-core" or (buildDepError "stripe-core"))
@@ -121,4 +126,4 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
           };
         };
       };
-    } // rec { src = (pkgs.lib).mkDefault ../.; }
+    } // rec { src = (pkgs.lib).mkDefault .././.; }
