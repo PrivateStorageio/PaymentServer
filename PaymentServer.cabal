@@ -73,9 +73,12 @@ test-suite PaymentServer-tests
   main-is:             Spec.hs
   other-modules:       Persistence
                      , Metrics
+                     , FakeStripe
   build-depends:       base
                      , bytestring
                      , text
+                     , raw-strings-qq
+                     , time
                      , tasty
                      , tasty-hunit
                      , directory
@@ -84,6 +87,8 @@ test-suite PaymentServer-tests
                      , http-types
                      , wai
                      , wai-extra
+                     , warp
+                     , http-types
                      , servant-server
                      , prometheus-client
                      , stripe-core
