@@ -12,11 +12,13 @@ import Test.Tasty
 
 import qualified Persistence
 import qualified Metrics
+import qualified Stripe
 
 tests :: TestTree
 tests = testGroup "Tests"
   [ Persistence.tests
   , Metrics.tests
+  , Stripe.tests
   ]
 
 main = defaultMain tests

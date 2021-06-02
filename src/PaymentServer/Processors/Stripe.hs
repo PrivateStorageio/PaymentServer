@@ -5,8 +5,11 @@
 
 module PaymentServer.Processors.Stripe
   ( StripeAPI
+  , Charges(Charges)
+  , Acknowledgement(Ok)
   , stripeServer
   , getVoucher
+  , charge
   ) where
 
 import Control.Monad.IO.Class
@@ -50,7 +53,7 @@ import Web.Stripe.Error
 import Web.Stripe.Types
   ( Charge(Charge, chargeId)
   , MetaData(MetaData)
-  , Currency
+  , Currency(USD)
   )
 import Web.Stripe.Charge
   ( createCharge
@@ -74,7 +77,7 @@ import PaymentServer.Persistence
   , ProcessorResult
   )
 
-data Acknowledgement = Ok
+data Acknowledgement = Ok deriving (Eq, Show)
 
 instance ToJSON Acknowledgement where
   toJSON Ok = object
@@ -149,8 +152,8 @@ withSuccessFailureMetrics attemptCount successCount op = do
 -- | call the stripe Charge API (with token, voucher in metadata, amount, currency etc
 -- and if the Charge is okay, then set the voucher as "paid" in the database.
 charge :: VoucherDatabase d => StripeConfig -> d -> Charges -> Handler Acknowledgement
-charge stripeConfig d (Charges token voucher amount currency) = do
-  result <- liftIO ((payForVoucher d voucher (completeStripeCharge currency)) :: IO ProcessorResult)
+charge stripeConfig d (Charges token voucher 650 USD) = do
+  result <- liftIO ((payForVoucher d voucher (completeStripeCharge USD)) :: IO ProcessorResult)
   case result of
     Left AlreadyPaid ->
       throwError voucherAlreadyPaid
@@ -171,7 +174,7 @@ charge stripeConfig d (Charges token voucher amount currency) = do
             return . Right $ chargeId
           where
           charge =
-            createCharge (Amount amount) currency
+            createCharge (Amount 650) currency
             -&- tokenId
             -&- MetaData [("Voucher", voucher)]
 
@@ -199,13 +202,18 @@ charge stripeConfig d (Charges token voucher amount currency) = do
       stripeChargeFailed  = jsonErr 400 "Stripe charge didn't succeed"
       voucherAlreadyPaid  = jsonErr 400 "Payment for voucher already supplied"
 
-      jsonErr httpCode reason = ServerError
-        { errHTTPCode = httpCode
-        , errReasonPhrase = ""
-        , errBody = encode $ Failure reason
-        , errHeaders = [("content-type", "application/json")]
-        }
+-- The wrong currency
+charge _ _ (Charges _ _ 650 _) = throwError (jsonErr 400 "Unsupported currency")
+-- The wrong amount
+charge _ _ (Charges _ _ _ USD) = throwError (jsonErr 400 "Incorrect charge amount")
 
+jsonErr :: Int -> Text -> ServerError
+jsonErr httpCode reason = ServerError
+  { errHTTPCode = httpCode
+  , errReasonPhrase = ""
+  , errBody = encode $ Failure reason
+  , errHeaders = [("content-type", "application/json")]
+  }
 
 data Failure = Failure Text
   deriving (Show, Eq)

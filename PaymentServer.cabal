@@ -73,10 +73,12 @@ test-suite PaymentServer-tests
   main-is:             Spec.hs
   other-modules:       Persistence
                      , Metrics
+                     , Stripe
                      , FakeStripe
   build-depends:       base
                      , bytestring
                      , text
+                     , transformers
                      , raw-strings-qq
                      , time
                      , tasty
