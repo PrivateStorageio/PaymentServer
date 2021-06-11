@@ -4,6 +4,7 @@
 module FakeStripe
   ( withFakeStripe
   , chargeOkay
+  , chargeFailed
   ) where
 
 import Text.RawString.QQ
@@ -23,6 +24,7 @@ import Data.Time.Calendar
 
 import Network.HTTP.Types
   ( status200
+  , status400
   )
 
 import Network.Wai
@@ -40,6 +42,17 @@ import Web.Stripe.Client
   , Protocol(HTTP)
   , Endpoint(Endpoint)
   )
+
+anError :: ByteString
+anError = [r|
+{
+  "error": {
+    "type": "card_error",
+    "code": "expired_card",
+    "message": "Your card is expired."
+  }
+}
+|]
 
 aCharge :: ByteString
 aCharge = [r|
@@ -138,10 +151,16 @@ aCharge = [r|
 }
 |]
 
+
+
 -- Accept a charge creation and respond in the affirmative.
 chargeOkay :: Application
 chargeOkay req respond =
   respond . responseLBS status200 [] $ aCharge
+
+chargeFailed :: Application
+chargeFailed req respond =
+  respond . responseLBS status400 [] $ anError
 
 -- Pass a Stripe-flavored configuration for a running Wai application to a
 -- function and evaluate the resulting IO action.

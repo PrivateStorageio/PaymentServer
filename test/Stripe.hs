@@ -70,6 +70,7 @@ import PaymentServer.Server
 import FakeStripe
   ( withFakeStripe
   , chargeOkay
+  , chargeFailed
   )
 
 tests :: TestTree
@@ -82,13 +83,19 @@ corsTests :: TestTree
 corsTests =
   testGroup "CORS"
   [ testCase "a request with the wrong content-type receives a CORS-enabled response" $
-    assertCORSHeader "POST" textPlain validChargeBytes
+    assertCORSHeader chargeOkay "POST" textPlain validChargeBytes
+
   , testCase "a request without a valid charge in the body receives a CORS-enabled response" $
-    assertCORSHeader "POST" applicationJSON invalidChargeBytes
+    assertCORSHeader chargeOkay "POST" applicationJSON invalidChargeBytes
+
   , testCase "a request with the wrong request method receives a CORS-enabled response" $
-    assertCORSHeader "GET" applicationJSON validChargeBytes
+    assertCORSHeader chargeOkay "GET" applicationJSON validChargeBytes
+
+  , testCase "a request associated with an error from Stripe receives a CORS-enabled response" $
+    assertCORSHeader chargeFailed "POST" applicationJSON validChargeBytes
+
   , testCase "a request with a valid charge in the body receives a CORS-enabled response" $
-    assertCORSHeader "POST" applicationJSON validChargeBytes
+    assertCORSHeader chargeOkay "POST" applicationJSON validChargeBytes
   ]
   where
     textPlain = [("content-type", "text/plain")]
@@ -96,8 +103,8 @@ corsTests =
     validChargeBytes = "{\"token\": \"abcdef\", \"voucher\": \"lmnopqrst\", \"amount\": \"650\", \"currency\": \"USD\"}"
     invalidChargeBytes = "[1, 2, 3]"
 
-    assertCORSHeader method headers body =
-      withFakeStripe (return chargeOkay) $
+    assertCORSHeader stripeResponse method headers body =
+      withFakeStripe (return stripeResponse) $
       \stripeConfig -> do
         db <- memory
         let origins = ["example.invalid"]
