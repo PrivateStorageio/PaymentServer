@@ -16,6 +16,10 @@ import Test.Tasty.HUnit
   )
 
 
+import Control.Monad.IO.Class
+  ( liftIO
+  )
+
 import Control.Monad.Trans.Except
   ( runExceptT
   )
@@ -29,6 +33,21 @@ import Web.Stripe.Types
   ( Currency(USD, AED)
   )
 
+import Network.Wai.Test
+  ( SRequest(SRequest)
+  , runSession
+  , request
+  , srequest
+  , defaultRequest
+  , assertHeader
+  , setPath
+  )
+
+import Network.Wai
+  ( requestMethod
+  , requestHeaders
+  )
+
 import PaymentServer.Persistence
   ( memory
   )
@@ -40,15 +59,67 @@ import PaymentServer.Processors.Stripe
 
   )
 
+import PaymentServer.Issuer
+  ( trivialIssue
+  )
+
+import PaymentServer.Server
+  ( paymentServerApp
+  )
+
 import FakeStripe
   ( withFakeStripe
   , chargeOkay
+  , chargeFailed
   )
 
 tests :: TestTree
 tests = testGroup "Stripe"
   [ chargeTests
+  , corsTests
   ]
+
+corsTests :: TestTree
+corsTests =
+  testGroup "CORS"
+  [ testCase "a request with the wrong content-type receives a CORS-enabled response" $
+    assertCORSHeader chargeOkay "POST" textPlain validChargeBytes
+
+  , testCase "a request without a valid charge in the body receives a CORS-enabled response" $
+    assertCORSHeader chargeOkay "POST" applicationJSON invalidChargeBytes
+
+  , testCase "a request with the wrong request method receives a CORS-enabled response" $
+    assertCORSHeader chargeOkay "GET" applicationJSON validChargeBytes
+
+  , testCase "a request associated with an error from Stripe receives a CORS-enabled response" $
+    assertCORSHeader chargeFailed "POST" applicationJSON validChargeBytes
+
+  , testCase "a request with a valid charge in the body receives a CORS-enabled response" $
+    assertCORSHeader chargeOkay "POST" applicationJSON validChargeBytes
+  ]
+  where
+    textPlain = [("content-type", "text/plain")]
+    applicationJSON = [("content-type", "application/json")]
+    validChargeBytes = "{\"token\": \"abcdef\", \"voucher\": \"lmnopqrst\", \"amount\": \"650\", \"currency\": \"USD\"}"
+    invalidChargeBytes = "[1, 2, 3]"
+
+    assertCORSHeader stripeResponse method headers body =
+      withFakeStripe (return stripeResponse) $
+      \stripeConfig -> do
+        db <- memory
+        let origins = ["example.invalid"]
+        let app = paymentServerApp origins stripeConfig trivialIssue db
+
+        let path = "/v1/stripe/charge"
+        let theRequest = setPath defaultRequest
+              { requestMethod = method
+              , requestHeaders = ("origin", "example.invalid"):headers
+              } path
+        let theSRequest = SRequest theRequest body
+        (flip runSession) app $ do
+          response <- srequest theSRequest
+          assertHeader "Access-Control-Allow-Origin" "example.invalid" response
+
 
 chargeTests :: TestTree
 chargeTests =
