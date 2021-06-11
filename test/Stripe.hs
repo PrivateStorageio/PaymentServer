@@ -104,11 +104,13 @@ corsTests =
         let app = paymentServerApp origins stripeConfig trivialIssue db
 
         let path = "/v1/stripe/charge"
-        let theRequest = setPath defaultRequest { requestMethod = method, requestHeaders = headers} path
+        let theRequest = setPath defaultRequest
+              { requestMethod = method
+              , requestHeaders = ("origin", "example.invalid"):headers
+              } path
         let theSRequest = SRequest theRequest body
         (flip runSession) app $ do
           response <- srequest theSRequest
-          liftIO $ print response
           assertHeader "Access-Control-Allow-Origin" "example.invalid" response
 
 
