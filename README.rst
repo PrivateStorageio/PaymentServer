@@ -9,6 +9,11 @@ Currently, Stripe is supported.
 Building
 --------
 
+Get all the build dependencies with nix::
+
+  $ nix-shell PrivateStorageio/shell.nix   # Might be needed depending on your system, see #88
+  $ nix-shell PaymentServer/shell.nix
+
 Build using Stack::
 
   $ stack build
