@@ -1,5 +1,5 @@
 name:                PaymentServer
-version:             0.1.0.0
+version:             0.1.1.0
 synopsis:            Coordinate entities for the purchase of PrivateStorage.io vouchers.
 -- description:
 homepage:            https://github.com/privatestorageio/PaymentServer#readme
