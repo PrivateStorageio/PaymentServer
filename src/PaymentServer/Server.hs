@@ -23,7 +23,9 @@ import Servant
   , (:>)
   , (:<|>)((:<|>))
   )
-import Prometheus (register)
+import Prometheus
+  ( register
+  )
 import Servant.Prometheus
   ( monitorServant
   , meters
