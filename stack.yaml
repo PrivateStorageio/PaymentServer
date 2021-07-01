@@ -42,7 +42,7 @@ extra-deps:
   - "stripe-haskell-2.5.0"
   - "stripe-http-client-2.5.0"
   - github: "PrivateStorageio/servant-prometheus"
-    commit: "71b0edc1f4d8fd940dda30e35108f4b50d07f985"
+    commit: "b9461cbf689b47506b2eee973136706092b74968"
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
