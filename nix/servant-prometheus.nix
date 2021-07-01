@@ -106,7 +106,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
     } // {
     src = (pkgs.lib).mkDefault (pkgs.fetchgit {
       url = "https://github.com/PrivateStorageio/servant-prometheus.git";
-      rev = "b1207d687aeb48bd035f986e88287391e4937e23";
-      sha256 = "0lswszfs52x5rpf7lj46iv77zghcbr4d05dwssi63yzjll1ixizd";
+      rev = "71b0edc1f4d8fd940dda30e35108f4b50d07f985";
+      sha256 = "1gfslw670ri119bnq3szc8b08n504f8cnzs5cgk5qvfwvfmsr1xh";
       });
     }
