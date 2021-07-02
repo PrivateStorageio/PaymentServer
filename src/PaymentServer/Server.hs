@@ -23,10 +23,12 @@ import Servant
   , (:>)
   , (:<|>)((:<|>))
   )
+import Prometheus
+  ( register
+  )
 import Servant.Prometheus
-  ( MeasureQuantiles(WithQuantiles)
-  , monitorServant
-  , makeMeters
+  ( monitorServant
+  , meters
   )
 
 import Web.Stripe.Client
@@ -94,5 +96,5 @@ paymentServerApp corsOrigins stripeConfig issuer =
 -- | Create middleware which captures metrics for the payment server app.
 makeMetricsMiddleware :: IO (Application -> Application)
 makeMetricsMiddleware = do
-  meters <- makeMeters paymentServerAPI WithQuantiles
-  return $ monitorServant paymentServerAPI meters
+  meters <- register $ meters paymentServerAPI
+  return $ monitorServant meters

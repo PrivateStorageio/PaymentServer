@@ -42,7 +42,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
     flags = {};
     package = {
       specVersion = "1.10";
-      identifier = { name = "servant-prometheus"; version = "0.1.0.0"; };
+      identifier = { name = "servant-prometheus"; version = "0.2.0.0"; };
       license = "BSD-3-Clause";
       copyright = "";
       maintainer = "Alex Mason <axman6@gmail.com>, Jack Kelly <jack.kelly@data61.csiro.au>";
@@ -106,7 +106,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
     } // {
     src = (pkgs.lib).mkDefault (pkgs.fetchgit {
       url = "https://github.com/PrivateStorageio/servant-prometheus.git";
-      rev = "ec21c5ed50e6f6f8e52916ce71cd68fcd0166cad";
-      sha256 = "0lswszfs52x5rpf7lj46iv77zghcbr4d05dwssi63yzjll1ixizd";
+      rev = "b9461cbf689b47506b2eee973136706092b74968";
+      sha256 = "1gfslw670ri119bnq3szc8b08n504f8cnzs5cgk5qvfwvfmsr1xh";
       });
     }
