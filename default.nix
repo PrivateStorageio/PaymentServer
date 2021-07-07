@@ -28,4 +28,5 @@ in pkgs.haskell-nix.project {
     name = "PaymentServer";
     src = ./.;
   };
+  modules = [];
 }
