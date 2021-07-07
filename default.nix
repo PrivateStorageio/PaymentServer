@@ -18,15 +18,18 @@ let
     haskellNix.sources.nixpkgs-2009
     # These arguments passed to nixpkgs, include some patches and also
     # the haskell.nix functionality itself as an overlay.
-    (haskellNix.nixpkgsArgs // {
-      overlays = haskellNix.nixpkgsArgs.overlays ++ [
-        (import ./oldnix/overlay.nix)
-      ];
-    });
+    haskellNix.nixpkgsArgs;
+    libchallenge_bypass_ristretto_ffi = pkgs.callPackage ./oldnix/challenge-bypass-ristretto.nix { };
+
 in pkgs.haskell-nix.project {
   # 'cleanGit' cleans a source directory based on the files known by git
   src = pkgs.haskell-nix.haskellLib.cleanGit {
     name = "PaymentServer";
     src = ./.;
   };
+  modules = [{
+    packages.PaymentServer.components.library.pkgconfig = pkgs.lib.mkForce [
+      [libchallenge_bypass_ristretto_ffi]
+    ];
+  }];
 }
