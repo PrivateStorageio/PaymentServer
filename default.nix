@@ -11,7 +11,7 @@ let
   #   niv add input-output-hk/haskell.nix -n haskellNix
 
   # Import nixpkgs and pass the haskell.nix provided nixpkgsArgs
-  pkgs = import
+  pkgs' = import
     # haskell.nix provides access to the nixpkgs pins which are used by our CI,
     # hence you will be more likely to get cache hits when using these.
     # But you can also just use your own, e.g. '<nixpkgs>'.
@@ -21,8 +21,8 @@ let
     haskellNix.nixpkgsArgs;
 
   # Help it find the non-Haskell dependency libchallenge_bypass_ristretto_ffi.
-  pkgs' = pkgs.appendOverlays [(import ./oldnix/overlay.nix)];
-in pkgs'.haskell-nix.project {
+  pkgs = pkgs'.appendOverlays [(import ./oldnix/overlay.nix)];
+in pkgs.haskell-nix.project {
   # 'cleanGit' cleans a source directory based on the files known by git
   src = pkgs.haskell-nix.haskellLib.cleanGit {
     name = "PaymentServer";
