@@ -20,9 +20,9 @@ let
     # the haskell.nix functionality itself as an overlay.
     (haskellNix.nixpkgsArgs // {
       overlays = haskellNix.nixpkgsArgs.overlays ++ [
-        (import ./odlnix/overlays.nix);
+        (import ./odlnix/overlays.nix)
       ]
-    })
+    });
 in pkgs.haskell-nix.project {
   # 'cleanGit' cleans a source directory based on the files known by git
   src = pkgs.haskell-nix.haskellLib.cleanGit {
