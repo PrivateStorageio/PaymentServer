@@ -10,6 +10,8 @@ let
   # If haskellNix is not found run:
   #   niv add input-output-hk/haskell.nix -n haskellNix
 
+  libchallenge_bypass_ristretto_ffi = pkgs.callPackage ./oldnix/challenge-bypass-ristretto.nix { };
+
   # Import nixpkgs and pass the haskell.nix provided nixpkgsArgs
   pkgs = import
     # haskell.nix provides access to the nixpkgs pins which are used by our CI,
@@ -18,8 +20,12 @@ let
     haskellNix.sources.nixpkgs-2009
     # These arguments passed to nixpkgs, include some patches and also
     # the haskell.nix functionality itself as an overlay.
-    haskellNix.nixpkgsArgs;
-    libchallenge_bypass_ristretto_ffi = pkgs.callPackage ./oldnix/challenge-bypass-ristretto.nix { };
+    (haskellNix.nixpkgsArgs // {
+      overlays = haskellNix.nixpkgsArgs.overlays ++ [
+        (self: super: { inherit libchallenge_bypass_ristretto_ffi; })
+      ];
+    });
+
 
 in pkgs.haskell-nix.project {
   # 'cleanGit' cleans a source directory based on the files known by git
