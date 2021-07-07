@@ -20,7 +20,7 @@ let
     # the haskell.nix functionality itself as an overlay.
     (haskellNix.nixpkgsArgs // {
       overlays = haskellNix.nixpkgsArgs.overlays ++ [
-        (import ./oldnix/overlays.nix)
+        (import ./oldnix/overlay.nix)
       ];
     });
 in pkgs.haskell-nix.project {
