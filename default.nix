@@ -34,7 +34,7 @@ in pkgs.haskell-nix.project {
     src = ./.;
   };
   modules = [{
-    packages.PaymentServer.components.library.depends = pkgs.lib.mkForce [
+    packages.PaymentServer.components.library.libs = pkgs.lib.mkForce [
       libchallenge_bypass_ristretto_ffi
     ];
   }];
