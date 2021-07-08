@@ -36,9 +36,5 @@ in
     PaymentServer.components.library = hsPkgs.PaymentServer.components.library.overrideAttrs (old: {
       PKG_CONFIG_PATH = "${pkgs.libchallenge_bypass_ristretto_ffi.lib}/pkgconfig";
       NIX_LDFLAGS = "-L${pkgs.libchallenge_bypass_ristretto_ffi.lib}/lib";
-
-      nativeBuildInputs = with pkgs; hsPkgs.PaymentServer.components.library.nativeBuildInputs ++ [
-        libchallenge_bypass_ristretto_ffi
-      ];
     });
   }
