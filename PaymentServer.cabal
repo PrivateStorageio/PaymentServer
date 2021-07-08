@@ -1,101 +1,24 @@
 name:                PaymentServer
 version:             0.1.1.0
 synopsis:            Coordinate entities for the purchase of PrivateStorage.io vouchers.
--- description:
 homepage:            https://github.com/privatestorageio/PaymentServer#readme
 license:             Apache-2.0
-license-file:        LICENSE
 author:              Jean-Paul Calderone
 maintainer:          support@privatestorage.io
 copyright:           2019 Private Storage.io, LLC.
 category:            Web
 build-type:          Simple
-extra-source-files:  README.rst
 cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     PaymentServer.Processors.Stripe
-                     , PaymentServer.Ristretto
-                     , PaymentServer.Issuer
-                     , PaymentServer.Persistence
-                     , PaymentServer.Redemption
-                     , PaymentServer.Metrics
-                     , PaymentServer.Server
-                     , PaymentServer.Main
+  exposed-modules:     PaymentServer.Ristretto
   build-depends:       base >= 4.7 && < 5
-                     , optparse-applicative
-                     , aeson
-                     , bytestring
                      , utf8-string
-                     , servant
-                     , servant-server
-                     , http-types
-                     , wai
-                     , wai-extra
-                     , wai-cors
-                     , data-default
-                     , warp
-                     , warp-tls
-                     , stripe-haskell
-                     , stripe-core
                      , text
-                     , containers
-                     , cryptonite
-                     , sqlite-simple
-                     , retry
-                     , prometheus-client
-                     , servant-prometheus
   default-language:    Haskell2010
   ghc-options:       -Wmissing-import-lists -Wunused-imports
   pkgconfig-depends: libchallenge_bypass_ristretto_ffi
-
-executable PaymentServer-exe
-  hs-source-dirs:      app
-  main-is:             Main.hs
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wmissing-import-lists -Wunused-imports
-  build-depends:       base
-                     , PaymentServer
-  default-language:    Haskell2010
-
-executable PaymentServer-generate-key
-  hs-source-dirs:      generate-key
-  main-is:             Main.hs
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wmissing-import-lists -Wunused-imports
-  build-depends:       base
-                     , text
-                     , PaymentServer
-  default-language:    Haskell2010
-
-test-suite PaymentServer-tests
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      test
-  main-is:             Spec.hs
-  other-modules:       Persistence
-                     , Metrics
-                     , Stripe
-                     , FakeStripe
-  build-depends:       base
-                     , bytestring
-                     , text
-                     , transformers
-                     , raw-strings-qq
-                     , time
-                     , tasty
-                     , tasty-hunit
-                     , directory
-                     , async
-                     , sqlite-simple
-                     , http-types
-                     , wai
-                     , wai-extra
-                     , warp
-                     , http-types
-                     , servant-server
-                     , prometheus-client
-                     , stripe-core
-                     , PaymentServer
-  default-language: Haskell2010
 
 source-repository head
   type:     git
