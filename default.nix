@@ -30,22 +30,15 @@ let
       name = "PaymentServer";
       src = ./.;
     };
-    modules = [{
-      packages.PaymentServer.components.library.libs = [
-        pkgs.pkg-config
-        pkgs.libchallenge_bypass_ristretto_ffi
-      ];
-    }];
   };
 in
-  hsPkgs
-  # pkgs.lib.recursiveUpdate hsPkgs {
-  #   PaymentServer.setup.propagatedNativeBuildInputs = [
-  #     pkgs.pkg-config
-  #     pkgs.libchallenge_bypass_ristretto_ffi
-  #   ];
-  #   PaymentServer.components.library.propagatedNativeBuildInputs = [
-  #     pkgs.pkg-config
-  #     pkgs.libchallenge_bypass_ristretto_ffi
-  #   ];
-  # }
+  pkgs.lib.recursiveUpdate hsPkgs {
+    PaymentServer.components.library = hsPkgs.PaymentServer.components.library.overrideAttrs (old: {
+      PKG_CONFIG_PATH = "${pkgs.libchallenge_bypass_ristretto_ffi.lib}/pkgconfig";
+      NIX_LDFLAGS = "-L${pkgs.libchallenge_bypass_ristretto_ffi.lib}/lib";
+
+      nativeBuildInputs = with pkgs; hsPkgs.PaymentServer.components.library.nativeBuildInputs ++ [
+        libchallenge_bypass_ristretto_ffi
+      ];
+    });
+  }
