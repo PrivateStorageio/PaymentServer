@@ -7,17 +7,10 @@ module PaymentServer.Ristretto
 
 import Data.Text
   ( Text
-  , pack
   )
 
 import Foreign.Ptr
   ( Ptr
-  )
-import Foreign.C.String
-  ( peekCString
-  )
-import Foreign.Marshal.Alloc
-  ( free
   )
 
 data C_SigningKey
@@ -29,8 +22,4 @@ foreign import ccall "signing_key_random" signing_key_random :: IO (Ptr C_Signin
 randomSigningKey :: IO Text
 randomSigningKey = do
   cSigningKey <- signing_key_random
-  cString <- signing_key_encode_base64 cSigningKey
-  signing_key_destroy cSigningKey
-  result <- peekCString cString
-  free cString
-  return $ pack result
+  return $ ""
