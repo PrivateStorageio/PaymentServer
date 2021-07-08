@@ -1,5 +1,5 @@
 let
-  moreOverlays = [ (import ./oldnix/overlay.nix) ];
+  moreOverlays = [ (import ./nix/overlay.nix) ];
 
   # Read in the Niv sources
   sources = import ./nix/sources.nix { };
