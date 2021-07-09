@@ -1,112 +1,31 @@
-let
-  buildDepError = pkg:
-    builtins.throw ''
-      The Haskell package set does not contain the package: ${pkg} (build dependency).
-      
-      If you are using Stackage, make sure that you are using a snapshot that contains the package. Otherwise you may need to update the Hackage snapshot you are using, usually by updating haskell.nix.
-      '';
-  sysDepError = pkg:
-    builtins.throw ''
-      The Nixpkgs package set does not contain the package: ${pkg} (system dependency).
-      
-      You may need to augment the system package mapping in haskell.nix so that it can be found.
-      '';
-  pkgConfDepError = pkg:
-    builtins.throw ''
-      The pkg-conf packages does not contain the package: ${pkg} (pkg-conf dependency).
-      
-      You may need to augment the pkg-conf package mapping in haskell.nix so that it can be found.
-      '';
-  exeDepError = pkg:
-    builtins.throw ''
-      The local executable components do not include the component: ${pkg} (executable dependency).
-      '';
-  legacyExeDepError = pkg:
-    builtins.throw ''
-      The Haskell package set does not contain the package: ${pkg} (executable dependency).
-      
-      If you are using Stackage, make sure that you are using a snapshot that contains the package. Otherwise you may need to update the Hackage snapshot you are using, usually by updating haskell.nix.
-      '';
-  buildToolDepError = pkg:
-    builtins.throw ''
-      Neither the Haskell package set or the Nixpkgs package set contain the package: ${pkg} (build tool dependency).
-      
-      If this is a system dependency:
-      You may need to augment the system package mapping in haskell.nix so that it can be found.
-      
-      If this is a Haskell dependency:
-      If you are using Stackage, make sure that you are using a snapshot that contains the package. Otherwise you may need to update the Hackage snapshot you are using, usually by updating haskell.nix.
-      '';
-in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
-  {
-    flags = {};
-    package = {
-      specVersion = "1.10";
-      identifier = { name = "servant-prometheus"; version = "0.2.0.0"; };
-      license = "BSD-3-Clause";
-      copyright = "";
-      maintainer = "Alex Mason <axman6@gmail.com>, Jack Kelly <jack.kelly@data61.csiro.au>";
-      author = "Alex Mason <axman6@gmail.com>, Anchor Engineering <engineering@lists.anchor.net.au>, Servant Contributors";
-      homepage = "";
-      url = "";
-      synopsis = "Helpers for using prometheus with servant";
-      description = "Helpers for using prometheus with servant. Each endpoint has its own metrics allowing more detailed monitoring than wai-middleware-prometheus allows";
-      buildType = "Simple";
-      };
-    components = {
-      "library" = {
-        depends = [
-          (hsPkgs."base" or (buildDepError "base"))
-          (hsPkgs."prometheus-client" or (buildDepError "prometheus-client"))
-          (hsPkgs."servant" or (buildDepError "servant"))
-          (hsPkgs."http-types" or (buildDepError "http-types"))
-          (hsPkgs."text" or (buildDepError "text"))
-          (hsPkgs."time" or (buildDepError "time"))
-          (hsPkgs."unordered-containers" or (buildDepError "unordered-containers"))
-          (hsPkgs."wai" or (buildDepError "wai"))
-          (hsPkgs."bytestring" or (buildDepError "bytestring"))
-          ];
-        };
-      exes = {
-        "bench" = {
-          depends = [
-            (hsPkgs."base" or (buildDepError "base"))
-            (hsPkgs."aeson" or (buildDepError "aeson"))
-            (hsPkgs."servant-prometheus" or (buildDepError "servant-prometheus"))
-            (hsPkgs."servant-server" or (buildDepError "servant-server"))
-            (hsPkgs."prometheus-client" or (buildDepError "prometheus-client"))
-            (hsPkgs."text" or (buildDepError "text"))
-            (hsPkgs."wai" or (buildDepError "wai"))
-            (hsPkgs."warp" or (buildDepError "warp"))
-            (hsPkgs."process" or (buildDepError "process"))
-            ];
-          };
-        };
-      tests = {
-        "spec" = {
-          depends = [
-            (hsPkgs."base" or (buildDepError "base"))
-            (hsPkgs."aeson" or (buildDepError "aeson"))
-            (hsPkgs."servant-prometheus" or (buildDepError "servant-prometheus"))
-            (hsPkgs."servant-server" or (buildDepError "servant-server"))
-            (hsPkgs."servant-client" or (buildDepError "servant-client"))
-            (hsPkgs."servant" or (buildDepError "servant"))
-            (hsPkgs."prometheus-client" or (buildDepError "prometheus-client"))
-            (hsPkgs."http-client" or (buildDepError "http-client"))
-            (hsPkgs."text" or (buildDepError "text"))
-            (hsPkgs."wai" or (buildDepError "wai"))
-            (hsPkgs."warp" or (buildDepError "warp"))
-            (hsPkgs."hspec" or (buildDepError "hspec"))
-            (hsPkgs."unordered-containers" or (buildDepError "unordered-containers"))
-            (hsPkgs."transformers" or (buildDepError "transformers"))
-            ];
-          };
-        };
-      };
-    } // {
-    src = (pkgs.lib).mkDefault (pkgs.fetchgit {
-      url = "https://github.com/PrivateStorageio/servant-prometheus.git";
-      rev = "b9461cbf689b47506b2eee973136706092b74968";
-      sha256 = "1gfslw670ri119bnq3szc8b08n504f8cnzs5cgk5qvfwvfmsr1xh";
-      });
-    }
+{ mkDerivation, aeson, base, bytestring, fetchgit, hspec
+, http-client, http-types, lib, process, prometheus-client, servant
+, servant-client, servant-server, text, time, transformers
+, unordered-containers, wai, warp
+}:
+mkDerivation {
+  pname = "servant-prometheus";
+  version = "0.2.0.0";
+  src = fetchgit {
+    url = "https://github.com/PrivateStorageio/servant-prometheus.git";
+    sha256 = "1gfslw670ri119bnq3szc8b08n504f8cnzs5cgk5qvfwvfmsr1xh";
+    rev = "b9461cbf689b47506b2eee973136706092b74968";
+    fetchSubmodules = true;
+  };
+  isLibrary = true;
+  isExecutable = true;
+  libraryHaskellDepends = [
+    base bytestring http-types prometheus-client servant text time
+    unordered-containers wai
+  ];
+  executableHaskellDepends = [
+    aeson base process prometheus-client servant-server text wai warp
+  ];
+  testHaskellDepends = [
+    aeson base hspec http-client prometheus-client servant
+    servant-client servant-server text transformers
+    unordered-containers wai warp
+  ];
+  description = "Helpers for using prometheus with servant";
+  license = lib.licenses.bsd3;
+}
