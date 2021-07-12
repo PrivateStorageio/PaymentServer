@@ -23,18 +23,11 @@ let
     # These arguments passed to nixpkgs, include some patches and also
     # the haskell.nix functionality itself as an overlay.
     (haskellNix.nixpkgsArgs // { overlays = allOverlays; });
-
-  hsPkgs = pkgs.haskell-nix.project {
+in
+  pkgs.haskell-nix.project {
     # 'cleanGit' cleans a source directory based on the files known by git
     src = pkgs.haskell-nix.haskellLib.cleanGit {
       name = "PaymentServer";
       src = ./.;
     };
-  };
-in
-  pkgs.lib.recursiveUpdate hsPkgs {
-    PaymentServer.components.library = hsPkgs.PaymentServer.components.library.overrideAttrs (old: {
-      PKG_CONFIG_PATH = "${pkgs.libchallenge_bypass_ristretto_ffi.lib}/pkgconfig";
-      NIX_LDFLAGS = "-L${pkgs.libchallenge_bypass_ristretto_ffi.lib}/lib";
-    });
   }
