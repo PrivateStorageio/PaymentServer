@@ -1,0 +1,4 @@
+This directory contains two kinds of Nix expressions.
+
+First, some Niv-generated files that help us get a pinned version of Haskell.nix.
+Second, some manually-managed expressions that bring in the crypto library dependency.
