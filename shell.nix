@@ -1,4 +1,5 @@
 # shell.nix
+{ pkgs ? import <nixpkgs> { } }:
 let
   project = import ./default.nix;
 in
@@ -9,6 +10,7 @@ in
 
     withHoogle = false;
 
-    packages = ps: [ ps.stack ];
-
+    buildInputs = [
+      pkgs.stack
+    ];
   }
