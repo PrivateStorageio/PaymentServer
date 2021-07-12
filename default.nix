@@ -12,6 +12,8 @@ let
   # If haskellNix is not found run:
   #   niv add input-output-hk/haskell.nix -n haskellNix
 
+  # Haskell.nix is delivery as an overlay.  Add our own overlay, which
+  # provides one of our crypto dependencies, in a non-destructive way.
   allOverlays = moreOverlays ++ haskellNix.nixpkgsArgs.overlays;
 
   # Import nixpkgs and pass the haskell.nix provided nixpkgsArgs
