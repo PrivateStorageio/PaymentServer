@@ -1,0 +1,6 @@
+This directory contains "materialized" Nix expressions for packaging PaymentServer on NixOS.
+Haskell.nix is capable of generating all of these expressions on the fly but at the cost of using roughly 500MB more memory.
+Thus we take advantage of this "materialization" feature of Haskell.nix to make it possible to deploy this software on systems that are close to memory constrained.
+
+The contents of this directory are automatically generated and need to be regenerated for certain kinds of dependency changes.
+See <https://input-output-hk.github.io/haskell.nix/tutorials/materialization/>.
