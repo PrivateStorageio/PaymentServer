@@ -99,6 +99,12 @@ jobs:
             - paymentserver-v2-{{ checksum "stack.yaml" }}
 
       - run:
+          name: "Setting Up"
+          command: |
+            # Try to pre-build and then cache our build-time dependencies.
+            nix-shell shell.nix --run "stack setup"
+
+      - run:
           # Build just our dependencies.  It's nice to have this as a separate
           # step so failures here are more easily identified as being
           # unrelated to our code.
