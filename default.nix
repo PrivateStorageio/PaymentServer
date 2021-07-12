@@ -32,5 +32,11 @@ in
       name = "PaymentServer";
       src = ./.;
     };
+
+    # Cause the expressions at this path to be used, rather than dynamically
+    # generating them all from other sources.  This is a great memory savings
+    # (some half GB or so of VmPeak shaved).  For instructions about ongoing
+    # maintenance of these expressions, see
+    # https://input-output-hk.github.io/haskell.nix/tutorials/materialization/
     materialized = ./materialized.paymentserver;
   }
