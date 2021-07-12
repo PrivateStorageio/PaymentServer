@@ -8,4 +8,7 @@ in
     exactDeps = true;
 
     withHoogle = false;
+
+    packages = ps: [ ps.stack ];
+
   }
