@@ -30,4 +30,5 @@ in
       name = "PaymentServer";
       src = ./.;
     };
+    materialized = ./materialized.paymentserver;
   }
