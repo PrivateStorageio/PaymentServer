@@ -102,11 +102,6 @@ jobs:
           paths:
             - "/nix"
 
-      - run:
-          name: "Running Tests"
-          command: |
-            ./result/bin/PaymentServer-tests
-
 workflows:
   version: 2
   everything:
