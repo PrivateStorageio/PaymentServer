@@ -86,103 +86,20 @@ jobs:
             - paymentserver-nix-store-v2-{{ checksum "nixpkgs.rev" }}-
             - paymentserver-nix-store-v2-
 
-      - restore_cache:
-          # Restore the cache of Stack's state.  This will have all of the
-          # compiled Haskell libraries we depend on and even the compiled
-          # output of our own libraries, if the source hasn't changed since
-          # the cache was written (but usually it will have).
-          name: "Restore Cached Dependencies"
-          keys:
-            - paymentserver-v2-{{ checksum "stack.yaml" }}-{{ checksum "PaymentServer.cabal" }}
-            - paymentserver-v2-{{ checksum "stack.yaml" }}
-
-      - run:
-          # Build just our dependencies.  It's nice to have this as a separate
-          # step so failures here are more easily identified as being
-          # unrelated to our code.
-          #
-          # See below for explanation of the various flags passed in.  If the
-          # flags here differ from those below in a way that makes ghc think a
-          # library needs to be rebuilt then we'll build everything twice and
-          # our cache will be useless!  Try not to make that happen.
-          name: "Build Dependencies"
-          command: |
-            BUILD="stack build \
-            --no-terminal \
-            --only-dependencies \
-            --jobs 1 \
-            --interleaved-output"
-            nix-shell shell.nix --run "$BUILD"
-
-          # Give it a good long while.  stripe-core, in particular, can take a
-          # while to build.
-          no_output_timeout: "20m"
-
-      - save_cache:
-          # We can save the stack cache right here.  It will have everything
-          # we want in it now that the dependencies have been built.  And this
-          # way we get to save the cache whether or not the test suite goes on
-          # to succeed.
-          name: "Cache Dependencies"
-          key: paymentserver-v2-{{ checksum "stack.yaml" }}-{{ checksum "PaymentServer.cabal" }}
-          paths:
-            - "/root/.stack"
-            - ".stack-work"
-
-      - run:
-          name: "Building"
-          command: |
-            # shell.nix gives us the stack we want.  Then stack.yaml specifies
-            # some more of the Nix-based environment to be able to build and
-            # run the tests.
-            #
-            # --no-terminal avoids having fancy progress reports written to
-            # stdout.
-            #
-            # --haddock builds the Haskell API documentation.
-            # --haddock-internal builds docs even for unexposed modules.
-            # --no-haddock-deps skips building docs for all our dependencies.
-            BUILD="stack build \
-              --no-terminal \
-              --haddock \
-              --haddock-internal \
-              --test \
-              --no-haddock-deps"
-            nix-shell shell.nix --run "$BUILD"
-
       - run:
           name: "Building with Nix"
           command: |
             nix-build ./nix/ -A PaymentServer.components.exes."PaymentServer-exe"
 
-      - save_cache:
-          name: "Cache Nix Store Paths"
-          key: paymentserver-nix-store-v2-{{ checksum "nixpkgs.rev" }}-{{ checksum "nix/challenge-bypass-ristretto-repo.nix" }}
-          paths:
-            - "/nix"
-
-      - store_artifacts:
-          # There may be useful build logs here.
-          path: ".stack-work/logs"
+      - run:
+          name: "Building Tests"
+          command: |
+            nix-build ./nix/ -A PaymentServer.components.tests."PaymentServer-tests"
 
       - run:
-          name: "Prepare Artifacts for Upload"
+          name: "Running Tests"
           command: |
-            # The flags passed to `stack path` need to pretty closely match
-            # those passed to `stack build` or the path comes out wrong.
-            # https://github.com/commercialhaskell/stack/issues/4892
-            GETPATH="stack path \
-              --haddock \
-              --haddock-internal \
-              --no-haddock-deps \
-              --local-doc-root"
-
-            mv $(nix-shell shell.nix --run "$GETPATH")/PaymentServer-* /tmp/PaymentServer-docs
-
-      - store_artifacts:
-          # This contains the html haddock output for the project.
-          path: "/tmp/PaymentServer-docs"
-          destination: "docs"
+            ./result/bin/PaymentServer-tests
 
 workflows:
   version: 2
