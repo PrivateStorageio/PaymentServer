@@ -1,9 +1,9 @@
 let
-  moreOverlays = [ (import ./nix/overlay.nix) ];
+  moreOverlays = [ (import ./overlay.nix) ];
 
   # Read in the Niv sources
-  sources = import ./nix/sources.nix { };
-  # If ./nix/sources.nix file is not found run:
+  sources = import ./sources.nix { };
+  # If ./sources.nix file is not found run:
   #   niv init
   #   niv add input-output-hk/haskell.nix -n haskellNix
 
