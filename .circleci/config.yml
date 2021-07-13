@@ -92,7 +92,7 @@ jobs:
           name: "Building with Nix"
           command: |
             nix-build \
-              --option extra-substitutors https://hydra.iohk.io/ \
+              --option extra-substituters https://hydra.iohk.io/ \
               ./nix/ \
               -A PaymentServer.components.exes."PaymentServer-exe"
 
@@ -100,7 +100,7 @@ jobs:
           name: "Building Tests"
           command: |
             nix-build \
-              --option extra-substitutors https://hydra.iohk.io/ \
+              --option extra-substituters https://hydra.iohk.io/ \
               ./nix/ \
               -A PaymentServer.components.tests."PaymentServer-tests"
 
