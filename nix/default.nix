@@ -30,7 +30,7 @@ in
     # 'cleanGit' cleans a source directory based on the files known by git
     src = pkgs.haskell-nix.haskellLib.cleanGit {
       name = "PaymentServer";
-      src = ./.;
+      src = ../.;
     };
 
     # Cause the expressions at this path to be used, rather than dynamically
