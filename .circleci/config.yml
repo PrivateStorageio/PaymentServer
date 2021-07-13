@@ -84,9 +84,9 @@ jobs:
             # If nixpkgs changes then potentially a lot of cached packages for
             # the base system will be invalidated so we may as well drop them
             # and make a new cache with the new packages.
-            - paymentserver-nix-store-v2-{{ checksum "nixpkgs.rev" }}-{{ checksum "nix/challenge-bypass-ristretto-repo.nix" }}
-            - paymentserver-nix-store-v2-{{ checksum "nixpkgs.rev" }}-
-            - paymentserver-nix-store-v2-
+            - paymentserver-nix-store-v3-{{ checksum "nixpkgs.rev" }}-{{ checksum "nix/challenge-bypass-ristretto-repo.nix" }}
+            - paymentserver-nix-store-v3-{{ checksum "nixpkgs.rev" }}-
+            - paymentserver-nix-store-v3-
 
       - run:
           name: "Building with Nix"
