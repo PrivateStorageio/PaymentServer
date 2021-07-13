@@ -111,7 +111,7 @@ jobs:
 
       - save_cache:
           name: "Cache Nix Store Paths"
-          key: paymentserver-nix-store-v2-{{ checksum "nixpkgs.rev" }}-{{ checksum "nix/challenge-bypass-ristretto-repo.nix" }}
+          key: paymentserver-nix-store-v3-{{ checksum "nixpkgs.rev" }}-{{ checksum "nix/challenge-bypass-ristretto-repo.nix" }}
           paths:
             - "/nix"
 
