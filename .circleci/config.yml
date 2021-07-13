@@ -22,6 +22,8 @@ jobs:
       # build.
       - image: "nixorg/nix:circleci"
 
+    resource_class: "xlarge"
+
     environment:
       # Specify a revision of NixOS/nixpkgs to run against.  This essentially
       # pins the majority of the software involved in the build.  This
@@ -82,23 +84,34 @@ jobs:
             # If nixpkgs changes then potentially a lot of cached packages for
             # the base system will be invalidated so we may as well drop them
             # and make a new cache with the new packages.
-            - paymentserver-nix-store-v2-{{ checksum "nixpkgs.rev" }}-{{ checksum "nix/challenge-bypass-ristretto-repo.nix" }}
-            - paymentserver-nix-store-v2-{{ checksum "nixpkgs.rev" }}-
-            - paymentserver-nix-store-v2-
+            - paymentserver-nix-store-v3-{{ checksum "nixpkgs.rev" }}-{{ checksum "nix/challenge-bypass-ristretto-repo.nix" }}
+            - paymentserver-nix-store-v3-{{ checksum "nixpkgs.rev" }}-
+            - paymentserver-nix-store-v3-
 
       - run:
           name: "Building with Nix"
           command: |
-            nix-build ./nix/ -A PaymentServer.components.exes."PaymentServer-exe"
+            nix-build \
+              --option extra-substituters https://hydra.iohk.io/ \
+              ./nix/ \
+              -A PaymentServer.components.exes."PaymentServer-exe"
 
       - run:
           name: "Building Tests"
           command: |
-            nix-build ./nix/ -A PaymentServer.components.tests."PaymentServer-tests"
+            nix-build \
+              --option extra-substituters https://hydra.iohk.io/ \
+              ./nix/ \
+              -A PaymentServer.components.tests."PaymentServer-tests"
+
+      - run:
+          name: "Running Tests"
+          command: |
+            ./result/bin/PaymentServer-tests
 
       - save_cache:
           name: "Cache Nix Store Paths"
-          key: paymentserver-nix-store-v2-{{ checksum "nixpkgs.rev" }}-{{ checksum "nix/challenge-bypass-ristretto-repo.nix" }}
+          key: paymentserver-nix-store-v3-{{ checksum "nixpkgs.rev" }}-{{ checksum "nix/challenge-bypass-ristretto-repo.nix" }}
           paths:
             - "/nix"
 

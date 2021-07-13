@@ -1,23 +1,42 @@
-{ pkgs ? import <nixpkgs> { } }:
-
 let
-  # Get our overlay in place regardless of whether a value is passed for pkgs.
-  # The build fails without it and it's unreasonable to expect our caller to
-  # know to apply it.
-  nixpkgs = import pkgs.path { overlays = [ (import ./overlay.nix) ]; };
+  moreOverlays = [ (import ./overlay.nix) ];
 
-  # Pin a particular version of haskell.nix.  The particular version isn't
-  # special.  It's just recent at the time this expression was written and it
-  # is known to work with PaymentServer.  It could be bumped if necessary but
-  # this would probably only happen as a result of bumping the resolver in
-  # stack.yaml.
-  haskell = import (builtins.fetchTarball https://github.com/input-output-hk/haskell.nix/archive/0cb32e695d7014908fb01fd7e3d225ea33dbdc98.tar.gz) { pkgs = nixpkgs; };
+  # Read in the Niv sources
+  sources = import ./sources.nix { };
+  # If ./sources.nix file is not found run:
+  #   niv init
+  #   niv add input-output-hk/haskell.nix -n haskellNix
 
-  pkgSet = haskell.mkStackPkgSet {
-    stack-pkgs = import ./pkgs.nix;
-    pkg-def-extras = [];
-    modules = [];
-  };
+  # Fetch the haskell.nix commit we have pinned with Niv
+  haskellNix = import sources.haskellNix { };
+  # If haskellNix is not found run:
+  #   niv add input-output-hk/haskell.nix -n haskellNix
 
+  # Haskell.nix is delivery as an overlay.  Add our own overlay, which
+  # provides one of our crypto dependencies, in a non-destructive way.
+  allOverlays = moreOverlays ++ haskellNix.nixpkgsArgs.overlays;
+
+  # Import nixpkgs and pass the haskell.nix provided nixpkgsArgs
+  pkgs = import
+    # haskell.nix provides access to the nixpkgs pins which are used by our CI,
+    # hence you will be more likely to get cache hits when using these.
+    # But you can also just use your own, e.g. '<nixpkgs>'.
+    haskellNix.sources.nixpkgs-2009
+    # These arguments passed to nixpkgs, include some patches and also
+    # the haskell.nix functionality itself as an overlay.
+    (haskellNix.nixpkgsArgs // { overlays = allOverlays; });
 in
-  pkgSet.config.hsPkgs
+  pkgs.haskell-nix.project {
+    # 'cleanGit' cleans a source directory based on the files known by git
+    src = pkgs.haskell-nix.haskellLib.cleanGit {
+      name = "PaymentServer";
+      src = ../.;
+    };
+
+    # Cause the expressions at this path to be used, rather than dynamically
+    # generating them all from other sources.  This is a great memory savings
+    # (some half GB or so of VmPeak shaved).  For instructions about ongoing
+    # maintenance of these expressions, see
+    # https://input-output-hk.github.io/haskell.nix/tutorials/materialization/
+    materialized = ./materialized.paymentserver;
+  }
