@@ -39,4 +39,6 @@ in
     # maintenance of these expressions, see
     # https://input-output-hk.github.io/haskell.nix/tutorials/materialization/
     materialized = ./materialized.paymentserver;
+    # See materialized.paymentserver/README
+    # checkMaterialization = true;
   }
