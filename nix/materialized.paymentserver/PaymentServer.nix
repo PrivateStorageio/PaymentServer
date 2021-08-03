@@ -11,7 +11,7 @@
     flags = {};
     package = {
       specVersion = "1.10";
-      identifier = { name = "PaymentServer"; version = "0.1.1.0"; };
+      identifier = { name = "PaymentServer"; version = "0.1.1.1"; };
       license = "Apache-2.0";
       copyright = "2019 Private Storage.io, LLC.";
       maintainer = "support@privatestorage.io";
