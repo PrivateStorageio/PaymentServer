@@ -304,7 +304,7 @@ redeemVoucherHelper isVoucherPaid lookupFingerprint lookupVoucherCounter markVou
 
 
 metricName :: Text -> Text
-metricName name = mappend "redemption." name
+metricName name = mappend "redemption_" name
 
 
 voucherRedeemed :: P.Counter

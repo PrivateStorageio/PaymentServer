@@ -121,7 +121,7 @@ instance FromJSON Charges where
 
 
 metricName :: Text -> Text
-metricName name = mappend ("processors.stripe.charge_") name
+metricName name = mappend ("processors_stripe_charge_") name
 
 chargeAttempts :: P.Counter
 chargeAttempts
