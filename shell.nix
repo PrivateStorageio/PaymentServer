@@ -1,7 +1,7 @@
 # shell.nix
 { pkgs ? import <nixpkgs> { } }:
 let
-  project = import ./default.nix;
+  project = import ./nix/default.nix;
 in
   project.shellFor {
     # Prevents cabal from choosing alternate plans, so that
