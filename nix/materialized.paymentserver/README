@@ -1,6 +1,15 @@
-This directory contains "materialized" Nix expressions for packaging PaymentServer on NixOS.
+Thie directory contains "materialized" Nix expressions for packaging PaymentServer on NixOS.
 Haskell.nix is capable of generating all of these expressions on the fly but at the cost of using roughly 500MB more memory.
 Thus we take advantage of this "materialization" feature of Haskell.nix to make it possible to deploy this software on systems that are close to memory constrained.
 
 The contents of this directory are automatically generated and need to be regenerated for certain kinds of dependency changes.
 See <https://input-output-hk.github.io/haskell.nix/tutorials/materialization/>.
+
+Here's what you do:
+
+1. Hack hack hack. Maybe change something that affects the packaging.
+2. Add checkMaterialization = true; below materialized = ... in nix/default.nix
+3. Build it (eg run nix-build nix -A PaymentServer.components.exes.PaymentServer-exe)
+4. Whether the build succeeds or fails, you can throw away the checkMaterialization = ... line now.
+5. If the build succeeds, the current materialization is up-to-date and you're done. If the build fails, it should do so with a line like "Materialized nix used for haskell-project-stack-to-nix-pkgs incorrect. To fix run: /nix/store/XXXXXX-updateMaterialized". Run the script it mentions. It will update the materialization in your working tree. This includes erasing the README I put there so maybe that README should be moved somewhere else. For now, check in the rest of the materialization changes and you're done.
+
