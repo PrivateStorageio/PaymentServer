@@ -227,7 +227,7 @@ redeem issue database (Redeem voucher tokens counter) =
 
 
 metricName :: Text -> Text
-metricName name = mappend "redemption_" name
+metricName name = mappend "payment_redemption_" name
 
 
 signaturesIssued :: P.Counter
