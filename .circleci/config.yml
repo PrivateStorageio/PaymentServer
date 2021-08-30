@@ -22,8 +22,6 @@ jobs:
       # build.
       - image: "nixorg/nix:circleci"
 
-    resource_class: "xlarge"
-
     environment:
       # Specify a revision of NixOS/nixpkgs to run against.  This essentially
       # pins the majority of the software involved in the build.  This
@@ -95,6 +93,7 @@ jobs:
           name: "Building with Nix"
           command: |
             nix-build \
+              -j 4 \
               ./nix/ \
               -A PaymentServer.components.exes."PaymentServer-exe"
 
@@ -102,6 +101,7 @@ jobs:
           name: "Building Tests"
           command: |
             nix-build \
+              -j 4 \
               ./nix/ \
               -A PaymentServer.components.tests."PaymentServer-tests"
 
