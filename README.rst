@@ -26,21 +26,19 @@ First, run the server::
 
   $ stack run
 
-Then configure Stripe with a `webhook`_ pointing at the server and receiving the *charge.successful* event.
-Configure Stripe with ``http://<youraddress>:8081/v1/stripe/webhook``.
+Then create a testing charge::
 
-Then create a testing charge using Stripe::
-
-   $ STRIPE_SECRET_KEY=sk_test_...
    $ curl \
-     https://api.stripe.com/v1/charges   \
-     -u ${STRIPE_SECRET_KEY}:   \
-     -d amount=999   \
-     -d currency=usd   \
-     -d source=tok_visa   \
-     -d 'metadata[Voucher]=abcdefghijk'
+     http://<youraddress>:8081/v1/stripe/charge \
+     -X POST \
+     -H 'content-type: application/json' \
+     --data '{ "token":"tok_visa", "voucher":"abcdefg", "amount":"650", "currency":"USD" }'
 
-This results in Stripe making a callback to the PaymentServer with the charge details.
 The PaymentServer marks the voucher as paid in its database.
+Then redeem the vouncher for tokens::
 
-.. _webhook: https://stripe.com/docs/webhooks/setup#configure-webhook-settings
+   $ curl \
+     http://<youraddress>:8081/v1/redeem \
+     -X POST \
+     -H 'content-type: application/json' \
+     --data '{ "redeemVoucher": "abcdefg", "redeemTokens":[]}'
