@@ -10,5 +10,11 @@
         };
       };
   resolver = "lts-14.1";
-  modules = [ ({ lib, ... }: { packages = {}; }) { packages = {}; } ];
+  modules = [
+    ({ lib, ... }:
+      { packages = {}; })
+    { packages = {}; }
+    ({ lib, ... }:
+      { planned = lib.mkOverride 900 true; })
+    ];
   }
