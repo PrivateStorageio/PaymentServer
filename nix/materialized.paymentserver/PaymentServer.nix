@@ -97,6 +97,7 @@
       tests = {
         "PaymentServer-tests" = {
           depends = [
+            (hsPkgs."aeson" or (errorHandler.buildDepError "aeson"))
             (hsPkgs."base" or (errorHandler.buildDepError "base"))
             (hsPkgs."bytestring" or (errorHandler.buildDepError "bytestring"))
             (hsPkgs."text" or (errorHandler.buildDepError "text"))
@@ -119,7 +120,13 @@
             (hsPkgs."PaymentServer" or (errorHandler.buildDepError "PaymentServer"))
             ];
           buildable = true;
-          modules = [ "Persistence" "Metrics" "Stripe" "FakeStripe" ];
+          modules = [
+            "Persistence"
+            "Redemption"
+            "Metrics"
+            "Stripe"
+            "FakeStripe"
+            ];
           hsSourceDirs = [ "test" ];
           mainPath = [ "Spec.hs" ];
           };

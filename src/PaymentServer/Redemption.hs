@@ -8,6 +8,7 @@
 module PaymentServer.Redemption
   ( RedemptionAPI
   , Redeem(Redeem)
+  , RedemptionConfig(RedemptionConfig)
   , redemptionServer
   ) where
 
@@ -85,6 +86,13 @@ import PaymentServer.Issuer
   , Issuer
   )
 
+data RedemptionConfig
+  = RedemptionConfig
+  { redemptionConfigMaxCounter :: Int
+  , redemptionConfigTokensPerVoucher :: Int
+  , redemptionConfigIssue :: Issuer
+  }
+
 data Result
   = Unpaid -- ^ A voucher has not been paid for.
   | DoubleSpend -- ^ A voucher has already been redeemed.
@@ -161,6 +169,9 @@ instance FromJSON Result where
 maxCounter :: Integer
 maxCounter = 16
 
+tokensPerVoucher :: Integer
+tokensPerVoucher = 50000
+
 type RedemptionAPI = ReqBody '[JSON] Redeem :> Post '[JSON] Result
 
 jsonErr err reason = err
@@ -168,7 +179,7 @@ jsonErr err reason = err
   , errHeaders = [ ("Content-Type", "application/json;charset=utf-8") ]
   }
 
-redemptionServer :: VoucherDatabase d => Issuer -> d -> Server RedemptionAPI
+redemptionServer :: VoucherDatabase d => RedemptionConfig -> d -> Server RedemptionAPI
 redemptionServer = redeem
 
 -- | Try an operation repeatedly for several minutes with a brief delay
@@ -190,40 +201,79 @@ retry op =
         Left NotPaid -> return True
         _ -> return False
 
+
+-- | Compute the number of tokens which should be present in a certain
+-- redemption group.
+tokenCountForGroup
+  :: Int
+  -- ^ The total number of redemption groups.
+  -> Int
+  -- ^ The total number of tokens across all redemption groups.
+  -> Int
+  -- ^ The number of the redemption group for which to compute the token
+  -- count.
+  -> Maybe Int
+  -- ^ Nothing if the parameters are incoherent.  Otherwise, Just the number
+  -- of tokens expected in the specified group.
+tokenCountForGroup numGroups totalTokens groupNumber =
+  if totalTokens < numGroups
+  then Nothing
+  else if groupNumber >= numGroups || groupNumber < 0
+  then Nothing
+  else
+    Just $ groupSize + groupSizeAdjustment
+    where
+      (groupSize, remainder) = totalTokens `divMod` numGroups
+      groupSizeAdjustment =
+        if groupNumber < remainder
+        then 1
+        else 0
+
+
 -- | Handler for redemption requests.  Use the database to try to redeem the
 -- voucher and return signatures.  Return a failure if this is not possible
 -- (eg because the voucher was already redeemed).
-redeem :: VoucherDatabase d => Issuer -> d -> Redeem -> Handler Result
-redeem issue database (Redeem voucher tokens counter) =
+redeem :: VoucherDatabase d => RedemptionConfig -> d -> Redeem -> Handler Result
+redeem (RedemptionConfig numGroups tokensPerVoucher issue) database (Redeem voucher tokens counter) =
   if counter < 0 || counter >= maxCounter then
     throwError $ jsonErr err400 (CounterOutOfBounds 0 maxCounter counter)
-  else do
-    redeemResult <- liftIO . retry $ redeem
-    case redeemResult of
-      Left NotPaid -> do
-        throwError $ jsonErr err400 Unpaid
-      Left AlreadyRedeemed -> do
-        throwError $ jsonErr err400 DoubleSpend
-      Left DuplicateFingerprint -> do
-        throwError $ jsonErr err400 $ OtherFailure "fingerprint already used"
-      Left DatabaseUnavailable -> do
-        throwError $ jsonErr err500 $ OtherFailure "database temporarily unavailable"
-      Right fresh -> do
-        let result = issue tokens
-        case result of
-          Left reason -> do
-            throwError $ jsonErr err400 $ OtherFailure reason
-          Right (ChallengeBypass key signatures proof) -> do
-            let count = fromInteger . toInteger . length $ signatures
-            -- addCounter returns bool indicating whether its argument was
-            -- greater than or equal to zero or not.  We don't care.  length
-            -- is greater than or equal to zero.
-            liftIO . when fresh $ (P.addCounter signaturesIssued count >>= \_ -> return ())
-            return $ Succeeded key signatures proof
-    where
-      fingerprint = fingerprintFromTokens tokens
-      redeem :: IO (Either RedeemError Bool)
-      redeem = redeemVoucherWithCounter database voucher fingerprint counter
+  else
+    case tokenCountForGroup numGroups tokensPerVoucher (fromIntegral counter) of
+      Nothing ->
+        throwError $ jsonErr err500 $ OtherFailure "invalid redemption counter"
+      Just allowedTokenCount ->
+        if allowedTokenCount /= length tokens
+        then throwError $ jsonErr err400 $ OtherFailure "wrong number of tokens"
+        else redeem
+  where
+    fingerprint = fingerprintFromTokens tokens
+
+    redeemOnce :: IO (Either RedeemError Bool)
+    redeemOnce = redeemVoucherWithCounter database voucher fingerprint counter
+
+    redeem :: Handler Result
+    redeem = do
+      redeemResult <- liftIO $ retry redeemOnce
+      case redeemResult of
+        Left NotPaid -> do
+          throwError $ jsonErr err400 Unpaid
+        Left AlreadyRedeemed -> do
+          throwError $ jsonErr err400 DoubleSpend
+        Left DuplicateFingerprint -> do
+          throwError $ jsonErr err400 $ OtherFailure "fingerprint already used"
+        Left DatabaseUnavailable -> do
+          throwError $ jsonErr err500 $ OtherFailure "database temporarily unavailable"
+        Right fresh ->
+          case issue tokens of
+            Left reason -> do
+              throwError $ jsonErr err400 $ OtherFailure reason
+            Right (ChallengeBypass key signatures proof) -> do
+              let count = fromInteger . toInteger . length $ signatures
+              -- addCounter returns bool indicating whether its argument was
+              -- greater than or equal to zero or not.  We don't care.  length
+              -- is greater than or equal to zero.
+              liftIO . when fresh $ (P.addCounter signaturesIssued count >>= \_ -> return ())
+              return $ Succeeded key signatures proof
 
 
 metricName :: Text -> Text
