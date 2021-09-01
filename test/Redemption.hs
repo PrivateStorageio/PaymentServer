@@ -51,7 +51,7 @@ import PaymentServer.Redemption
   ( Redeem(Redeem)
   , RedemptionConfig
     ( RedemptionConfig
-    , redemptionConfigMaxCounter
+    , redemptionConfigNumGroups
     , redemptionConfigTokensPerVoucher
     , redemptionConfigIssue
     )
@@ -111,7 +111,7 @@ redemptionTests =
     aVoucher = "abc"
 
     redemptionConfig = RedemptionConfig
-      { redemptionConfigMaxCounter = tokenGroups
+      { redemptionConfigNumGroups = tokenGroups
       , redemptionConfigTokensPerVoucher = totalTokens
       , redemptionConfigIssue = trivialIssue
       }

@@ -10,7 +10,7 @@ module PaymentServer.Redemption
   , Redeem(Redeem)
   , RedemptionConfig
     ( RedemptionConfig
-    , redemptionConfigMaxCounter
+    , redemptionConfigNumGroups
     , redemptionConfigTokensPerVoucher
     , redemptionConfigIssue
     )
@@ -91,11 +91,15 @@ import PaymentServer.Issuer
   , Issuer
   )
 
+-- | Parameters controlling exactly how vouchers are redeemed for tokens.
 data RedemptionConfig
   = RedemptionConfig
-  { redemptionConfigMaxCounter :: Int
+  { redemptionConfigNumGroups :: Int
+  -- ^ The number of redemption groups a single redemption is divided into.
   , redemptionConfigTokensPerVoucher :: Int
+  -- ^ The total number of tokens received in exchange for one voucher.
   , redemptionConfigIssue :: Issuer
+  -- ^ An issuer which can actually issue signatures during a redemption.
   }
 
 data Result
