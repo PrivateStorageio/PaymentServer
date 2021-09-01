@@ -8,7 +8,12 @@
 module PaymentServer.Redemption
   ( RedemptionAPI
   , Redeem(Redeem)
-  , RedemptionConfig(RedemptionConfig)
+  , RedemptionConfig
+    ( RedemptionConfig
+    , redemptionConfigMaxCounter
+    , redemptionConfigTokensPerVoucher
+    , redemptionConfigIssue
+    )
   , redemptionServer
   ) where
 
@@ -98,7 +103,7 @@ data Result
   | DoubleSpend -- ^ A voucher has already been redeemed.
   | OtherFailure Text -- ^ Some other unrecognized failure mode.
   -- | Given counter was not in the expected range
-  | CounterOutOfBounds Integer Integer Integer
+  | CounterOutOfBounds Int Int Int
   | Succeeded PublicKey [Signature] Proof
   deriving (Show, Eq)
 
@@ -108,7 +113,7 @@ data Redeem
   = Redeem
   { redeemVoucher :: Voucher        -- ^ The voucher being redeemed.
   , redeemTokens :: [BlindedToken]  -- ^ Tokens to be signed as part of this redemption.
-  , redeemCounter :: Integer        -- ^ Counter tag on this redemption.
+  , redeemCounter :: Int            -- ^ Counter tag on this redemption.
   } deriving (Show, Eq, Generic)
 
 instance FromJSON Redeem where
@@ -164,13 +169,6 @@ instance FromJSON Result where
         then return DoubleSpend
         else return $ OtherFailure reason
 
--- | Limit the value for the counter value supplied during a voucher
--- redemption attempt.  A counter in the range [0..maxCounter) is allowed.
-maxCounter :: Integer
-maxCounter = 16
-
-tokensPerVoucher :: Integer
-tokensPerVoucher = 50000
 
 type RedemptionAPI = ReqBody '[JSON] Redeem :> Post '[JSON] Result
 
@@ -235,8 +233,8 @@ tokenCountForGroup numGroups totalTokens groupNumber =
 -- (eg because the voucher was already redeemed).
 redeem :: VoucherDatabase d => RedemptionConfig -> d -> Redeem -> Handler Result
 redeem (RedemptionConfig numGroups tokensPerVoucher issue) database (Redeem voucher tokens counter) =
-  if counter < 0 || counter >= maxCounter then
-    throwError $ jsonErr err400 (CounterOutOfBounds 0 maxCounter counter)
+  if counter < 0 || counter >= numGroups then
+    throwError $ jsonErr err400 (CounterOutOfBounds 0 numGroups counter)
   else
     case tokenCountForGroup numGroups tokensPerVoucher (fromIntegral counter) of
       Nothing ->
@@ -249,7 +247,8 @@ redeem (RedemptionConfig numGroups tokensPerVoucher issue) database (Redeem vouc
     fingerprint = fingerprintFromTokens tokens
 
     redeemOnce :: IO (Either RedeemError Bool)
-    redeemOnce = redeemVoucherWithCounter database voucher fingerprint counter
+    redeemOnce =
+      redeemVoucherWithCounter database voucher fingerprint (fromIntegral counter)
 
     redeem :: Handler Result
     redeem = do

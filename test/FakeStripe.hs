@@ -2,7 +2,8 @@
 {-# LANGUAGE QuasiQuotes #-}
 
 module FakeStripe
-  ( withFakeStripe
+  ( ChargeId(ChargeId)
+  , withFakeStripe
   , chargeOkay
   , chargeFailed
   ) where
@@ -41,6 +42,10 @@ import Web.Stripe.Client
   , StripeKey(StripeKey)
   , Protocol(HTTP)
   , Endpoint(Endpoint)
+  )
+
+import Web.Stripe.Types
+  ( ChargeId(ChargeId)
   )
 
 anError :: ByteString

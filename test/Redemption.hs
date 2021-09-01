@@ -43,22 +43,26 @@ import Network.Wai
 import PaymentServer.Issuer
   ( trivialIssue
   )
-
 import PaymentServer.Persistence
   ( memory
-  )
-
-import PaymentServer.Server
-  ( RedemptionConfig(RedemptionConfig)
-  , paymentServerApp
+  , payForVoucher
   )
 import PaymentServer.Redemption
   ( Redeem(Redeem)
+  , RedemptionConfig
+    ( RedemptionConfig
+    , redemptionConfigMaxCounter
+    , redemptionConfigTokensPerVoucher
+    , redemptionConfigIssue
+    )
   )
-
+import PaymentServer.Server
+  ( paymentServerApp
+  )
 import FakeStripe
   ( withFakeStripe
   , chargeOkay
+  , ChargeId(ChargeId)
   )
 
 tests :: TestTree
@@ -72,29 +76,45 @@ redemptionTests =
   [ testCase "success" $
     -- A redemption attempt with a valid group number and correct token count
     -- for that group receives a 200 HTTP response.
-    withFakeStripe (return chargeOkay) $
-    \stripeConfig -> do
-      db <- memory
-      let app = paymentServerApp origins stripeConfig redemptionConfig db
-
-      (flip runSession) app $ do
-        response <- request $ Redeem "abc" (replicate (1024 `div` 16) "a") 0
-        assertStatus 200 response
+    let redemption = Redeem aVoucher (replicate tokensPerGroup aToken) 0
+    in assertRedemptionStatus redemption 200
 
   , testCase "negative counter" $
     -- A redemption attempt with a negative counter value fails with an HTTP
     -- error.
-    withFakeStripe (return chargeOkay) $
-    \stripeConfig -> do
-      db <- memory
-      let app = paymentServerApp origins stripeConfig redemptionConfig db
+    let redemption = Redeem aVoucher (replicate tokensPerGroup aToken) (-1)
+    in assertRedemptionStatus redemption 400
 
-      (flip runSession) app $ do
-        response <- request $ Redeem "abc" (replicate (1024 `div` 16) "a") (-1)
-        assertStatus 400 response
+  , testCase "counter too large" $
+    -- A redemption attempt with a counter value greater than the maximum
+    -- allowed fails with an HTTP error.
+    let redemption = Redeem aVoucher (replicate tokensPerGroup aToken) tokenGroups
+    in assertRedemptionStatus redemption 400
+
+  , testCase "too few tokens" $
+    -- A redemption attempt with fewer tokens than are expected in the
+    -- indicated redemption group fails with an HTTP error.
+    let redemption = Redeem aVoucher (replicate (tokensPerGroup - 1) aToken) 0
+    in assertRedemptionStatus redemption 400
+
+  , testCase "too many tokens" $
+    -- A redemption attempt with more tokens than are expected in the
+    -- indicated redemption group fails with an HTTP error.
+    let redemption = Redeem aVoucher (replicate (tokensPerGroup + 1) aToken) 0
+    in assertRedemptionStatus redemption 400
   ]
   where
-    redemptionConfig = RedemptionConfig 16 1024 trivialIssue
+    totalTokens = 32
+    tokenGroups = 4
+    tokensPerGroup = totalTokens `div` tokenGroups
+    aToken = "a"
+    aVoucher = "abc"
+
+    redemptionConfig = RedemptionConfig
+      { redemptionConfigMaxCounter = tokenGroups
+      , redemptionConfigTokensPerVoucher = totalTokens
+      , redemptionConfigIssue = trivialIssue
+      }
     origins = ["example.invalid"]
     headers = [("origin", "example.invalid"), ("content-type", "application/json")]
     path = "/v1/redeem"
@@ -104,3 +124,17 @@ redemptionTests =
                  } path
 
     request = srequest . SRequest theRequest . encode
+
+    -- | Assert that using the given redemption parameters results in a
+    -- response with the given status.
+    assertRedemptionStatus redemption expectedStatus =
+      withFakeStripe (return chargeOkay) $
+      \stripeConfig -> do
+        db <- memory
+        payForVoucher db aVoucher (return $ Right $ ChargeId "xyz")
+
+        let app = paymentServerApp origins stripeConfig redemptionConfig db
+
+        (flip runSession) app $ do
+          response <- request redemption
+          assertStatus expectedStatus response
