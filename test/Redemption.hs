@@ -135,6 +135,6 @@ redemptionTests =
 
         let app = paymentServerApp origins stripeConfig redemptionConfig db
 
-        (flip runSession) app $ do
+        flip runSession app $ do
           response <- request redemption
           assertStatus expectedStatus response

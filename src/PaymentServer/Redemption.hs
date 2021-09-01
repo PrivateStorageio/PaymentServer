@@ -213,19 +213,13 @@ tokenCountForGroup
   -> Maybe Int
   -- ^ Nothing if the parameters are incoherent.  Otherwise, Just the number
   -- of tokens expected in the specified group.
-tokenCountForGroup numGroups totalTokens groupNumber =
-  if totalTokens < numGroups
-  then Nothing
-  else if groupNumber >= numGroups || groupNumber < 0
-  then Nothing
-  else
-    Just $ groupSize + groupSizeAdjustment
-    where
-      (groupSize, remainder) = totalTokens `divMod` numGroups
-      groupSizeAdjustment =
-        if groupNumber < remainder
-        then 1
-        else 0
+tokenCountForGroup numGroups totalTokens groupNumber
+  | totalTokens < numGroups = Nothing
+  | groupNumber >= numGroups || groupNumber < 0 = Nothing
+  | otherwise = Just $ groupSize + groupSizeAdjustment
+  where
+    (groupSize, remainder) = totalTokens `divMod` numGroups
+    groupSizeAdjustment = if groupNumber < remainder then 1 else 0
 
 
 -- | Handler for redemption requests.  Use the database to try to redeem the
