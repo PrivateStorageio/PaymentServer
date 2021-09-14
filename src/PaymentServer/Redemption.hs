@@ -274,7 +274,7 @@ redeem (RedemptionConfig numGroups tokensPerVoucher issue) database (Redeem vouc
 
 
 metricName :: Text -> Text
-metricName name = mappend "redemption_" name
+metricName name = mappend "payment_redemption_" name
 
 
 signaturesIssued :: P.Counter

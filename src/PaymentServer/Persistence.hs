@@ -304,14 +304,14 @@ redeemVoucherHelper isVoucherPaid lookupFingerprint lookupVoucherCounter markVou
 
 
 metricName :: Text -> Text
-metricName name = mappend "redemption_" name
+metricName name = mappend "payment_redemption_" name
 
 
 voucherRedeemed :: P.Counter
 voucherRedeemed
   = P.unsafeRegister
   $ P.counter
-  $ P.Info (metricName "voucher_redeemed")
+  $ P.Info (metricName "vouchers_redeemed")
   "The number of unique (voucher, counter) pairs which have been redeemed."
 
 
