@@ -5,7 +5,8 @@
 -- | This module exposes a Servant-based Network.Wai server for payment
 -- interactions.
 module PaymentServer.Server
-  ( paymentServerApp
+  ( RedemptionConfig(RedemptionConfig)
+  , paymentServerApp
   , makeMetricsMiddleware
   ) where
 
@@ -40,7 +41,8 @@ import PaymentServer.Processors.Stripe
   , stripeServer
   )
 import PaymentServer.Redemption
-  ( RedemptionAPI
+  ( RedemptionConfig(RedemptionConfig)
+  , RedemptionAPI
   , redemptionServer
   )
 import PaymentServer.Metrics
@@ -61,10 +63,10 @@ type PaymentServerAPI
   :<|> MetricsAPI
 
 -- | Create a server which uses the given database.
-paymentServer :: VoucherDatabase d => StripeConfig -> Issuer -> d -> Server PaymentServerAPI
-paymentServer stripeConfig issuer database =
+paymentServer :: VoucherDatabase d => StripeConfig -> RedemptionConfig -> d -> Server PaymentServerAPI
+paymentServer stripeConfig redemptionConfig database =
   stripeServer stripeConfig database
-  :<|> redemptionServer issuer database
+  :<|> redemptionServer redemptionConfig database
   :<|> metricsServer
 
 paymentServerAPI :: Proxy PaymentServerAPI
@@ -76,12 +78,12 @@ paymentServerApp
   :: VoucherDatabase d
   => [Origin]              -- ^ A list of CORS Origins to accept.
   -> StripeConfig
-  -> Issuer
+  -> RedemptionConfig
   -> d
   -> Application
-paymentServerApp corsOrigins stripeConfig issuer =
+paymentServerApp corsOrigins stripeConfig redemptionConfig =
   let
-    app = serve paymentServerAPI . paymentServer stripeConfig issuer
+    app = serve paymentServerAPI . paymentServer stripeConfig redemptionConfig
     withCredentials = False
     corsResourcePolicy = simpleCorsResourcePolicy
                          { corsOrigins = Just (corsOrigins, withCredentials)

@@ -71,7 +71,8 @@ import PaymentServer.Issuer
   , ristrettoIssue
   )
 import PaymentServer.Server
-  ( paymentServerApp
+  ( RedemptionConfig(RedemptionConfig)
+  , paymentServerApp
   , makeMetricsMiddleware
   )
 
@@ -313,7 +314,8 @@ getApp config =
             stripeConfig' <- stripeConfig config
             let
               origins = corsOrigins config
-              app = paymentServerApp origins stripeConfig' issuer db
+              redemptionConfig = RedemptionConfig 16 50000 issuer
+              app = paymentServerApp origins stripeConfig' redemptionConfig db
             metricsMiddleware <- makeMetricsMiddleware
             logger <- mkRequestLogger (def { outputFormat = Detailed True})
             return . logger . metricsMiddleware $ app

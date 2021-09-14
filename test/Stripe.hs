@@ -64,7 +64,8 @@ import PaymentServer.Issuer
   )
 
 import PaymentServer.Server
-  ( paymentServerApp
+  ( RedemptionConfig(RedemptionConfig)
+  , paymentServerApp
   )
 
 import FakeStripe
@@ -108,7 +109,8 @@ corsTests =
       \stripeConfig -> do
         db <- memory
         let origins = ["example.invalid"]
-        let app = paymentServerApp origins stripeConfig trivialIssue db
+        let redemptionConfig = RedemptionConfig 16 1024 trivialIssue
+        let app = paymentServerApp origins stripeConfig redemptionConfig db
 
         let path = "/v1/stripe/charge"
         let theRequest = setPath defaultRequest

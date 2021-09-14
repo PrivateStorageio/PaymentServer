@@ -72,10 +72,12 @@ test-suite PaymentServer-tests
   hs-source-dirs:      test
   main-is:             Spec.hs
   other-modules:       Persistence
+                     , Redemption
                      , Metrics
                      , Stripe
                      , FakeStripe
-  build-depends:       base
+  build-depends:       aeson
+                     , base
                      , bytestring
                      , text
                      , transformers
