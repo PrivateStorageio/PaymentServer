@@ -22,6 +22,8 @@ jobs:
       # build.
       - image: "nixorg/nix:circleci"
 
+    resource_class: "xlarge"
+
     environment:
       # Specify a revision of NixOS/nixpkgs to run against.  This essentially
       # pins the majority of the software involved in the build.  This
