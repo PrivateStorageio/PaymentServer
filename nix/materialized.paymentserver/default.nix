@@ -9,6 +9,12 @@
         servant-prometheus = ./.stack-to-nix.cache.0;
         };
       };
-  resolver = "lts-14.1";
-  modules = [ ({ lib, ... }: { packages = {}; }) { packages = {}; } ];
+  resolver = "lts-14.2";
+  modules = [
+    ({ lib, ... }:
+      { packages = {}; })
+    { packages = {}; }
+    ({ lib, ... }:
+      { planned = lib.mkOverride 900 true; })
+    ];
   }
