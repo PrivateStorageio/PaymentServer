@@ -93,6 +93,16 @@
           hsSourceDirs = [ "generate-key" ];
           mainPath = [ "Main.hs" ];
           };
+        "PaymentServer-get-public-key" = {
+          depends = [
+            (hsPkgs."base" or (errorHandler.buildDepError "base"))
+            (hsPkgs."text" or (errorHandler.buildDepError "text"))
+            (hsPkgs."PaymentServer" or (errorHandler.buildDepError "PaymentServer"))
+            ];
+          buildable = true;
+          hsSourceDirs = [ "get-public-key" ];
+          mainPath = [ "Main.hs" ];
+          };
         };
       tests = {
         "PaymentServer-tests" = {
