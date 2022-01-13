@@ -11,6 +11,18 @@
         "url": "https://github.com/input-output-hk/haskell.nix/archive/f624ca56629d5be438c7d44a721b0c1d944eda23.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
+    "libchallenge_bypass_ristretto_ffi": {
+        "branch": "master",
+        "description": "Python bindings for Brave's challenge-bypass-ristretto library",
+        "homepage": null,
+        "owner": "leastauthority",
+        "repo": "python-challenge-bypass-ristretto",
+        "rev": "v2021.07.12",
+        "sha256": "16af1qmx7srhvcc936x7hl2bz50hafm39311dbzqam9ms1i5q89j",
+        "type": "tarball",
+        "url": "https://github.com/leastauthority/python-challenge-bypass-ristretto/archive/v2021.07.12.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
     "niv": {
         "branch": "master",
         "description": "Easy dependency management for Nix projects",
