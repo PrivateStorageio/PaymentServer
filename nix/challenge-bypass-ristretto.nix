@@ -2,8 +2,7 @@
 let
   sources = import ./sources.nix;
 in
-{ fetchFromGitHub
-, callPackage
+{ callPackage
 , libchallenge_bypass_ristretto_ffi_repo ? sources.libchallenge_bypass_ristretto_ffi
 }:
-  import "${libchallenge_bypass_ristretto_ffi_repo}/challenge-bypass-ristretto.nix" { }
+  callPackage "${libchallenge_bypass_ristretto_ffi_repo}/challenge-bypass-ristretto.nix" { }
