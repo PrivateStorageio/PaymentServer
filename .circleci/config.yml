@@ -24,46 +24,16 @@ jobs:
 
     resource_class: "xlarge"
 
-    environment:
-      # Specify a revision of NixOS/nixpkgs to run against.  This essentially
-      # pins the majority of the software involved in the build.  This
-      # revision is selected arbitrarily.  It's somewhat current as of the
-      # time of this comment.  We can bump it to a newer version when that
-      # makes sense.  Meanwhile, the platform won't shift around beneath us
-      # unexpectedly.
-      NIXPKGS_REV: "92609f3d9bc3acffbdbe54fa1c591a885612aa73"
-
     steps:
       - run:
           name: "Setup Environment Variables"
           command: |
-            # Get NIX_PATH set for the rest of the job so that the revision of
-            # nixpkgs we selected will be used everywhere Nix pulls in software.
-            # There is no way to set an environment variable containing the
-            # value of another environment variable on CircleCI except to use
-            # the `BASH_ENV` feature as we do here.
-            echo "export NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/$NIXPKGS_REV.tar.gz" >> $BASH_ENV
             # Set XDG_CONFIG_DIRS to point at the source directory, so that nix
             # will pickup nix/nix.conf as a configuration file from there.
             echo "export XDG_CONFIG_DIRS=$CIRCLE_WORKING_DIRECTORY" >> $BASH_ENV
 
       # Get *our* source code.
       - "checkout"
-
-      - "run":
-          # CircleCI won't let us interpolate NIXPKGS_REV into a cache key.
-          # Only CircleCI's own environment variables or variables set via the
-          # web interface in a "context" can be interpolated into cache keys.
-          # However, we can interpolate the checksum of a file...  Since we
-          # don't care about the exact revision, we just care that a new
-          # revision gives us a new string, we can write the revision to a
-          # file and then put the checksum of that file into the cache key.
-          # This way, we don't have to maintain the nixpkgs revision in two
-          # places and risk having them desynchronize.
-          name: "Prepare For Cache Key"
-          command: |
-            echo "${NIXPKGS_REV}" > nixpkgs.rev
-
       - restore_cache:
           # Get all of Nix's state relating to the particular revision of
           # nixpkgs we're using.  It will always be the same.  CircleCI
@@ -87,9 +57,8 @@ jobs:
             # If nixpkgs changes then potentially a lot of cached packages for
             # the base system will be invalidated so we may as well drop them
             # and make a new cache with the new packages.
-            - paymentserver-nix-store-v5-{{ checksum "nixpkgs.rev" }}-{{ checksum "nix/challenge-bypass-ristretto-repo.nix" }}
-            - paymentserver-nix-store-v5-{{ checksum "nixpkgs.rev" }}-
-            - paymentserver-nix-store-v5-
+            - paymentserver-nix-store-v6-{{ checksum "nix/sources.json" }}
+            - paymentserver-nix-store-v6-
 
       - run:
           name: "Building with Nix"
@@ -114,7 +83,7 @@ jobs:
 
       - save_cache:
           name: "Cache Nix Store Paths"
-          key: paymentserver-nix-store-v5-{{ checksum "nixpkgs.rev" }}-{{ checksum "nix/challenge-bypass-ristretto-repo.nix" }}
+          key: paymentserver-nix-store-v6-{{ checksum "niv/sources.json" }}
           paths:
             - "/nix"
 
