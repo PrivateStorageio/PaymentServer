@@ -6,4 +6,4 @@ in
 , callPackage
 , libchallenge_bypass_ristretto_ffi_repo ? sources.libchallenge_bypass_ristretto_ffi
 }:
-  import "${libchallenge_bypass_ristretto_ffi_repo}/default-challenge-bypass-ristretto-ffi.nix" { }
+  import "${libchallenge_bypass_ristretto_ffi_repo}/challenge-bypass-ristretto.nix" { }

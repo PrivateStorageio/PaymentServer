@@ -12,15 +12,15 @@
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "libchallenge_bypass_ristretto_ffi": {
-        "branch": "master",
+        "branch": "lib-dir-is-lib-dir",
         "description": "Python bindings for Brave's challenge-bypass-ristretto library",
         "homepage": null,
         "owner": "leastauthority",
         "repo": "python-challenge-bypass-ristretto",
-        "rev": "v2021.07.12",
-        "sha256": "16af1qmx7srhvcc936x7hl2bz50hafm39311dbzqam9ms1i5q89j",
+        "rev": "7c99b67e8731486f1aa0193ac1325f77e7d6338d",
+        "sha256": "0w5vpq9kqhdbbynbbky1ibx1im5582yacqnb9y2y3h114diywdyq",
         "type": "tarball",
-        "url": "https://github.com/leastauthority/python-challenge-bypass-ristretto/archive/v2021.07.12.tar.gz",
+        "url": "https://github.com/leastauthority/python-challenge-bypass-ristretto/archive/7c99b67e8731486f1aa0193ac1325f77e7d6338d.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "niv": {
