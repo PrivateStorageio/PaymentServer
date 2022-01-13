@@ -83,7 +83,7 @@ jobs:
 
       - save_cache:
           name: "Cache Nix Store Paths"
-          key: paymentserver-nix-store-v6-{{ checksum "niv/sources.json" }}
+          key: paymentserver-nix-store-v6-{{ checksum "nix/sources.json" }}
           paths:
             - "/nix"
 
