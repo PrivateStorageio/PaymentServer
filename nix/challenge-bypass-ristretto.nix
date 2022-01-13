@@ -1,6 +1,9 @@
 # Provide the ffi bindings to the Rust challenge-bypass-ristretto library.
-{ fetchFromGitHub, callPackage }:
 let
-  src = import ./challenge-bypass-ristretto-repo.nix;
+  sources = import ./sources.nix;
 in
-  import "${src}/default-challenge-bypass-ristretto-ffi.nix" { }
+{ fetchFromGitHub
+, callPackage
+, libchallenge_bypass_ristretto_ffi_repo ? sources.libchallenge_bypass_ristretto_ffi
+}:
+  import "${libchallenge_bypass_ristretto_ffi_repo}/default-challenge-bypass-ristretto-ffi.nix" { }
