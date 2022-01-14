@@ -71,8 +71,8 @@ jobs:
             nix-build \
               -vvvv \
               --debug \
-              "${EXTRA_SUBSTITUTERS}" \
-              "${EXTRA_TRUSTED_PUBLIC_KEYS}" \
+              ${EXTRA_SUBSTITUTERS} \
+              ${EXTRA_TRUSTED_PUBLIC_KEYS} \
               -j 4 \
               ./nix/ \
               -A PaymentServer.components.exes."PaymentServer-exe"
@@ -81,8 +81,8 @@ jobs:
           name: "Building Tests"
           command: |
             nix-build \
-              "${EXTRA_SUBSTITUTERS}" \
-              "${EXTRA_TRUSTED_PUBLIC_KEYS}" \
+              ${EXTRA_SUBSTITUTERS} \
+              ${EXTRA_TRUSTED_PUBLIC_KEYS} \
               -j 4 \
               ./nix/ \
               -A PaymentServer.components.tests."PaymentServer-tests"
