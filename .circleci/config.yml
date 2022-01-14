@@ -17,9 +17,8 @@ version: 2.1
 jobs:
   build:
     docker:
-      # Run in a highly Nix-capable environment.  This lets us use Stack's nix
-      # integration and other useful Nix features to specify and run the
-      # build.
+      # Run in a highly Nix-capable environment.  This lets build with Nix
+      # directly.
       - image: "nixos/nix:2.3.16"
 
     resource_class: "xlarge"
