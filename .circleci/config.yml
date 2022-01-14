@@ -25,7 +25,14 @@ jobs:
     resource_class: "xlarge"
 
     environment:
-      XDG_CONFIG_DIRS: "/root/project"
+      NIX_CONFIG: |
+        # Add privatestorage's and haskell.nix[1] nix caches for builds.  [1]
+        # https://input-output-hk.github.io/haskell.nix/tutorials/getting-started/#setting-up-the-binary-cache
+        extra-substituters = http://saxtons.private.storage/ https://hydra.iohk.io/
+        # We needed to explictly specify the key for cache.nixos.org until we
+        # are using a version of nix that has
+        # https://github.com/NixOS/nix/commit/ff4dea63c9403880500f82ce273713ecf793d2d9
+        extra-trusted-public-keys = saxtons.private.storage:MplOcEH8G/6mRlhlKkbA8GdeFR3dhCFsSszrspE/ZwY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
 
     steps:
       # Get *our* source code.
@@ -59,9 +66,6 @@ jobs:
       - run:
           name: "Building with Nix"
           command: |
-            echo "BASH_ENV: $BASH_ENV"
-            cat $BASH_ENV
-            echo
             echo "XDG_CONFIG_DIRS: $XDG_CONFIG_DIRS"
             nix-build \
               -vvvv \
