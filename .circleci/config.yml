@@ -20,7 +20,7 @@ jobs:
       # Run in a highly Nix-capable environment.  This lets us use Stack's nix
       # integration and other useful Nix features to specify and run the
       # build.
-      - image: "nixorg/nix:circleci"
+      - image: "nixos/nix:2.3.16"
 
     resource_class: "xlarge"
 
