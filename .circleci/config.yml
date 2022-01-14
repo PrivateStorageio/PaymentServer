@@ -64,6 +64,8 @@ jobs:
           name: "Building with Nix"
           command: |
             nix-build \
+              -vvvv \
+              --debug \
               -j 4 \
               ./nix/ \
               -A PaymentServer.components.exes."PaymentServer-exe"
