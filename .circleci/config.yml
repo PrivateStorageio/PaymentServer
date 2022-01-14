@@ -66,6 +66,7 @@ jobs:
       - run:
           name: "Building with Nix"
           command: |
+            env
             echo "XDG_CONFIG_DIRS: $XDG_CONFIG_DIRS"
             nix-build \
               -vvvv \
