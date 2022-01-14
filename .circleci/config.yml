@@ -69,8 +69,6 @@ jobs:
             env
             echo "XDG_CONFIG_DIRS: $XDG_CONFIG_DIRS"
             nix-build \
-              -vvvv \
-              --debug \
               --option extra-substituters "${EXTRA_SUBSTITUTERS}" \
               --option trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
               -j 4 \
