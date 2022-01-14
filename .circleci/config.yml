@@ -32,7 +32,7 @@ jobs:
       # We needed to explictly specify the key for cache.nixos.org until we
       # are using a version of nix that has
       # https://github.com/NixOS/nix/commit/ff4dea63c9403880500f82ce273713ecf793d2d9
-      EXTRA_TRUSTED_PUBLIC_KEYS: "saxtons.private.storage:MplOcEH8G/6mRlhlKkbA8GdeFR3dhCFsSszrspE/ZwY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ="
+      TRUSTED_PUBLIC_KEYS: "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= saxtons.private.storage:MplOcEH8G/6mRlhlKkbA8GdeFR3dhCFsSszrspE/ZwY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ="
 
     steps:
       # Get *our* source code.
@@ -72,7 +72,7 @@ jobs:
               -vvvv \
               --debug \
               --option extra-substituters "${EXTRA_SUBSTITUTERS}" \
-              --option extra-trusted-public-keys "${EXTRA_TRUSTED_PUBLIC_KEYS}" \
+              --option trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
               -j 4 \
               ./nix/ \
               -A PaymentServer.components.exes."PaymentServer-exe"
@@ -82,7 +82,7 @@ jobs:
           command: |
             nix-build \
               --option extra-substituters "${EXTRA_SUBSTITUTERS}" \
-              --option extra-trusted-public-keys "${EXTRA_TRUSTED_PUBLIC_KEYS}" \
+              --option trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
               -j 4 \
               ./nix/ \
               -A PaymentServer.components.tests."PaymentServer-tests"
