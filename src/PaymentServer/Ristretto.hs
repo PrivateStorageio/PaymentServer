@@ -4,6 +4,7 @@
 module PaymentServer.Ristretto
   ( Issuance(Issuance)
   , randomSigningKey
+  , getPublicKey
   , ristretto
   ) where
 
@@ -159,3 +160,14 @@ randomSigningKey = do
   result <- peekCString cString
   free cString
   return $ pack result
+
+-- | getPublicKey returns the base64 encoded public key corresponding to the
+-- base64 encoded signing key passed to it.
+getPublicKey :: Text -> IO Text
+getPublicKey enc_skey = do
+  enc_cstr_skey <- newCString . unpack $ enc_skey
+  skey <- signing_key_decode_base64 $ enc_cstr_skey
+  pkey <- signing_key_get_public_key skey
+  enc_cstr_pkey <- public_key_encode_base64 pkey
+  enc_pkey <- peekCString enc_cstr_pkey
+  return $ pack enc_pkey
