@@ -30,6 +30,7 @@ jobs:
           command: |
             # Set XDG_CONFIG_DIRS to point at the source directory, so that nix
             # will pickup nix/nix.conf as a configuration file from there.
+            set -x
             echo "export XDG_CONFIG_DIRS=$CIRCLE_WORKING_DIRECTORY" >> $BASH_ENV
 
       # Get *our* source code.
@@ -63,6 +64,9 @@ jobs:
       - run:
           name: "Building with Nix"
           command: |
+            echo "BASH_ENV: $BASH_ENV"
+            cat $BASH_ENV
+            echo
             echo "XDG_CONFIG_DIRS: $XDG_CONFIG_DIRS"
             nix-build \
               -vvvv \
