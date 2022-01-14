@@ -24,15 +24,10 @@ jobs:
 
     resource_class: "xlarge"
 
-    steps:
-      - run:
-          name: "Setup Environment Variables"
-          command: |
-            # Set XDG_CONFIG_DIRS to point at the source directory, so that nix
-            # will pickup nix/nix.conf as a configuration file from there.
-            echo "Shell: $0"
-            echo "export XDG_CONFIG_DIRS=$CIRCLE_WORKING_DIRECTORY" >> $BASH_ENV
+    environment:
+      XDG_CONFIG_DIRS: "/root/project"
 
+    steps:
       # Get *our* source code.
       - "checkout"
       - restore_cache:
