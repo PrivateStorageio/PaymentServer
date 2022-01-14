@@ -26,12 +26,27 @@ jobs:
     environment:
       # Add privatestorage's and haskell.nix[1] nix caches for builds.  [1]
       # https://input-output-hk.github.io/haskell.nix/tutorials/getting-started/#setting-up-the-binary-cache
-      EXTRA_SUBSTITUTERS: "https://hydra.iohk.io/"
+      #
+      # - iohk gives us lots of excellent cached Haskell-related objects
+      # - saxtons gives us a lot of other nice stuff such as Rust crates and any
+      #   more Haskell libraries we might need
+      #
+      # Note the use of `>-` - YAML "folded-style chomping-strip block string"
+      # style to keep the list orderly in the source file yet represent a
+      # single line string with no trailing newline.
+      # https://stackoverflow.com/questions/3790454/how-do-i-break-a-string-in-yaml-over-multiple-lines/21699210
+      # is an excellent resource on yaml strings.
+      EXTRA_SUBSTITUTERS: >-
+        https://hydra.iohk.io/
+        http://saxtons.private.storage/
 
       # We needed to explictly specify the key for cache.nixos.org until we
       # are using a version of nix that has
       # https://github.com/NixOS/nix/commit/ff4dea63c9403880500f82ce273713ecf793d2d9
-      TRUSTED_PUBLIC_KEYS: "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ="
+      TRUSTED_PUBLIC_KEYS: >-
+        cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+        hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
+        saxtons.private.storage:MplOcEH8G/6mRlhlKkbA8GdeFR3dhCFsSszrspE/ZwY=
 
     steps:
       # Get *our* source code.
