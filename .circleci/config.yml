@@ -27,12 +27,12 @@ jobs:
     environment:
       # Add privatestorage's and haskell.nix[1] nix caches for builds.  [1]
       # https://input-output-hk.github.io/haskell.nix/tutorials/getting-started/#setting-up-the-binary-cache
-      EXTRA_SUBSTITUTERS: "--extra-substituters='http://saxtons.private.storage/ https://hydra.iohk.io/'"
+      EXTRA_SUBSTITUTERS: "http://saxtons.private.storage/ https://hydra.iohk.io/"
 
       # We needed to explictly specify the key for cache.nixos.org until we
       # are using a version of nix that has
       # https://github.com/NixOS/nix/commit/ff4dea63c9403880500f82ce273713ecf793d2d9
-      EXTRA_TRUSTED_PUBLIC_KEYS: "--extra-trusted-public-keys='saxtons.private.storage:MplOcEH8G/6mRlhlKkbA8GdeFR3dhCFsSszrspE/ZwY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ='"
+      EXTRA_TRUSTED_PUBLIC_KEYS: "saxtons.private.storage:MplOcEH8G/6mRlhlKkbA8GdeFR3dhCFsSszrspE/ZwY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ="
 
     steps:
       # Get *our* source code.
@@ -71,8 +71,8 @@ jobs:
             nix-build \
               -vvvv \
               --debug \
-              ${EXTRA_SUBSTITUTERS} \
-              ${EXTRA_TRUSTED_PUBLIC_KEYS} \
+              --extra-substituters="${EXTRA_SUBSTITUTERS}" \
+              --extra-trusted-public-keys"${EXTRA_TRUSTED_PUBLIC_KEYS}" \
               -j 4 \
               ./nix/ \
               -A PaymentServer.components.exes."PaymentServer-exe"
@@ -81,8 +81,8 @@ jobs:
           name: "Building Tests"
           command: |
             nix-build \
-              ${EXTRA_SUBSTITUTERS} \
-              ${EXTRA_TRUSTED_PUBLIC_KEYS} \
+              --extra-substituters="${EXTRA_SUBSTITUTERS}" \
+              --extra-trusted-public-keys"${EXTRA_TRUSTED_PUBLIC_KEYS}" \
               -j 4 \
               ./nix/ \
               -A PaymentServer.components.tests."PaymentServer-tests"
