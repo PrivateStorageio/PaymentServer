@@ -6,6 +6,10 @@ module Stripe
   ( tests
   ) where
 
+import Prelude hiding
+  ( concat
+  )
+
 import Test.Tasty
   ( TestTree
   , testGroup
@@ -16,6 +20,16 @@ import Test.Tasty.HUnit
   )
 
 
+import Data.Text.Lazy.Encoding
+  ( encodeUtf8
+  )
+import Data.Text.Lazy
+  ( Text
+  , toStrict
+  , concat
+  )
+
+import qualified Data.ByteString.Lazy as LBS
 import Control.Monad.IO.Class
   ( liftIO
   )
@@ -31,6 +45,7 @@ import Servant.Server
 
 import Web.Stripe.Types
   ( Currency(USD, AED)
+  , ChargeId(ChargeId)
   )
 
 import Network.Wai.Test
@@ -49,7 +64,9 @@ import Network.Wai
   )
 
 import PaymentServer.Persistence
-  ( memory
+  ( Voucher
+  , memory
+  , payForVoucher
   )
 
 import PaymentServer.Processors.Stripe
@@ -97,6 +114,12 @@ corsTests =
 
   , testCase "a request with a valid charge in the body receives a CORS-enabled response" $
     assertCORSHeader chargeOkay "POST" applicationJSON validChargeBytes
+
+  , testCase "a request with an already-paid voucher receives a CORS-enabled response" $ do
+      let pay = return . Right . ChargeId $ "abc"
+      db <- memory
+      payForVoucher db (toStrict alreadyPaidVoucher') pay
+      assertCORSHeader' db chargeOkay "POST" applicationJSON (alreadyPaidVoucher alreadyPaidVoucher')
   ]
   where
     textPlain = [("content-type", "text/plain")]
@@ -104,10 +127,19 @@ corsTests =
     validChargeBytes = "{\"token\": \"abcdef\", \"voucher\": \"lmnopqrst\", \"amount\": \"650\", \"currency\": \"USD\"}"
     invalidChargeBytes = "[1, 2, 3]"
 
-    assertCORSHeader stripeResponse method headers body =
+    alreadyPaidVoucher' :: Text
+    alreadyPaidVoucher' = "hello world"
+
+    alreadyPaidVoucher :: Text -> LBS.ByteString
+    alreadyPaidVoucher voucher = encodeUtf8 $ concat ["{\"token\": \"abcdef\", \"voucher\": \"", voucher, "\", \"amount\": \"650\", \"currency\": \"USD\"}"]
+
+    assertCORSHeader stripeResponse method headers body = do
+      db <- memory
+      assertCORSHeader' db stripeResponse method headers body
+
+    assertCORSHeader' db stripeResponse method headers body =
       withFakeStripe (return stripeResponse) $
       \stripeConfig -> do
-        db <- memory
         let origins = ["example.invalid"]
         let redemptionConfig = RedemptionConfig 16 1024 trivialIssue
         let app = paymentServerApp origins stripeConfig redemptionConfig db

@@ -2,6 +2,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module PaymentServer.Processors.Stripe
   ( StripeAPI
@@ -12,6 +13,9 @@ module PaymentServer.Processors.Stripe
   , charge
   ) where
 
+import Control.Exception
+  ( catch
+  )
 import Control.Monad.IO.Class
   ( liftIO
   )
@@ -153,16 +157,25 @@ withSuccessFailureMetrics attemptCount successCount op = do
 -- and if the Charge is okay, then set the voucher as "paid" in the database.
 charge :: VoucherDatabase d => StripeConfig -> d -> Charges -> Handler Acknowledgement
 charge stripeConfig d (Charges token voucher 650 USD) = do
-  result <- liftIO ((payForVoucher d voucher (completeStripeCharge USD)) :: IO ProcessorResult)
+  result <- liftIO payForVoucher'
   case result of
     Left AlreadyPaid ->
       throwError voucherAlreadyPaid
+
     Left (PaymentFailed (StripeError { errorType = errorType, errorMsg = msg })) -> do
       liftIO $ print "Stripe createCharge failed:"
       liftIO $ print msg
       throwError . errorForStripeType $ errorType
+
     Right chargeId -> return Ok
+
     where
+      payForVoucher' :: IO ProcessorResult
+      payForVoucher' = do
+        payForVoucher d voucher (completeStripeCharge USD) `catch` (
+          \(e :: PaymentError) -> return $ Left e
+          )
+
       tokenId = TokenId token
       completeStripeCharge :: Currency -> IO ProcessorResult
       completeStripeCharge currency = do
