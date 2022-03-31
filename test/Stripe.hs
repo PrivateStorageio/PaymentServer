@@ -43,6 +43,10 @@ import Servant.Server
   , ServerError(ServerError)
   )
 
+import Data.Aeson
+  ( decode
+  )
+
 import Web.Stripe.Types
   ( Currency(USD, AED)
   , ChargeId(ChargeId)
@@ -72,6 +76,7 @@ import PaymentServer.Persistence
 import PaymentServer.Processors.Stripe
   ( Charges(Charges)
   , Acknowledgement(Ok)
+  , Failure(Failure)
   , charge
 
   )
@@ -163,15 +168,27 @@ chargeTests =
       let amount = 650
       let currency = AED
       db <- memory
-      (Left (ServerError code _ _ _)) <- runExceptT . runHandler' $ charge stripeConfig db (Charges token voucher amount currency)
+      (Left (ServerError code _ body _)) <- runExceptT . runHandler' $ charge stripeConfig db (Charges token voucher amount currency)
       assertEqual "The result is an error" 400 code
+      assertEqual "The JSON body includes the reason" (Just $ Failure "Unsupported currency") (decode body)
   , testCase "incorrect USD amount is rejected" $
     withFakeStripe (return chargeOkay) $ \stripeConfig -> do
       let amount = 649
       let currency = USD
       db <- memory
-      (Left (ServerError code _ _ _)) <- runExceptT . runHandler' $ charge stripeConfig db (Charges token voucher amount currency)
+      (Left (ServerError code _ body _)) <- runExceptT . runHandler' $ charge stripeConfig db (Charges token voucher amount currency)
       assertEqual "The result is an error" 400 code
+      assertEqual "The JSON body includes the reason" (Just $ Failure "Incorrect charge amount") (decode body)
+  , testCase "a Stripe charge failure is propagated" $
+    withFakeStripe (return chargeFailed) $ \stripeConfig -> do
+      let amount = 650
+      let currency = USD
+      db <- memory
+      (Left (ServerError code _ body _)) <- runExceptT . runHandler' $ charge stripeConfig db (Charges token voucher amount currency)
+      assertEqual "The result is an error" 400 code
+      -- The chargeFailed fixture is hard-coded for a card expired error.
+      assertEqual "The JSON body includes the reason"
+        (Just $ Failure "Stripe charge didn't succeed: Your card is expired.") (decode body)
   , testCase "currect USD amount is accepted" $
     withFakeStripe (return chargeOkay) $ \stripeConfig -> do
       let amount = 650

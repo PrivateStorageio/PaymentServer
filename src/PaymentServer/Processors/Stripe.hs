@@ -8,10 +8,15 @@ module PaymentServer.Processors.Stripe
   ( StripeAPI
   , Charges(Charges)
   , Acknowledgement(Ok)
+  , Failure(Failure)
   , stripeServer
   , getVoucher
   , charge
   ) where
+
+import Prelude hiding
+  ( concat
+  )
 
 import Control.Exception
   ( catch
@@ -25,6 +30,7 @@ import Control.Monad
 import Data.Text
   ( Text
   , unpack
+  , concat
   )
 import Text.Read
   ( readMaybe
@@ -160,12 +166,13 @@ charge stripeConfig d (Charges token voucher 650 USD) = do
   result <- liftIO payForVoucher'
   case result of
     Left AlreadyPaid ->
-      throwError voucherAlreadyPaid
+      throwError $ voucherAlreadyPaid Nothing
 
     Left (PaymentFailed (StripeError { errorType = errorType, errorMsg = msg })) -> do
       liftIO $ print "Stripe createCharge failed:"
       liftIO $ print msg
-      throwError . errorForStripeType $ errorType
+      let err = errorForStripe errorType (Just msg)
+      throwError err
 
     Right chargeId -> return Ok
 
@@ -192,22 +199,22 @@ charge stripeConfig d (Charges token voucher 650 USD) = do
             -&- MetaData [("Voucher", voucher)]
 
       -- "Invalid request errors arise when your request has invalid parameters."
-      errorForStripeType InvalidRequest    = internalServerError
+      errorForStripe InvalidRequest    = internalServerError
 
       -- "API errors cover any other type of problem (e.g., a temporary
       -- problem with Stripe's servers), and are extremely uncommon."
-      errorForStripeType APIError          = serviceUnavailable
+      errorForStripe APIError          = serviceUnavailable
 
       -- "Failure to connect to Stripe's API."
-      errorForStripeType ConnectionFailure = serviceUnavailable
+      errorForStripe ConnectionFailure = serviceUnavailable
 
       -- "Card errors are the most common type of error you should expect to
       -- handle. They result when the user enters a card that can't be charged
       -- for some reason."
-      errorForStripeType CardError         = stripeChargeFailed
+      errorForStripe CardError         = stripeChargeFailed
 
       -- Something else we don't know about...
-      errorForStripeType _                 = internalServerError
+      errorForStripe _                 = internalServerError
 
       serviceUnavailable  = jsonErr 503 "Service temporarily unavailable"
       internalServerError = jsonErr 500 "Internal server error"
@@ -216,24 +223,33 @@ charge stripeConfig d (Charges token voucher 650 USD) = do
       voucherAlreadyPaid  = jsonErr 400 "Payment for voucher already supplied"
 
 -- The wrong currency
-charge _ _ (Charges _ _ 650 _) = throwError (jsonErr 400 "Unsupported currency")
+charge _ _ (Charges _ _ 650 _) = throwError (jsonErr 400 "Unsupported currency" Nothing)
 -- The wrong amount
-charge _ _ (Charges _ _ _ USD) = throwError (jsonErr 400 "Incorrect charge amount")
+charge _ _ (Charges _ _ _ USD) = throwError (jsonErr 400 "Incorrect charge amount" Nothing)
 
-jsonErr :: Int -> Text -> ServerError
-jsonErr httpCode reason = ServerError
+jsonErr :: Int -> Text -> Maybe Text -> ServerError
+jsonErr httpCode reason detail = ServerError
   { errHTTPCode = httpCode
   , errReasonPhrase = ""
-  , errBody = encode $ Failure reason
+  , errBody = encode failure
   , errHeaders = [("content-type", "application/json")]
   }
+  where
+    failure = Failure message
+    message = case detail of
+      Nothing -> reason
+      Just detail' -> concat [ reason, ": ", detail' ]
 
 data Failure = Failure Text
   deriving (Show, Eq)
-
 
 instance ToJSON Failure where
   toJSON (Failure reason) = object
     [ "success" .= False
     , "reason" .= reason
     ]
+
+instance FromJSON Failure where
+  parseJSON (Object v) = Failure <$>
+                         v .: "reason"
+  parseJSON _ = mzero
