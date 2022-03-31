@@ -6,6 +6,8 @@ module FakeStripe
   , withFakeStripe
   , chargeOkay
   , chargeFailed
+  , cardError
+  , apiError
   ) where
 
 import Text.RawString.QQ
@@ -48,13 +50,24 @@ import Web.Stripe.Types
   ( ChargeId(ChargeId)
   )
 
-anError :: ByteString
-anError = [r|
+cardError :: ByteString
+cardError = [r|
 {
   "error": {
     "type": "card_error",
     "code": "expired_card",
     "message": "Your card is expired."
+  }
+}
+|]
+
+apiError :: ByteString
+apiError = [r|
+{
+  "error": {
+    "type": "api_error",
+    "code": "api_key_expired",
+    "message": "The API key provided has expired."
   }
 }
 |]
@@ -163,9 +176,9 @@ chargeOkay :: Application
 chargeOkay req respond =
   respond . responseLBS status200 [] $ aCharge
 
-chargeFailed :: Application
-chargeFailed req respond =
-  respond . responseLBS status400 [] $ anError
+chargeFailed :: ByteString -> Application
+chargeFailed stripeResponse req respond =
+  respond . responseLBS status400 [] $ stripeResponse
 
 -- Pass a Stripe-flavored configuration for a running Wai application to a
 -- function and evaluate the resulting IO action.

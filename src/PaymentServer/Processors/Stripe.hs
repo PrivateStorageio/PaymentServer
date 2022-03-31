@@ -35,6 +35,18 @@ import Data.Text
 import Text.Read
   ( readMaybe
   )
+
+import Network.HTTP.Types
+  ( Status(Status)
+  , status400
+  , status500
+  , status503
+  )
+
+import Data.ByteString.UTF8
+  ( toString
+  )
+
 import Data.Aeson
   ( ToJSON(toJSON)
   , FromJSON(parseJSON)
@@ -166,12 +178,12 @@ charge stripeConfig d (Charges token voucher 650 USD) = do
   result <- liftIO payForVoucher'
   case result of
     Left AlreadyPaid ->
-      throwError $ voucherAlreadyPaid Nothing
+      throwError $ voucherAlreadyPaid "Payment for voucher already supplied"
 
     Left (PaymentFailed (StripeError { errorType = errorType, errorMsg = msg })) -> do
       liftIO $ print "Stripe createCharge failed:"
       liftIO $ print msg
-      let err = errorForStripe errorType (Just msg)
+      let err = errorForStripe errorType ( concat [ "Stripe charge didn't succeed: ", msg ])
       throwError err
 
     Right chargeId -> return Ok
@@ -216,29 +228,23 @@ charge stripeConfig d (Charges token voucher 650 USD) = do
       -- Something else we don't know about...
       errorForStripe _                 = internalServerError
 
-      serviceUnavailable  = jsonErr 503 "Service temporarily unavailable"
-      internalServerError = jsonErr 500 "Internal server error"
-      voucherCodeNotFound = jsonErr 400 "Voucher code not found"
-      stripeChargeFailed  = jsonErr 400 "Stripe charge didn't succeed"
-      voucherAlreadyPaid  = jsonErr 400 "Payment for voucher already supplied"
+      serviceUnavailable  = jsonErr status503
+      internalServerError = jsonErr status500
+      stripeChargeFailed  = jsonErr status400
+      voucherAlreadyPaid  = jsonErr status400
 
 -- The wrong currency
-charge _ _ (Charges _ _ 650 _) = throwError (jsonErr 400 "Unsupported currency" Nothing)
+charge _ _ (Charges _ _ 650 _) = throwError (jsonErr status400 "Unsupported currency")
 -- The wrong amount
-charge _ _ (Charges _ _ _ USD) = throwError (jsonErr 400 "Incorrect charge amount" Nothing)
+charge _ _ (Charges _ _ _ USD) = throwError (jsonErr status400 "Incorrect charge amount")
 
-jsonErr :: Int -> Text -> Maybe Text -> ServerError
-jsonErr httpCode reason detail = ServerError
-  { errHTTPCode = httpCode
-  , errReasonPhrase = ""
-  , errBody = encode failure
+jsonErr :: Status -> Text -> ServerError
+jsonErr (Status statusCode statusMessage) detail = ServerError
+  { errHTTPCode = statusCode
+  , errReasonPhrase = toString statusMessage
+  , errBody = encode $ Failure detail
   , errHeaders = [("content-type", "application/json")]
   }
-  where
-    failure = Failure message
-    message = case detail of
-      Nothing -> reason
-      Just detail' -> concat [ reason, ": ", detail' ]
 
 data Failure = Failure Text
   deriving (Show, Eq)
