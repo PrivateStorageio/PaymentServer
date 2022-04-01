@@ -43,6 +43,10 @@ import Servant.Server
   , ServerError(ServerError)
   )
 
+import Data.Aeson
+  ( decode
+  )
+
 import Web.Stripe.Types
   ( Currency(USD, AED)
   , ChargeId(ChargeId)
@@ -72,6 +76,7 @@ import PaymentServer.Persistence
 import PaymentServer.Processors.Stripe
   ( Charges(Charges)
   , Acknowledgement(Ok)
+  , Failure(Failure)
   , charge
 
   )
@@ -89,6 +94,8 @@ import FakeStripe
   ( withFakeStripe
   , chargeOkay
   , chargeFailed
+  , cardError
+  , apiError
   )
 
 tests :: TestTree
@@ -110,7 +117,7 @@ corsTests =
     assertCORSHeader chargeOkay "GET" applicationJSON validChargeBytes
 
   , testCase "a request associated with an error from Stripe receives a CORS-enabled response" $
-    assertCORSHeader chargeFailed "POST" applicationJSON validChargeBytes
+    assertCORSHeader (chargeFailed cardError) "POST" applicationJSON validChargeBytes
 
   , testCase "a request with a valid charge in the body receives a CORS-enabled response" $
     assertCORSHeader chargeOkay "POST" applicationJSON validChargeBytes
@@ -163,15 +170,43 @@ chargeTests =
       let amount = 650
       let currency = AED
       db <- memory
-      (Left (ServerError code _ _ _)) <- runExceptT . runHandler' $ charge stripeConfig db (Charges token voucher amount currency)
+      (Left (ServerError code phrase body _)) <- runExceptT . runHandler' $ charge stripeConfig db (Charges token voucher amount currency)
       assertEqual "The result is an error" 400 code
+      assertEqual "The HTTP phrase matches the code" "Bad Request" phrase
+      assertEqual "The JSON body includes the reason" (Just $ Failure "Unsupported currency") (decode body)
+
   , testCase "incorrect USD amount is rejected" $
     withFakeStripe (return chargeOkay) $ \stripeConfig -> do
       let amount = 649
       let currency = USD
       db <- memory
-      (Left (ServerError code _ _ _)) <- runExceptT . runHandler' $ charge stripeConfig db (Charges token voucher amount currency)
+      (Left (ServerError code phrase body _)) <- runExceptT . runHandler' $ charge stripeConfig db (Charges token voucher amount currency)
       assertEqual "The result is an error" 400 code
+      assertEqual "The HTTP phrase matches the code" "Bad Request" phrase
+      assertEqual "The JSON body includes the reason" (Just $ Failure "Incorrect charge amount") (decode body)
+
+  , testCase "a Stripe charge failure is propagated" $
+    withFakeStripe (return (chargeFailed cardError)) $ \stripeConfig -> do
+      let amount = 650
+      let currency = USD
+      db <- memory
+      (Left (ServerError code phrase body _)) <- runExceptT . runHandler' $ charge stripeConfig db (Charges token voucher amount currency)
+      assertEqual "The result is an error" 400 code
+      assertEqual "The HTTP phrase matches the code" "Bad Request" phrase
+      -- The `cardError` is for a card expired error.
+      assertEqual "The JSON body includes the reason"
+        (Just $ Failure "Stripe charge didn't succeed: Your card is expired.") (decode body)
+
+  , testCase "the HTTP error code is derived from the specific failure" $
+    withFakeStripe (return (chargeFailed apiError)) $ \stripeConfig -> do
+      let amount = 650
+      let currency = USD
+      db <- memory
+      (Left (ServerError code phrase body _)) <- runExceptT . runHandler' $ charge stripeConfig db (Charges token voucher amount currency)
+      -- The `apiError` is for a Stripe API error.
+      assertEqual "The result is an error" 503 code
+      assertEqual "The HTTP phrase matches the code" "Service Unavailable" phrase
+
   , testCase "currect USD amount is accepted" $
     withFakeStripe (return chargeOkay) $ \stripeConfig -> do
       let amount = 650
