@@ -1,5 +1,6 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE EmptyDataDecls #-}
+{-# LANGUAGE RankNTypes #-}
 
 module PaymentServer.Ristretto
   ( Issuance(Issuance)
@@ -8,6 +9,9 @@ module PaymentServer.Ristretto
   , ristretto
   ) where
 
+import Control.Monad
+  ( liftM
+  )
 import Control.Exception
   ( bracket
   )
@@ -85,6 +89,14 @@ data RistrettoFailure
   | PublicKeyEncoding
   deriving (Show, Eq)
 
+type FFIResult b = forall a. IO (Either a b)
+
+nullable :: (Monad m) => c -> (a -> m (Ptr b)) -> a -> m (Either c (Ptr b))
+nullable c f a =
+  f a >>= \r -> return $ case r of
+                           nullPtr -> Left c
+                           ptr -> Right ptr
+
 ristretto
   :: Text                                  -- ^ The base64 encoded signing key.
   -> [Text]                                -- ^ A list of the base64 blinded tokens.
@@ -105,19 +117,11 @@ ristretto textSigningKey textTokens =
     stringTokens = map unpack textTokens
 
     extractKeyMaterial :: String -> IO (Either RistrettoFailure (Ptr C_SigningKey, Ptr C_PublicKey))
-    extractKeyMaterial stringSigningKey = do
-      cStringSigningKey <- newCString stringSigningKey
-      if cStringSigningKey == nullPtr
-        then return $ Left SigningKeyAllocation
-        else do
-          signingKey <- signing_key_decode_base64 cStringSigningKey
-          if signingKey == nullPtr
-            then return $ Left SigningKeyDecoding
-            else do
-              publicKey <- signing_key_get_public_key signingKey
-              if publicKey == nullPtr
-                then return $ Left PublicKeyLookup
-                else return $ Right (signingKey, publicKey)
+    extractKeyMaterial stringSigningKey =
+      nullable SigningKeyAllocation newCString stringSigningKey >>= \cStringSigningKey ->
+      nullable SigningKeyDecoding signing_key_decode_base64 cStringSigningKey >>= \signingKey ->
+      nullable PublicKeyLookup signing_key_get_public_key signingKey >>= \publicKey ->
+      return $ Right (signingKey, publicKey)
   in
     unsafePerformIO $ do
       keys <- extractKeyMaterial stringSigningKey
