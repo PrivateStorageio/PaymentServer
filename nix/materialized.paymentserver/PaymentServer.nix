@@ -93,6 +93,17 @@
           hsSourceDirs = [ "generate-key" ];
           mainPath = [ "Main.hs" ];
           };
+        "PaymentServer-pay-for-voucher" = {
+          depends = [
+            (hsPkgs."base" or (errorHandler.buildDepError "base"))
+            (hsPkgs."text" or (errorHandler.buildDepError "text"))
+            (hsPkgs."stripe-core" or (errorHandler.buildDepError "stripe-core"))
+            (hsPkgs."PaymentServer" or (errorHandler.buildDepError "PaymentServer"))
+            ];
+          buildable = true;
+          hsSourceDirs = [ "pay-for-voucher" ];
+          mainPath = [ "Main.hs" ];
+          };
         "PaymentServer-get-public-key" = {
           depends = [
             (hsPkgs."base" or (errorHandler.buildDepError "base"))
@@ -142,6 +153,4 @@
           };
         };
       };
-    } // rec {
-    src = (pkgs.lib).mkDefault ./.;
-    }
+    } // rec { src = (pkgs.lib).mkDefault ./.; }

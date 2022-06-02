@@ -67,6 +67,16 @@ executable PaymentServer-generate-key
                      , PaymentServer
   default-language:    Haskell2010
 
+executable PaymentServer-pay-for-voucher
+  hs-source-dirs:      pay-for-voucher
+  main-is:             Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wmissing-import-lists -Wunused-imports
+  build-depends:       base
+                     , text
+                     , stripe-core
+                     , PaymentServer
+  default-language:    Haskell2010
+
 executable PaymentServer-get-public-key
   hs-source-dirs:      get-public-key
   main-is:             Main.hs
