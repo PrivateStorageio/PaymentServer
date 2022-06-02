@@ -20,4 +20,5 @@ main :: IO ()
 main = do
   [db_path, voucher, chargeId] <- getArgs
   db <- sqlite $ pack db_path
-  payForVoucher db (pack voucher) (return (ChargeId (pack chargeId)))
+  payForVoucher db (pack voucher) (return . Right . ChargeId . pack $ chargeId)
+  return ()
