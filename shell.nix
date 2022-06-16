@@ -8,10 +8,9 @@ in
     # *all* dependencies are provided by Nix.
     exactDeps = true;
 
-    withHoogle = true;
+    withHoogle = false;
 
     buildInputs = [
       pkgs.stack
-      pkgs.ormolu
     ];
   }

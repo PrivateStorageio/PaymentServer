@@ -1,6 +1,5 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE EmptyDataDecls #-}
-{-# LANGUAGE RankNTypes #-}
 
 module PaymentServer.Ristretto
   ( Issuance(Issuance)
@@ -9,9 +8,6 @@ module PaymentServer.Ristretto
   , ristretto
   ) where
 
-import Control.Monad
-  ( liftM
-  )
 import Control.Exception
   ( bracket
   )
