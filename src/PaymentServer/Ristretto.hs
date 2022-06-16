@@ -15,6 +15,13 @@ import Control.Monad
 import Control.Exception
   ( bracket
   )
+import Control.Monad.Except
+  ( ExceptT
+  , throwError
+  , runExceptT
+  , liftIO
+  )
+
 import System.IO.Unsafe
   ( unsafePerformIO
   )
@@ -89,13 +96,19 @@ data RistrettoFailure
   | PublicKeyEncoding
   deriving (Show, Eq)
 
-type FFIResult b = forall a. IO (Either a b)
+nullIsError :: b -> IO (Ptr a) -> ExceptT b IO (Ptr a)
+nullIsError fallback op =
+  liftIO op >>= \r ->
+                  case r of
+                    nullPtr -> throwError fallback
+                    ptr -> return ptr
 
-nullable :: (Monad m) => c -> (a -> m (Ptr b)) -> a -> m (Either c (Ptr b))
-nullable c f a =
-  f a >>= \r -> return $ case r of
-                           nullPtr -> Left c
-                           ptr -> Right ptr
+anyNullIsError :: b -> IO [Ptr a] -> ExceptT b IO [Ptr a]
+anyNullIsError fallback op =
+  liftIO op >>= \r ->
+                  if nullPtr `elem` r
+                  then throwError fallback
+                  else return r
 
 ristretto
   :: Text                                  -- ^ The base64 encoded signing key.
@@ -116,42 +129,24 @@ ristretto textSigningKey textTokens =
     stringSigningKey = unpack textSigningKey
     stringTokens = map unpack textTokens
 
-    extractKeyMaterial :: String -> IO (Either RistrettoFailure (Ptr C_SigningKey, Ptr C_PublicKey))
-    extractKeyMaterial stringSigningKey =
-      nullable SigningKeyAllocation newCString stringSigningKey >>= \cStringSigningKey ->
-      nullable SigningKeyDecoding signing_key_decode_base64 cStringSigningKey >>= \signingKey ->
-      nullable PublicKeyLookup signing_key_get_public_key signingKey >>= \publicKey ->
-      return $ Right (signingKey, publicKey)
+    extractKeyMaterial :: String -> ExceptT RistrettoFailure IO (Ptr C_SigningKey, Ptr C_PublicKey)
+    extractKeyMaterial stringSigningKey = do
+      cStringSigningKey <- nullIsError SigningKeyAllocation $ newCString stringSigningKey
+      signingKey <- nullIsError SigningKeyDecoding $ signing_key_decode_base64 cStringSigningKey
+      publicKey <- nullIsError PublicKeyLookup $ signing_key_get_public_key signingKey
+      return (signingKey, publicKey)
   in
-    unsafePerformIO $ do
-      keys <- extractKeyMaterial stringSigningKey
-      case keys of
-        Left err -> return $ Left err
-        Right (signingKey, publicKey) -> do
-          cStringEncodedPublicKey <- public_key_encode_base64 publicKey
-          if cStringEncodedPublicKey == nullPtr
-            then return $ Left PublicKeyEncoding
-            else do
-              encodedPublicKey <- peekCString cStringEncodedPublicKey
-              cStringTokens <- mapM newCString stringTokens
-              if nullPtr `elem` cStringTokens
-                then return $ Left BlindedTokenAllocation
-                else do
-                  blindedTokens <- mapM blinded_token_decode_base64 cStringTokens
-                  if nullPtr `elem` blindedTokens
-                    then return $ Left BlindedTokenDecoding
-                    else do
-                      signedTokens <- mapM (signing_key_sign signingKey) blindedTokens
-                      if nullPtr `elem` signedTokens
-                        then return $ Left TokenSigning
-                        else do
-                          encodedCStringSignedTokens <- mapM signed_token_encode_base64 signedTokens
-                          if nullPtr `elem` encodedCStringSignedTokens
-                            then return $ Left SignedTokenEncoding
-                            else do
-                              encodedSignedTokens <- mapM peekCString encodedCStringSignedTokens
-                              encodedProof <- newEncodedProof blindedTokens signedTokens signingKey
-                              return . Right $ Issuance (pack encodedPublicKey) (map pack encodedSignedTokens) (pack encodedProof)
+    unsafePerformIO . runExceptT $ do
+      (signingKey, publicKey) <- extractKeyMaterial stringSigningKey
+      cStringEncodedPublicKey <- nullIsError PublicKeyEncoding $ public_key_encode_base64 publicKey
+      encodedPublicKey <- liftIO $ peekCString cStringEncodedPublicKey
+      cStringTokens <- anyNullIsError BlindedTokenAllocation $ mapM newCString stringTokens
+      blindedTokens <- anyNullIsError BlindedTokenDecoding $ mapM blinded_token_decode_base64 cStringTokens
+      signedTokens <- anyNullIsError TokenSigning $ mapM (signing_key_sign signingKey) blindedTokens
+      encodedCStringSignedTokens <- anyNullIsError SignedTokenEncoding $ mapM signed_token_encode_base64 signedTokens
+      encodedSignedTokens <- liftIO $ mapM peekCString encodedCStringSignedTokens
+      encodedProof <- liftIO $ newEncodedProof blindedTokens signedTokens signingKey
+      return $ Issuance (pack encodedPublicKey) (map pack encodedSignedTokens) (pack encodedProof)
 
 
 -- | randomSigningKey generates a new signing key at random and returns it
