@@ -133,6 +133,8 @@ redemptionTests =
         db <- memory
         payForVoucher db aVoucher (return $ Right $ ChargeId "xyz")
 
+        -- It would be nice if we exercised `getApp` here instead of doing it
+        -- all ourselves.
         let app = paymentServerApp origins stripeConfig redemptionConfig db
 
         flip runSession app $ do
