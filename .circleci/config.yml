@@ -72,7 +72,7 @@ jobs:
       - run:
           name: "Building with Nix"
           command: |
-            cachix watch-exec "${CACHIX_NAME}" nix-build \
+            cachix watch-exec "${CACHIX_NAME}" -- nix-build \
               --option extra-substituters "${EXTRA_SUBSTITUTERS}" \
               --option trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
               -j 4 \
@@ -82,7 +82,7 @@ jobs:
       - run:
           name: "Building Tests"
           command: |
-            cachix watch-exec "${CACHIX_NAME}" nix-build \
+            cachix watch-exec "${CACHIX_NAME}" -- nix-build \
               --option extra-substituters "${EXTRA_SUBSTITUTERS}" \
               --option trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
               -j 4 \
