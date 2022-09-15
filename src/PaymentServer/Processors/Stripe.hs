@@ -106,7 +106,8 @@ instance ToJSON Acknowledgement where
     [ "success" .= True
     ]
 
-type StripeAPI = ChargesAPI
+type StripeAPI = WebhookAPI :<|> ChargesAPI
+type WebhookAPI = "webhook" :> ReqBody '[JSON] Event :> Post '[JSON] Acknowledgement
 
 -- | getVoucher finds the metadata item with the key `"Voucher"` and returns
 -- the corresponding value, or Nothing.
@@ -118,6 +119,31 @@ getVoucher (MetaData (x:xs)) = getVoucher (MetaData xs)
 stripeServer :: VoucherDatabase d => StripeConfig -> d -> Server StripeAPI
 stripeServer stripeConfig d =
   withSuccessFailureMetrics chargeAttempts chargeSuccesses . charge stripeConfig d
+
+--stripeServer :: VoucherDatabase d => StripeSecretKey -> d -> Server StripeAPI
+--stripeServer key d = webhook d :<|> charge d key
+
+-- | Process charge succeeded events
+webhook :: VoucherDatabase d => StripeConfig -> d -> Event -> Handler Acknowledgement
+webhook stripeConfig d Event{eventId=Just (EventId eventId), eventType=ChargeSucceededEvent, eventData=(ChargeEvent charge)} =
+  case getVoucher $ chargeMetaData charge of
+    Nothing ->
+      -- TODO: Record the eventId somewhere.  In all cases where we don't
+      -- associate the value of the charge with something in our system, we
+      -- probably need enough information to issue a refund.  We're early
+      -- enough in the system here that refunds are possible and not even
+      -- particularly difficult.
+      return Ok
+    Just v  -> do
+      -- TODO: What if it is a duplicate payment?  payForVoucher should be
+      -- able to indicate error I guess.
+      () <- liftIO $ payForVoucher d v
+      return Ok
+
+-- Disregard anything else - but return success so that Stripe doesn't retry.
+webhook d _ =
+  -- TODO: Record the eventId somewhere.
+  return Ok
 
 -- | Browser facing API that takes token, voucher and a few other information
 -- and calls stripe charges API. If payment succeeds, then the voucher is stored
@@ -175,6 +201,9 @@ withSuccessFailureMetrics attemptCount successCount op = do
 -- and if the Charge is okay, then set the voucher as "paid" in the database.
 charge :: VoucherDatabase d => StripeConfig -> d -> Charges -> Handler Acknowledgement
 charge stripeConfig d (Charges token voucher 650 USD) = do
+
+  # TODO verify the webhook request
+
   result <- liftIO payForVoucher'
   case result of
     Left AlreadyPaid ->
