@@ -67,6 +67,13 @@ import Servant.API
   , JSON
   , Post
   , (:>)
+  , (:<|>)((:<|>))
+  )
+import Web.Stripe.Event
+  ( Event(Event, eventId, eventType, eventData)
+  , EventId(EventId)
+  , EventType(ChargeSucceededEvent)
+  , EventData(ChargeEvent)
   )
 import Web.Stripe.Error
   ( StripeError(StripeError, errorType, errorMsg)
@@ -202,7 +209,7 @@ withSuccessFailureMetrics attemptCount successCount op = do
 charge :: VoucherDatabase d => StripeConfig -> d -> Charges -> Handler Acknowledgement
 charge stripeConfig d (Charges token voucher 650 USD) = do
 
-  # TODO verify the webhook request
+  -- TODO verify the webhook request as a first step
 
   result <- liftIO payForVoucher'
   case result of
