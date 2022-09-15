@@ -39,9 +39,9 @@ packages:
 # (e.g., acme-missiles-0.3)
 extra-deps:
   - github: "PrivateStorageio/servant-prometheus"
-    commit: "b9461cbf689b47506b2eee973136706092b74968"
+    commit: "622eb77cb08c5f13729173b8feb123a6700ff91f"
     # https://input-output-hk.github.io/haskell.nix/tutorials/source-repository-hashes/#stack
-    # nix-sha256: 1gfslw670ri119bnq3szc8b08n504f8cnzs5cgk5qvfwvfmsr1xh
+    # nix-sha256: 09dcwj5ac2x2ilb4a0rai3qhl875vvvjr12af5plpz86faga3lnz
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
