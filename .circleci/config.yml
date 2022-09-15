@@ -72,24 +72,22 @@ jobs:
       - run:
           name: "Building with Nix"
           command: |
-            nix-build \
+            cachix watch-exec "${CACHIX_NAME}" nix-build \
               --option extra-substituters "${EXTRA_SUBSTITUTERS}" \
               --option trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
               -j 4 \
               ./nix/ \
-              -A PaymentServer.components.exes."PaymentServer-exe" |
-              cachix push "${CACHIX_NAME}"
+              -A PaymentServer.components.exes."PaymentServer-exe"
 
       - run:
           name: "Building Tests"
           command: |
-            nix-build \
+            cachix watch-exec "${CACHIX_NAME}" nix-build \
               --option extra-substituters "${EXTRA_SUBSTITUTERS}" \
               --option trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
               -j 4 \
               ./nix/ \
-              -A PaymentServer.components.tests."PaymentServer-tests" |
-              cachix push "${CACHIX_NAME}"
+              -A PaymentServer.components.tests."PaymentServer-tests"
 
       - run:
           name: "Running Tests"
