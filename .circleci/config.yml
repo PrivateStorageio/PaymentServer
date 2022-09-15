@@ -52,6 +52,14 @@ jobs:
       # to push to CACHIX_NAME.
       CACHIX_NAME: "privatestorage-opensource"
 
+      # Pin a NixOS 21.11 revision.  Most of the software involved in the
+      # build process is pinned by nix/sources.json with niv but a few things
+      # need to work before we get that far.  This pin is for those things.
+      # This pin has no particular bearing on what version of our dependencies
+      # we are testing against, what version of Python we support, etc.  It is
+      # part of CI infrastructure.
+      NIXPKGS: "https://github.com/NixOS/nixpkgs/archive/28abc4e43a24d28729509e2d83f5c4f3b3418189.tar.gz"
+
     steps:
       - run: &SETUP_CACHIX
           name: "Set up Cachix"
