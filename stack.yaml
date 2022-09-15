@@ -17,7 +17,7 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver: lts-14.2
+resolver: lts-18.28
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -38,9 +38,6 @@ packages:
 # using the same syntax as the packages field.
 # (e.g., acme-missiles-0.3)
 extra-deps:
-  - "stripe-core-2.5.0"
-  - "stripe-haskell-2.5.0"
-  - "stripe-http-client-2.5.0"
   - github: "PrivateStorageio/servant-prometheus"
     commit: "b9461cbf689b47506b2eee973136706092b74968"
     # https://input-output-hk.github.io/haskell.nix/tutorials/source-repository-hashes/#stack
