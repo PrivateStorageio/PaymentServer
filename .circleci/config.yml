@@ -19,7 +19,7 @@ jobs:
     docker:
       # Run in a highly Nix-capable environment.  This lets build with Nix
       # directly.
-      - image: "nixos/nix:2.3.16"
+      - image: "nixos/nix:2.10.3"
 
     resource_class: "xlarge"
 
