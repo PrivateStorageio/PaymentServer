@@ -48,34 +48,18 @@ jobs:
         hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
         saxtons.private.storage:MplOcEH8G/6mRlhlKkbA8GdeFR3dhCFsSszrspE/ZwY=
 
+      # CACHIX_AUTH_TOKEN is manually set in the CircleCI web UI and allows us
+      # to push to CACHIX_NAME.
+      CACHIX_NAME: "privatestorage-opensource"
+
     steps:
+      - run: &SETUP_CACHIX
+          name: "Set up Cachix"
+          command: |
+            nix-env -f $NIXPKGS -iA cachix bash
+
       # Get *our* source code.
       - "checkout"
-      - restore_cache:
-          # Get all of Nix's state relating to the particular revision of
-          # nixpkgs we're using.  It will always be the same.  CircleCI
-          # artifacts and nixpkgs store objects are probably mostly hosted in
-          # the same place (S3) so there's not a lot of difference for
-          # anything that's pre-built.  For anything we end up building
-          # ourselves, though, this saves us all of the build time (less the
-          # download time).
-          #
-          # Read about caching dependencies: https://circleci.com/docs/2.0/caching/
-          name: "Restore Nix Store Paths"
-          keys:
-            # Construct cache keys that allow sharing as long as nixpkgs and
-            # the python-challenge-bypass-ristretto library are the same.
-            #
-            # If python-challenge-bypass-ristretto changes, we have to rebuild
-            # it so we may as well throw away the part of the cache with the
-            # old build and make a new one with the new build so we don't have
-            # to rebuild it *again* next time.
-            #
-            # If nixpkgs changes then potentially a lot of cached packages for
-            # the base system will be invalidated so we may as well drop them
-            # and make a new cache with the new packages.
-            - paymentserver-nix-store-v7-{{ checksum "nix/sources.json" }}
-            - paymentserver-nix-store-v7-
 
       - run:
           name: "Building with Nix"
@@ -85,7 +69,8 @@ jobs:
               --option trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
               -j 4 \
               ./nix/ \
-              -A PaymentServer.components.exes."PaymentServer-exe"
+              -A PaymentServer.components.exes."PaymentServer-exe" |
+              cachix push "${CACHIX_NAME}"
 
       - run:
           name: "Building Tests"
@@ -95,18 +80,13 @@ jobs:
               --option trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
               -j 4 \
               ./nix/ \
-              -A PaymentServer.components.tests."PaymentServer-tests"
+              -A PaymentServer.components.tests."PaymentServer-tests" |
+              cachix push "${CACHIX_NAME}"
 
       - run:
           name: "Running Tests"
           command: |
             ./result/bin/PaymentServer-tests
-
-      - save_cache:
-          name: "Cache Nix Store Paths"
-          key: paymentserver-nix-store-v7-{{ checksum "nix/sources.json" }}
-          paths:
-            - "/nix"
 
 workflows:
   version: 2
