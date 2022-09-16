@@ -82,7 +82,7 @@ jobs:
             # named cache.
             cachix watch-exec "${CACHIX_NAME}" -- nix-build \
               --option extra-substituters "${EXTRA_SUBSTITUTERS}" \
-              --option trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
+              --option extra-trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
               -j 4 \
               ./nix/ \
               -A PaymentServer.components.exes."PaymentServer-exe"
@@ -92,7 +92,7 @@ jobs:
           command: |
             cachix watch-exec "${CACHIX_NAME}" -- nix-build \
               --option extra-substituters "${EXTRA_SUBSTITUTERS}" \
-              --option trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
+              --option extra-trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
               -j 4 \
               ./nix/ \
               -A PaymentServer.components.tests."PaymentServer-tests"
