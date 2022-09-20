@@ -6,10 +6,12 @@
 
 module PaymentServer.Processors.Stripe
   ( StripeAPI
+  , WebhookAPI
   , Charges(Charges)
   , Acknowledgement(Ok)
   , Failure(Failure)
   , stripeServer
+  , webhookServer
   , getVoucher
   , charge
   ) where
@@ -80,7 +82,7 @@ import Web.Stripe.Error
   , StripeErrorType(InvalidRequest, APIError, ConnectionFailure, CardError)
   )
 import Web.Stripe.Types
-  ( Charge(Charge, chargeId)
+  ( Charge(Charge, chargeId, chargeMetaData)
   , MetaData(MetaData)
   , Currency(USD)
   )
@@ -113,8 +115,8 @@ instance ToJSON Acknowledgement where
     [ "success" .= True
     ]
 
-type StripeAPI = WebhookAPI :<|> ChargesAPI
-type WebhookAPI = "webhook" :> ReqBody '[JSON] Event :> Post '[JSON] Acknowledgement
+type StripeAPI = ChargesAPI
+type WebhookAPI = ReqBody '[JSON] Event :> Post '[JSON] Acknowledgement
 
 -- | getVoucher finds the metadata item with the key `"Voucher"` and returns
 -- the corresponding value, or Nothing.
@@ -131,8 +133,8 @@ stripeServer stripeConfig d =
 --stripeServer key d = webhook d :<|> charge d key
 
 -- | Process charge succeeded events
-webhook :: VoucherDatabase d => StripeConfig -> d -> Event -> Handler Acknowledgement
-webhook stripeConfig d Event{eventId=Just (EventId eventId), eventType=ChargeSucceededEvent, eventData=(ChargeEvent charge)} =
+webhookServer :: VoucherDatabase d => StripeConfig -> d -> Event -> Handler Acknowledgement
+webhookServer stripeConfig d Event{eventId=Just (EventId eventId), eventType=ChargeSucceededEvent, eventData=(ChargeEvent charge)} =
   case getVoucher $ chargeMetaData charge of
     Nothing ->
       -- TODO: Record the eventId somewhere.  In all cases where we don't
@@ -144,11 +146,11 @@ webhook stripeConfig d Event{eventId=Just (EventId eventId), eventType=ChargeSuc
     Just v  -> do
       -- TODO: What if it is a duplicate payment?  payForVoucher should be
       -- able to indicate error I guess.
-      () <- liftIO $ payForVoucher d v
+      _ <- liftIO $ payForVoucher d v (return $ Right $ chargeId charge)
       return Ok
 
 -- Disregard anything else - but return success so that Stripe doesn't retry.
-webhook d _ =
+webhook _ d _ =
   -- TODO: Record the eventId somewhere.
   return Ok
 
