@@ -69,8 +69,8 @@ type PaymentServerAPI
 paymentServer :: VoucherDatabase d => StripeConfig -> RedemptionConfig -> d -> Server PaymentServerAPI
 paymentServer stripeConfig redemptionConfig database =
   stripeServer stripeConfig database
-  :<|> webhookServer stripeConfig database
   :<|> redemptionServer redemptionConfig database
+  :<|> webhookServer stripeConfig database
   :<|> metricsServer
 
 paymentServerAPI :: Proxy PaymentServerAPI
