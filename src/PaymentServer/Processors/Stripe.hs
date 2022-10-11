@@ -31,12 +31,9 @@ import Control.Monad
   )
 import Data.Text
   ( Text
-  , unpack
   , concat
   )
-import Text.Read
-  ( readMaybe
-  )
+import Text.Read()
 
 import Network.HTTP.Types
   ( Status(Status)
@@ -69,7 +66,6 @@ import Servant.API
   , JSON
   , Post
   , (:>)
-  , (:<|>)((:<|>))
   )
 import Web.Stripe.Event
   ( Event(Event, eventId, eventType, eventData)
