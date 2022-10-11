@@ -42,9 +42,9 @@ extra-deps:
   - "stripe-haskell-2.6.2"
   - "stripe-http-client-2.6.2"
   - github: "PrivateStorageio/servant-prometheus"
-    commit: "6c8430b802303f9b8a3d11acb0c212b80444ad7c"
+    commit: "622eb77cb08c5f13729173b8feb123a6700ff91f"
     # https://input-output-hk.github.io/haskell.nix/tutorials/source-repository-hashes/#stack
-    # nix-sha256: 1gfslw670ri119bnq3szc8b08n504f8cnzs5cgk5qvfwvfmsr1xh
+    # nix-sha256: 39KhnnIG/UtvcUqELPfe5SAK8YgqA0UWjaILporkrCU=
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
