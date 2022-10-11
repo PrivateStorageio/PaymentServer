@@ -11,7 +11,7 @@
     flags = {};
     package = {
       specVersion = "1.10";
-      identifier = { name = "servant-prometheus"; version = "0.2.0.0"; };
+      identifier = { name = "servant-prometheus"; version = "0.2.1.0"; };
       license = "BSD-3-Clause";
       copyright = "";
       maintainer = "Alex Mason <axman6@gmail.com>, Jack Kelly <jack.kelly@data61.csiro.au>";
@@ -76,5 +76,5 @@
         };
       };
     } // rec {
-    src = (pkgs.lib).mkDefault /nix/store/zvvv6lxnqnva4302265x8wwbyb0mfy56-servant-prometheus-b9461cb;
+    src = (pkgs.lib).mkDefault /nix/store/g62jlfm3vg9dld12fi12f5rkp9sjgbab-servant-prometheus-6c8430b;
     }

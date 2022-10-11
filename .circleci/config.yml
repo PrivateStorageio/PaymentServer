@@ -19,7 +19,7 @@ jobs:
     docker:
       # Run in a highly Nix-capable environment.  This lets build with Nix
       # directly.
-      - image: "nixos/nix:2.3.16"
+      - image: "nixos/nix:2.10.3"
 
     resource_class: "xlarge"
 
@@ -48,41 +48,41 @@ jobs:
         hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
         saxtons.private.storage:MplOcEH8G/6mRlhlKkbA8GdeFR3dhCFsSszrspE/ZwY=
 
+      # CACHIX_AUTH_TOKEN is manually set in the CircleCI web UI and allows us
+      # to push to CACHIX_NAME.
+      CACHIX_NAME: "privatestorage-opensource"
+
+      # Pin a NixOS 21.11 revision.  Most of the software involved in the
+      # build process is pinned by nix/sources.json with niv but a few things
+      # need to work before we get that far.  This pin is for those things.
+      # This pin has no particular bearing on what version of our dependencies
+      # we are testing against, what version of Python we support, etc.  It is
+      # part of CI infrastructure.
+      NIXPKGS: "https://github.com/NixOS/nixpkgs/archive/28abc4e43a24d28729509e2d83f5c4f3b3418189.tar.gz"
+
     steps:
+      - run: &SETUP_CACHIX
+          name: "Set up Cachix"
+          command: |
+            # Install cachix, the Nix-friendly caching tool.
+            nix-env -f $NIXPKGS -iA cachix bash
+            # Activate it for "binary substitution".  This sets up
+            # configuration that lets Nix download something from the cache
+            # instead of building it locally, if possible.
+            cachix use "${CACHIX_NAME}"
+
       # Get *our* source code.
       - "checkout"
-      - restore_cache:
-          # Get all of Nix's state relating to the particular revision of
-          # nixpkgs we're using.  It will always be the same.  CircleCI
-          # artifacts and nixpkgs store objects are probably mostly hosted in
-          # the same place (S3) so there's not a lot of difference for
-          # anything that's pre-built.  For anything we end up building
-          # ourselves, though, this saves us all of the build time (less the
-          # download time).
-          #
-          # Read about caching dependencies: https://circleci.com/docs/2.0/caching/
-          name: "Restore Nix Store Paths"
-          keys:
-            # Construct cache keys that allow sharing as long as nixpkgs and
-            # the python-challenge-bypass-ristretto library are the same.
-            #
-            # If python-challenge-bypass-ristretto changes, we have to rebuild
-            # it so we may as well throw away the part of the cache with the
-            # old build and make a new one with the new build so we don't have
-            # to rebuild it *again* next time.
-            #
-            # If nixpkgs changes then potentially a lot of cached packages for
-            # the base system will be invalidated so we may as well drop them
-            # and make a new cache with the new packages.
-            - paymentserver-nix-store-v7-{{ checksum "nix/sources.json" }}
-            - paymentserver-nix-store-v7-
 
       - run:
           name: "Building with Nix"
           command: |
-            nix-build \
+            # The `cachix watch-exec ...` does our cache population.  When it
+            # sees something added to the store (I guess) it pushes it to the
+            # named cache.
+            cachix watch-exec "${CACHIX_NAME}" -- nix-build \
               --option extra-substituters "${EXTRA_SUBSTITUTERS}" \
-              --option trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
+              --option extra-trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
               -j 4 \
               ./nix/ \
               -A PaymentServer.components.exes."PaymentServer-exe"
@@ -90,9 +90,9 @@ jobs:
       - run:
           name: "Building Tests"
           command: |
-            nix-build \
+            cachix watch-exec "${CACHIX_NAME}" -- nix-build \
               --option extra-substituters "${EXTRA_SUBSTITUTERS}" \
-              --option trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
+              --option extra-trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
               -j 4 \
               ./nix/ \
               -A PaymentServer.components.tests."PaymentServer-tests"
@@ -101,12 +101,6 @@ jobs:
           name: "Running Tests"
           command: |
             ./result/bin/PaymentServer-tests
-
-      - save_cache:
-          name: "Cache Nix Store Paths"
-          key: paymentserver-nix-store-v7-{{ checksum "nix/sources.json" }}
-          paths:
-            - "/nix"
 
 workflows:
   version: 2
