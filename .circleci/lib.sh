@@ -8,6 +8,7 @@ function cache_if_able() {
     # in-repo jobs will get this from CircleCI configuration but jobs from
     # forks may not.
     if [ -v CACHIX_AUTH_TOKEN ]; then
+	echo "Cachix credentials present; will attempt to write to cache."
 	cachix watch-exec "${CACHIX_NAME}" -- "$@"
     else
 	# If we're building a from a forked repository then we're allowed to
@@ -23,6 +24,7 @@ function cache_if_able() {
 	# So if it is not set then we should have had credentials and we fail
 	# if we get here.
 	if [ -v CIRCLE_PR_REPONAME ]; then
+	    echo "Cachix credentials missing; will not attempt cache writes."
 	    "$@"
 	else
 	    echo "Required credentials (CACHIX_AUTH_TOKEN) are missing."
