@@ -94,7 +94,24 @@ jobs:
               if [ -v CACHIX_AUTH_TOKEN ]; then
                 cachix watch-exec "${CACHIX_NAME}" -- "$@"
               else
-                "$@"
+                # If we're building a from a forked repository then we're
+                # allowed to not have the credentials (but it's also fine if
+                # the owner of the fork supplied their own).
+                #
+                # https://circleci.com/docs/built-in-environment-variables/ says
+                # about `CIRCLE_PR_REPONAME`:
+                #
+                #   The name of the GitHub or Bitbucket repository where the
+                #   pull request was created. Only available on forked PRs.
+                #
+                # So if it is not set then we should have had credentials and we
+                # fail if we get here.
+                if [ -v CIRCLE_PR_REPONAME ]; then
+                  "$@"
+                else
+                  echo "Required credentials (CACHIX_AUTH_TOKEN) are missing."
+                  exit 1
+                fi
               fi
             }
             EOF
