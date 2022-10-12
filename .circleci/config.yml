@@ -78,7 +78,7 @@ jobs:
           name: "Building with Nix"
           command: |
             source .circleci/lib.sh
-            maybe_cache nix-build \
+            cache_if_able nix-build \
               --option extra-substituters "${EXTRA_SUBSTITUTERS}" \
               --option extra-trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
               -j 4 \
@@ -89,7 +89,7 @@ jobs:
           name: "Building Tests"
           command: |
             source .circleci/lib.sh
-            maybe_cache nix-build \
+            cache_if_able nix-build \
               --option extra-substituters "${EXTRA_SUBSTITUTERS}" \
               --option extra-trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
               -j 4 \

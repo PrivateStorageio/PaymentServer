@@ -1,6 +1,6 @@
 # Run a command, enabling cache writes to cachix if possible.  The command is
 # accepted as a variable number of positional arguments (like argv).
-function maybe_cache() {
+function cache_if_able() {
     # The `cachix watch-exec ...` does our cache population.  When it sees
     # something added to the store (I guess) it pushes it to the named cache.
     #
