@@ -38,9 +38,7 @@ packages:
 # using the same syntax as the packages field.
 # (e.g., acme-missiles-0.3)
 extra-deps:
-  - "stripe-core-2.5.0"
-  - "stripe-haskell-2.5.0"
-  - "stripe-http-client-2.5.0"
+  - "network-3.1.2.7"
   - github: "PrivateStorageio/servant-prometheus"
     commit: "622eb77cb08c5f13729173b8feb123a6700ff91f"
     # https://input-output-hk.github.io/haskell.nix/tutorials/source-repository-hashes/#stack
