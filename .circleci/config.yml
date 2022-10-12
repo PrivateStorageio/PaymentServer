@@ -82,7 +82,7 @@ jobs:
             # across the next few steps.
             #
             # The escape on the heredoc syntax is required by CircleCI.
-            echo >> "$BASH_ENV" \<<EOF
+            cat >> "$BASH_ENV" \<<EOF
             function maybe-cache() {
               # The `cachix watch-exec ...` does our cache population.  When
               # it sees something added to the store (I guess) it pushes it to
