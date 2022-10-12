@@ -77,10 +77,8 @@ jobs:
       - run:
           name: "Building with Nix"
           command: |
-            # The `cachix watch-exec ...` does our cache population.  When it
-            # sees something added to the store (I guess) it pushes it to the
-            # named cache.
-            cachix watch-exec "${CACHIX_NAME}" -- nix-build \
+            source .circleci/lib.sh
+            cache_if_able nix-build \
               --option extra-substituters "${EXTRA_SUBSTITUTERS}" \
               --option extra-trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
               -j 4 \
@@ -90,7 +88,8 @@ jobs:
       - run:
           name: "Building Tests"
           command: |
-            cachix watch-exec "${CACHIX_NAME}" -- nix-build \
+            source .circleci/lib.sh
+            cache_if_able nix-build \
               --option extra-substituters "${EXTRA_SUBSTITUTERS}" \
               --option extra-trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
               -j 4 \
