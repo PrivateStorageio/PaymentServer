@@ -1,0 +1,10 @@
+###
+POST http://localhost:8080/v1/stripe/charge
+Content-Type: application/json
+
+{
+  "token": "tok_visa",
+  "voucher": "abcg",
+  "amount": "650",
+  "currency": "USD"
+}

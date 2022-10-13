@@ -5,12 +5,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module PaymentServer.Processors.Stripe
-  ( StripeAPI
+  ( ChargesAPI
   , WebhookAPI
   , Charges(Charges)
   , Acknowledgement(Ok)
   , Failure(Failure)
-  , stripeServer
+  , chargeServer
   , webhookServer
   , getVoucher
   , charge
@@ -41,6 +41,8 @@ import Network.HTTP.Types
   , status500
   , status503
   )
+
+import Data.ByteString (ByteString)
 
 import Data.ByteString.UTF8
   ( toString
@@ -111,8 +113,7 @@ instance ToJSON Acknowledgement where
     [ "success" .= True
     ]
 
-type StripeAPI = ChargesAPI
-type WebhookAPI = ReqBody '[JSON] Event :> Post '[JSON] Acknowledgement
+type WebhookAPI = "webhook" :> ReqBody '[JSON] Event :> Post '[JSON] Acknowledgement
 
 -- | getVoucher finds the metadata item with the key `"Voucher"` and returns
 -- the corresponding value, or Nothing.
@@ -121,14 +122,18 @@ getVoucher (MetaData []) = Nothing
 getVoucher (MetaData (("Voucher", value):xs)) = Just value
 getVoucher (MetaData (x:xs)) = getVoucher (MetaData xs)
 
-stripeServer :: VoucherDatabase d => StripeConfig -> d -> Server StripeAPI
-stripeServer stripeConfig d =
+chargeServer :: VoucherDatabase d => StripeConfig -> d -> Server ChargesAPI
+chargeServer stripeConfig d =
   withSuccessFailureMetrics chargeAttempts chargeSuccesses . charge stripeConfig d
 
 --stripeServer :: VoucherDatabase d => StripeSecretKey -> d -> Server StripeAPI
 --stripeServer key d = webhook d :<|> charge d key
 
--- | Process charge succeeded events
+--webhookServer :: VoucherDatabase d => StripeConfig -> d -> ByteString -> Handler Acknowledgement
+--webhookServer stripeConfig d payload =
+
+
+-- | Process charge succeeded
 webhookServer :: VoucherDatabase d => StripeConfig -> d -> Event -> Handler Acknowledgement
 webhookServer stripeConfig d Event{eventId=Just (EventId eventId), eventType=ChargeSucceededEvent, eventData=(ChargeEvent charge)} =
   case getVoucher $ chargeMetaData charge of

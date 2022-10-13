@@ -37,9 +37,9 @@ import Web.Stripe.Client
   )
 
 import PaymentServer.Processors.Stripe
-  ( StripeAPI
+  ( ChargesAPI
   , WebhookAPI
-  , stripeServer
+  , chargeServer
   , webhookServer
   )
 import PaymentServer.Redemption
@@ -60,17 +60,17 @@ import PaymentServer.Persistence
 
 -- | This is the complete type of the server API.
 type PaymentServerAPI
-  =    "v1" :> "stripe" :> StripeAPI
+  =    "v1" :> "stripe" :> ChargesAPI
+  :<|> "v1" :> "stripe" :> WebhookAPI
   :<|> "v1" :> "redeem" :> RedemptionAPI
-  :<|> "v1" :> "webhook" :> WebhookAPI
   :<|> MetricsAPI
 
 -- | Create a server which uses the given database.
 paymentServer :: VoucherDatabase d => StripeConfig -> RedemptionConfig -> d -> Server PaymentServerAPI
 paymentServer stripeConfig redemptionConfig database =
-  stripeServer stripeConfig database
-  :<|> redemptionServer redemptionConfig database
+  chargeServer stripeConfig database
   :<|> webhookServer stripeConfig database
+  :<|> redemptionServer redemptionConfig database
   :<|> metricsServer
 
 paymentServerAPI :: Proxy PaymentServerAPI
