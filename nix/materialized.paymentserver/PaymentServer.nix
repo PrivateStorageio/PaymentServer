@@ -49,6 +49,7 @@
           (hsPkgs."warp-tls" or (errorHandler.buildDepError "warp-tls"))
           (hsPkgs."stripe-haskell" or (errorHandler.buildDepError "stripe-haskell"))
           (hsPkgs."stripe-core" or (errorHandler.buildDepError "stripe-core"))
+          (hsPkgs."stripe-signature" or (errorHandler.buildDepError "stripe-signature"))
           (hsPkgs."text" or (errorHandler.buildDepError "text"))
           (hsPkgs."containers" or (errorHandler.buildDepError "containers"))
           (hsPkgs."cryptonite" or (errorHandler.buildDepError "cryptonite"))
@@ -142,6 +143,4 @@
           };
         };
       };
-    } // rec {
-    src = (pkgs.lib).mkDefault ./.;
-    }
+    } // rec { src = (pkgs.lib).mkDefault ./.; }

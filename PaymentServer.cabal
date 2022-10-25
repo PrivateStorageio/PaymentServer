@@ -39,6 +39,7 @@ library
                      , warp-tls
                      , stripe-haskell
                      , stripe-core
+		     , stripe-signature
                      , text
                      , containers
                      , cryptonite
