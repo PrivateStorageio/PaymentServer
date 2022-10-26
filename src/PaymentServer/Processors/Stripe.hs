@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module PaymentServer.Processors.Stripe
   ( ChargesAPI
@@ -20,6 +21,8 @@ import Prelude hiding
   ( concat
   )
 
+import Data.Data (Typeable)
+
 import Control.Exception
   ( catch
   )
@@ -36,6 +39,7 @@ import Data.Text
 import Text.Read()
 import Data.Maybe
 
+import qualified Network.HTTP.Media as M
 import Network.HTTP.Types
   ( Status(Status)
   , status400
@@ -44,6 +48,8 @@ import Network.HTTP.Types
   )
 
 import Data.ByteString (ByteString)
+
+import Data.ByteString.Lazy (toStrict)
 
 import Data.ByteString.UTF8
   ( toString
@@ -71,6 +77,8 @@ import Servant.API
   , OctetStream
   , PlainText
   , Post
+  , Accept(contentType)
+  , MimeUnrender(mimeUnrender)
   , (:>)
   )
 import Web.Stripe.Event
@@ -109,6 +117,8 @@ import PaymentServer.Persistence
   , PaymentError(AlreadyPaid, PaymentFailed)
   , ProcessorResult
   )
+import Data.Data (Typeable)
+import Servant.API.ContentTypes (AcceptHeader(AcceptHeader))
 
 data Acknowledgement = Ok deriving (Eq, Show)
 
@@ -128,20 +138,23 @@ chargeServer :: VoucherDatabase d => StripeConfig -> d -> Server ChargesAPI
 chargeServer stripeConfig d =
   withSuccessFailureMetrics chargeAttempts chargeSuccesses . charge stripeConfig d
 
---stripeServer :: VoucherDatabase d => StripeSecretKey -> d -> Server StripeAPI
---stripeServer key d = webhook d :<|> charge d key
+data UnparsedJSON deriving Typeable
 
---webhookServer :: VoucherDatabase d => StripeConfig -> d -> ByteString -> Handler Acknowledgement
---webhookServer stripeConfig d payload =
+instance Accept UnparsedJSON where
+  -- We could also require charset=utf-8 on this but we think Stripe doesn't
+  -- actually include that in its requests.
+  contentType _ = "application" M.// "json"
 
---type WebhookAPI = "webhook" :> ReqBody '[JSON] Event :> Post '[JSON] Acknowledgement
-type WebhookAPI = "webhook" :> Header "STRIPE_SIGNATURE" Text :> ReqBody '[OctetStream] ByteString :> Post '[PlainText] Text
+instance MimeUnrender UnparsedJSON ByteString where
+  mimeUnrender _ = Right . toStrict
+
+type WebhookAPI = "webhook" :> Header "STRIPE_SIGNATURE" Text :> ReqBody '[UnparsedJSON] ByteString :> Post '[PlainText] Text
 
 -- | Process charge succeeded
 webhookServer :: VoucherDatabase d => StripeConfig -> d -> Maybe Text -> ByteString -> Handler Text
 webhookServer stripeConfig d signatureHeader payload =
   return "asdf"
-  
+
 --  case getVoucher $ chargeMetaData charge of
 --    Nothing ->
 --      -- TODO: Record the eventId somewhere.  In all cases where we don't

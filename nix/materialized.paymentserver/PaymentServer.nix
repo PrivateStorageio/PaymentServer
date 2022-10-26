@@ -41,6 +41,7 @@
           (hsPkgs."servant" or (errorHandler.buildDepError "servant"))
           (hsPkgs."servant-server" or (errorHandler.buildDepError "servant-server"))
           (hsPkgs."http-types" or (errorHandler.buildDepError "http-types"))
+          (hsPkgs."http-media" or (errorHandler.buildDepError "http-media"))
           (hsPkgs."wai" or (errorHandler.buildDepError "wai"))
           (hsPkgs."wai-extra" or (errorHandler.buildDepError "wai-extra"))
           (hsPkgs."wai-cors" or (errorHandler.buildDepError "wai-cors"))
