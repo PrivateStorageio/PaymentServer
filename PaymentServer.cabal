@@ -38,6 +38,7 @@ library
                      , data-default
                      , warp
                      , warp-tls
+                     , stripe-concepts
                      , stripe-haskell
                      , stripe-core
 		     , stripe-signature

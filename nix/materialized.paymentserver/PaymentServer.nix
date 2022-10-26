@@ -48,6 +48,7 @@
           (hsPkgs."data-default" or (errorHandler.buildDepError "data-default"))
           (hsPkgs."warp" or (errorHandler.buildDepError "warp"))
           (hsPkgs."warp-tls" or (errorHandler.buildDepError "warp-tls"))
+          (hsPkgs."stripe-concepts" or (errorHandler.buildDepError "stripe-concepts"))
           (hsPkgs."stripe-haskell" or (errorHandler.buildDepError "stripe-haskell"))
           (hsPkgs."stripe-core" or (errorHandler.buildDepError "stripe-core"))
           (hsPkgs."stripe-signature" or (errorHandler.buildDepError "stripe-signature"))

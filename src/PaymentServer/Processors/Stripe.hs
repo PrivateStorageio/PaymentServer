@@ -87,6 +87,9 @@ import Web.Stripe.Event
   , EventType(ChargeSucceededEvent)
   , EventData(ChargeEvent)
   )
+
+import Stripe.Signature (parseSig, isSigValid)
+
 import Web.Stripe.Error
   ( StripeError(StripeError, errorType, errorMsg)
   , StripeErrorType(InvalidRequest, APIError, ConnectionFailure, CardError)
@@ -102,12 +105,18 @@ import Web.Stripe.Charge
   , TokenId(TokenId)
   )
 import Web.Stripe.Client
-  ( StripeConfig
+  ( StripeConfig(StripeConfig, secretKey)
+  , StripeKey(StripeKey)
   )
 import Web.Stripe
   ( stripe
   , (-&-)
   )
+
+import Stripe.Concepts
+  ( WebhookSecretKey(WebhookSecretKey)
+  )
+
 
 import qualified Prometheus as P
 
@@ -148,12 +157,18 @@ instance Accept UnparsedJSON where
 instance MimeUnrender UnparsedJSON ByteString where
   mimeUnrender _ = Right . toStrict
 
-type WebhookAPI = "webhook" :> Header "STRIPE_SIGNATURE" Text :> ReqBody '[UnparsedJSON] ByteString :> Post '[PlainText] Text
+type WebhookAPI = "webhook" :> Header "HTTP_STRIPE_SIGNATURE" Text :> ReqBody '[UnparsedJSON] ByteString :> Post '[PlainText] Text
 
 -- | Process charge succeeded
 webhookServer :: VoucherDatabase d => StripeConfig -> d -> Maybe Text -> ByteString -> Handler Text
-webhookServer stripeConfig d signatureHeader payload =
-  return "asdf"
+webhookServer _ _ Nothing _ = throwError $ jsonErr status400 "Bad Request"
+webhookServer stripeConfig@StripeConfig { secretKey = (StripeKey stripeKey) } d (Just signatureText) payload =
+  case parseSig signatureText of
+    Nothing -> throwError $ jsonErr status400 "Bad Request"
+    Just sig ->
+      if isSigValid sig (WebhookSecretKey stripeKey) payload
+      then return "ok"
+      else throwError $ jsonErr status400 "Bad Request"
 
 --  case getVoucher $ chargeMetaData charge of
 --    Nothing ->
@@ -168,11 +183,6 @@ webhookServer stripeConfig d signatureHeader payload =
 --      -- able to indicate error I guess.
 --      _ <- liftIO $ payForVoucher d v (return $ Right $ chargeId charge)
 --      return Ok
-
--- Disregard anything else - but return success so that Stripe doesn't retry.
-webhook _ d _ =
-  -- TODO: Record the eventId somewhere.
-  return Ok
 
 -- | Browser facing API that takes token, voucher and a few other information
 -- and calls stripe charges API. If payment succeeds, then the voucher is stored
