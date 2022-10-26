@@ -34,6 +34,7 @@ import Data.Text
   , concat
   )
 import Text.Read()
+import Data.Maybe
 
 import Network.HTTP.Types
   ( Status(Status)
@@ -64,8 +65,11 @@ import Servant
   , throwError
   )
 import Servant.API
-  ( ReqBody
+  ( Header
+  , ReqBody
   , JSON
+  , OctetStream
+  , PlainText
   , Post
   , (:>)
   )
@@ -113,8 +117,6 @@ instance ToJSON Acknowledgement where
     [ "success" .= True
     ]
 
-type WebhookAPI = "webhook" :> ReqBody '[JSON] Event :> Post '[JSON] Acknowledgement
-
 -- | getVoucher finds the metadata item with the key `"Voucher"` and returns
 -- the corresponding value, or Nothing.
 getVoucher :: MetaData -> Maybe Voucher
@@ -132,23 +134,27 @@ chargeServer stripeConfig d =
 --webhookServer :: VoucherDatabase d => StripeConfig -> d -> ByteString -> Handler Acknowledgement
 --webhookServer stripeConfig d payload =
 
+--type WebhookAPI = "webhook" :> ReqBody '[JSON] Event :> Post '[JSON] Acknowledgement
+type WebhookAPI = "webhook" :> Header "STRIPE_SIGNATURE" Text :> ReqBody '[OctetStream] ByteString :> Post '[PlainText] Text
 
 -- | Process charge succeeded
-webhookServer :: VoucherDatabase d => StripeConfig -> d -> Event -> Handler Acknowledgement
-webhookServer stripeConfig d Event{eventId=Just (EventId eventId), eventType=ChargeSucceededEvent, eventData=(ChargeEvent charge)} =
-  case getVoucher $ chargeMetaData charge of
-    Nothing ->
-      -- TODO: Record the eventId somewhere.  In all cases where we don't
-      -- associate the value of the charge with something in our system, we
-      -- probably need enough information to issue a refund.  We're early
-      -- enough in the system here that refunds are possible and not even
-      -- particularly difficult.
-      return Ok
-    Just v  -> do
-      -- TODO: What if it is a duplicate payment?  payForVoucher should be
-      -- able to indicate error I guess.
-      _ <- liftIO $ payForVoucher d v (return $ Right $ chargeId charge)
-      return Ok
+webhookServer :: VoucherDatabase d => StripeConfig -> d -> Maybe Text -> ByteString -> Handler Text
+webhookServer stripeConfig d signatureHeader payload =
+  return "asdf"
+  
+--  case getVoucher $ chargeMetaData charge of
+--    Nothing ->
+--      -- TODO: Record the eventId somewhere.  In all cases where we don't
+--      -- associate the value of the charge with something in our system, we
+--      -- probably need enough information to issue a refund.  We're early
+--      -- enough in the system here that refunds are possible and not even
+--      -- particularly difficult.
+--      return Ok
+--    Just v  -> do
+--      -- TODO: What if it is a duplicate payment?  payForVoucher should be
+--      -- able to indicate error I guess.
+--      _ <- liftIO $ payForVoucher d v (return $ Right $ chargeId charge)
+--      return Ok
 
 -- Disregard anything else - but return success so that Stripe doesn't retry.
 webhook _ d _ =
