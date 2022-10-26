@@ -29,6 +29,7 @@ import Data.Text.Lazy
   , concat
   )
 
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import Control.Monad.IO.Class
   ( liftIO
@@ -37,6 +38,17 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Except
   ( runExceptT
   )
+
+import Stripe.Concepts
+  ( WebhookSecretKey(WebhookSecretKey)
+  )
+
+import Stripe.Signature
+  ( digest
+  , natBytes
+  )
+
+import qualified Data.ByteString.Base16 as Base16
 
 import Servant.Server
   ( Handler(runHandler')
@@ -62,7 +74,7 @@ import Network.HTTP.Types
   )
 import Network.Wai.Test
   ( SRequest(SRequest)
-  , SResponse(simpleStatus)
+  , SResponse(simpleStatus, simpleBody)
   , runSession
   , request
   , srequest
@@ -240,7 +252,7 @@ chargeTests =
 webhookTests :: TestTree
 webhookTests =
   testGroup "The Stripe charge web hook"
-  [ testCase "If the signature header is missing then the response is a Bad Request" $ do
+  [ testCase "If the signature is missing then the response is Bad Request" $ do
       db <- memory
 
       let
@@ -252,9 +264,10 @@ webhookTests =
         app = paymentServerApp origins stripeConfig redemptionConfig db
 
       response <- (flip runSession) app $ srequest theSRequest
+      assertEqual "The body reflects the error" (Just $ Failure "missing signature") (decode . simpleBody $ response)
       assertEqual "The response is 400" status400 (simpleStatus response)
 
-  , testCase "If the signature header contains an invalid signature then the response is a Bad Request" $ do
+  , testCase "If the signature is misformatted then the response is Bad Request" $ do
       db <- memory
       let
         app = paymentServerApp origins stripeConfig redemptionConfig db
@@ -267,13 +280,60 @@ webhookTests =
         theSRequest = SRequest theRequest body
 
       response <- (flip runSession) app $ srequest theSRequest
+      assertEqual "The body reflects the error" (Just $ Failure "malformed signature") (decode . simpleBody $ response)
       assertEqual "The response is 400" status400 (simpleStatus response)
 
+  , testCase "If the signature is incorrect then the response is Bad Request" $ do
+      db <- memory
+      let
+        app = paymentServerApp origins stripeConfig redemptionConfig db
+        theRequest = (flip setPath) path defaultRequest
+                     { requestMethod = "POST"
+                     , requestHeaders = [ ("content-type", "application/json; charset=utf-8")
+                                        , ("HTTP_STRIPE_SIGNATURE", stripeSignature (WebhookSecretKey "key") timestamp "Some other body")
+                                        ]
+                     }
+        theSRequest = SRequest theRequest body
+
+      response <- (flip runSession) app $ srequest theSRequest
+      assertEqual "The body reflects the error" (Just $ Failure "invalid signature") (decode . simpleBody $ response)
+      assertEqual "The response is 400" status400 (simpleStatus response)
+
+  , testCase "If the signature is correct then the response is OK" $ do
+      db <- memory
+      let
+        app = paymentServerApp origins stripeConfig redemptionConfig db
+        theRequest = (flip setPath) path defaultRequest
+                     { requestMethod = "POST"
+                     , requestHeaders = [ ("content-type", "application/json; charset=utf-8")
+                                        , ("HTTP_STRIPE_SIGNATURE", stripeSignature (WebhookSecretKey keyBytes) timestamp (LBS.toStrict body))
+                                        ]
+                     }
+        theSRequest = SRequest theRequest body
+
+      response <- (flip runSession) app $ srequest theSRequest
+      assertEqual "The body reflects the error" "Ok" (simpleBody response)
+      assertEqual "The response is 200" status200 (simpleStatus response)
   ]
   where
-    stripeKey = StripeKey ""
+    stripeSignature key when what = BS.concat
+      [ "t="
+      , natBytes when
+      , ","
+      , "v1="
+      , encodeHex $ digest key when what
+      ]
+
+    timestamp = 1234567890
+    encodeHex = Base16.encode
+
+
+    keyBytes = "an extremely good key"
+    stripeKey = StripeKey keyBytes
     stripeConfig = StripeConfig stripeKey Nothing
     origins = []
     redemptionConfig = RedemptionConfig 16 1024 trivialIssue
     path = "/v1/stripe/webhook"
+
+    body :: LBS.ByteString
     body = "{\"api_version\":\"2022-08-01\",\"created\":1665593127,\"data\":{\"object\":{\"amount\":250,\"amount_captured\":250,\"amount_refunded\":0,\"application\":null,\"application_fee\":null,\"application_fee_amount\":null,\"balance_transaction\":\"txn_3Ls83eLswFpehDNg0dFvPaKv\",\"billing_details\":{\"address\":{\"city\":null,\"country\":\"DE\",\"line1\":null,\"line2\":null,\"postal_code\":null,\"state\":null},\"email\":\"a@b.d\",\"name\":\"asdfasf\",\"phone\":null},\"calculated_statement_descriptor\":\"Stripe\",\"captured\":true,\"created\":1665593127,\"currency\":\"usd\",\"customer\":null,\"description\":null,\"destination\":null,\"dispute\":null,\"disputed\":false,\"failure_balance_transaction\":null,\"failure_code\":null,\"failure_message\":null,\"fraud_details\":{},\"id\":\"ch_3Ls83eLswFpehDNg0WVw0vTa\",\"invoice\":null,\"livemode\":false,\"metadata\":{},\"object\":\"charge\",\"on_behalf_of\":null,\"order\":null,\"outcome\":{\"network_status\":\"approved_by_network\",\"reason\":null,\"risk_level\":\"normal\",\"risk_score\":21,\"seller_message\":\"Payment complete.\",\"type\":\"authorized\"},\"paid\":true,\"payment_intent\":\"pi_3Ls83eLswFpehDNg0b2mAFUW\",\"payment_method\":\"pm_1Ls83dLswFpehDNgpYAGL3j9\",\"payment_method_details\":{\"card\":{\"brand\":\"mastercard\",\"checks\":{\"address_line1_check\":null,\"address_postal_code_check\":null,\"cvc_check\":\"pass\"},\"country\":\"US\",\"exp_month\":12,\"exp_year\":2023,\"fingerprint\":\"DoAWRfUcyOfJupbL\",\"funding\":\"credit\",\"installments\":null,\"last4\":\"4444\",\"mandate\":null,\"network\":\"mastercard\",\"three_d_secure\":null,\"wallet\":null},\"type\":\"card\"},\"receipt_email\":null,\"receipt_number\":null,\"receipt_url\":\"https://pay.stripe.com/receipts/payment/CAcaFwoVYWNjdF8xTGZORGFMc3dGcGVoRE5nKKjem5oGMgZo4m-xDMM6LBadftys-t7FIeo23hfQKTAtYI3zpLwmJb_3-A6VqCpIGjfmpkWUwCDQC38M\",\"refunded\":false,\"refunds\":{\"data\":[],\"has_more\":false,\"object\":\"list\",\"total_count\":0,\"url\":\"/v1/charges/ch_3Ls83eLswFpehDNg0WVw0vTa/refunds\"},\"review\":null,\"shipping\":null,\"source\":null,\"source_transfer\":null,\"statement_descriptor\":null,\"statement_descriptor_suffix\":null,\"status\":\"succeeded\",\"transfer_data\":null,\"transfer_group\":null}},\"id\":\"evt_3Ls83eLswFpehDNg0dmzogyf\",\"livemode\":false,\"object\":\"event\",\"pending_webhooks\":2,\"request\":{\"id\":\"req_F8pjOORr12gJT9\",\"idempotency_key\":\"8fdd25c9-cb73-4807-973f-f0b21d8bb7cc\"},\"type\":\"charge.succeeded\"}"

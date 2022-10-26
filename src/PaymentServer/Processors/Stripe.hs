@@ -17,6 +17,10 @@ module PaymentServer.Processors.Stripe
   , charge
   ) where
 
+import Data.Aeson
+  ( eitherDecode
+  )
+
 import Prelude hiding
   ( concat
   )
@@ -35,6 +39,7 @@ import Control.Monad
 import Data.Text
   ( Text
   , concat
+  , pack
   )
 import Text.Read()
 import Data.Maybe
@@ -49,7 +54,7 @@ import Network.HTTP.Types
 
 import Data.ByteString (ByteString)
 
-import Data.ByteString.Lazy (toStrict)
+import Data.ByteString.Lazy (toStrict, fromStrict)
 
 import Data.ByteString.UTF8
   ( toString
@@ -161,14 +166,19 @@ type WebhookAPI = "webhook" :> Header "HTTP_STRIPE_SIGNATURE" Text :> ReqBody '[
 
 -- | Process charge succeeded
 webhookServer :: VoucherDatabase d => StripeConfig -> d -> Maybe Text -> ByteString -> Handler Text
-webhookServer _ _ Nothing _ = throwError $ jsonErr status400 "Bad Request"
+webhookServer _ _ Nothing _ = throwError $ jsonErr status400 "missing signature"
 webhookServer stripeConfig@StripeConfig { secretKey = (StripeKey stripeKey) } d (Just signatureText) payload =
   case parseSig signatureText of
-    Nothing -> throwError $ jsonErr status400 "Bad Request"
+    Nothing -> throwError $ jsonErr status400 "malformed signature"
     Just sig ->
       if isSigValid sig (WebhookSecretKey stripeKey) payload
-      then return "ok"
-      else throwError $ jsonErr status400 "Bad Request"
+      then fundVoucher
+      else throwError $ jsonErr status400 "invalid signature"
+  where
+    fundVoucher =
+      case eitherDecode . fromStrict $ payload of
+        Left s -> throwError $ jsonErr status400 (pack s)
+        Right Event{eventId=Just (EventId eventId), eventType=ChargeSucceededEvent, eventData=(ChargeEvent charge)} -> return "Ok"
 
 --  case getVoucher $ chargeMetaData charge of
 --    Nothing ->

@@ -91,6 +91,9 @@ test-suite PaymentServer-tests
   build-depends:       aeson
                      , base
                      , bytestring
+                     , stripe-signature
+                     , stripe-concepts
+                     , base16-bytestring
                      , text
                      , transformers
                      , raw-strings-qq
