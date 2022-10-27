@@ -83,18 +83,18 @@ aChargeId :: ChargeId
 aChargeId = ChargeId "abc"
 
 -- Mock a successful payment.
-paySuccessfully :: IO ProcessorResult
+paySuccessfully :: IO (ProcessorResult ChargeId)
 paySuccessfully = return . Right $ aChargeId
 
 -- Mock a failed payment.
-failPayment :: IO ProcessorResult
+failPayment :: IO (ProcessorResult ChargeId)
 failPayment = throwIO ArbitraryException
 
 -- Mock a payment that fails at the processor rather than with an IO
 -- exception.
 aStripeError :: StripeError
 aStripeError = StripeError CardError "Card rejected because reasons" Nothing Nothing Nothing
-failPaymentProcessing :: IO ProcessorResult
+failPaymentProcessing :: IO (ProcessorResult ChargeId)
 failPaymentProcessing = return $ Left $ PaymentFailed aStripeError
 
 -- | Create a group of tests related to voucher payment and redemption.

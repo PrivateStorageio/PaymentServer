@@ -102,6 +102,7 @@ import Web.Stripe.Error
 import Web.Stripe.Types
   ( Charge(Charge, chargeId, chargeMetaData)
   , CheckoutSession(checkoutSessionClientReferenceId)
+  , ChargeId
   , MetaData(MetaData)
   , Currency(USD)
   )
@@ -197,7 +198,7 @@ webhookServer stripeConfig@StripeConfig { secretKey = (StripeKey stripeKey) } d 
             Just v -> do
               -- TODO: What if it is a duplicate payment?  payForVoucher
               -- should be able to indicate error I guess.
-              _ <- liftIO . payForVoucher d v . return . Right $ mempty
+              _ <- liftIO . payForVoucher d v . return . Right $ ()
               return Ok
         Right _ ->
           return Ok
@@ -272,17 +273,17 @@ charge stripeConfig d (Charges token voucher 650 USD) = do
       let err = errorForStripe errorType ( concat [ "Stripe charge didn't succeed: ", msg ])
       throwError err
 
-    Right chargeId -> return Ok
+    Right _ -> return Ok
 
     where
-      payForVoucher' :: IO ProcessorResult
+      payForVoucher' :: IO (ProcessorResult ChargeId)
       payForVoucher' = do
         payForVoucher d voucher (completeStripeCharge USD) `catch` (
           \(e :: PaymentError) -> return $ Left e
           )
 
       tokenId = TokenId token
-      completeStripeCharge :: Currency -> IO ProcessorResult
+      completeStripeCharge :: Currency -> IO (ProcessorResult ChargeId)
       completeStripeCharge currency = do
         result <- stripe stripeConfig charge
         case result of

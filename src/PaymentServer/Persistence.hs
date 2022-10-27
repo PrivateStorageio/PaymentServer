@@ -51,9 +51,6 @@ import Data.Maybe
 import Web.Stripe.Error
   ( StripeError
   )
-import Web.Stripe.Types
-  ( ChargeId(ChargeId)
-  )
 
 -- | A voucher is a unique identifier which can be associated with a payment.
 -- A paid voucher can be redeemed for ZKAPs which can themselves be exchanged
@@ -119,7 +116,7 @@ type RedemptionKey = (Voucher, Integer)
 -- indicating that the payment has *not* been completed (funds will not move)
 -- or a payment processor-specific identifier for the completed transaction
 -- (funds will move).
-type ProcessorResult = Either PaymentError ChargeId
+type ProcessorResult = Either PaymentError
 
 -- | A VoucherDatabase provides persistence for state related to vouchers.
 class VoucherDatabase d where
@@ -129,13 +126,13 @@ class VoucherDatabase d where
     -- ^ The database in which to record the change
     -> Voucher
     -- ^ A voucher which should be considered paid
-    -> IO ProcessorResult
+    -> IO (ProcessorResult a)
     -- ^ An operation which completes the payment.  This is evaluated in the
     -- context of a database transaction so that if it fails the voucher is
     -- not marked as paid in the database but if it succeeds the database
     -- state is not confused by a competing transaction run around the same
     -- time.
-    -> IO ProcessorResult
+    -> IO (ProcessorResult a)
     -- ^ The result of the attempt to complete payment processing.
 
   -- | Attempt to redeem a voucher.  If it has not been redeemed before or it
@@ -194,7 +191,7 @@ instance VoucherDatabase VoucherDatabaseState where
       do
         result <- pay
         case result of
-          Right chargeId ->
+          Right _ ->
             -- Only modify the paid set if the payment succeeds.
             modifyIORef paidRef (Set.insert voucher)
 
@@ -346,7 +343,7 @@ getVoucherFingerprint dbConn (voucher, counter) =
     listToMaybe <$> Sqlite.query dbConn sql ((voucher :: Text), (counter :: Integer))
 
 -- | Mark the given voucher as paid in the database.
-insertVoucher :: Sqlite.Connection -> Voucher -> IO ProcessorResult -> IO ProcessorResult
+insertVoucher :: Sqlite.Connection -> Voucher -> IO (ProcessorResult a) -> IO (ProcessorResult a)
 insertVoucher dbConn voucher pay =
   -- Begin an immediate transaction so that it includes the IO.  The
   -- transaction is immediate so that we can first check that the voucher is
@@ -369,8 +366,8 @@ insertVoucher dbConn voucher pay =
         -- rolled back so, indeed, it won't be marked thus.
         result <- pay
         case result of
-          Right (ChargeId chargeId) -> do
-            Sqlite.execute dbConn "INSERT INTO vouchers (name, charge_id) VALUES (?, ?)" (voucher, chargeId)
+          Right _ -> do
+            Sqlite.execute dbConn "INSERT INTO vouchers (name, charge_id) VALUES (?, ?)" (voucher, Nothing :: Maybe Text)
             return result
           Left err ->
             return result
@@ -416,6 +413,17 @@ updateVersions =
     , "CREATE TABLE redeemed (id INTEGER PRIMARY KEY, voucher_id INTEGER, counter INTEGER, fingerprint TEXT, FOREIGN KEY (voucher_id) REFERENCES vouchers(id))"
     ]
   , [ "CREATE TABLE version AS SELECT 2 AS version"
+    -- Though we have this column it has become difficult to get the
+    -- information from Stripe.  Since we don't have _much_ of a reason to
+    -- keep it locally, we don't go to the trouble of getting it and so this
+    -- column is no longer populated with a meaningful value.
+    --
+    -- If you want to know what charge id corresponds to what voucher, consult
+    -- the database maintained by the payment processor.
+    --
+    -- We could probably drop this column now since we're not populating it
+    -- with meaningful data but that's still more work and it's not really a
+    -- burden to keep it so for now let's just leave it be.
     , "ALTER TABLE vouchers ADD COLUMN charge_id"
     ]
   ]
