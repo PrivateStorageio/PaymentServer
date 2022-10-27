@@ -89,8 +89,8 @@ import Servant.API
 import Web.Stripe.Event
   ( Event(Event, eventId, eventType, eventData)
   , EventId(EventId)
-  , EventType(ChargeSucceededEvent)
-  , EventData(ChargeEvent)
+  , EventType(ChargeSucceededEvent, CheckoutSessionCompleted)
+  , EventData(ChargeEvent, CheckoutSessionEvent)
   )
 
 import Stripe.Signature (parseSig, isSigValid)
@@ -101,6 +101,7 @@ import Web.Stripe.Error
   )
 import Web.Stripe.Types
   ( Charge(Charge, chargeId, chargeMetaData)
+  , CheckoutSession(checkoutSessionClientReferenceId)
   , MetaData(MetaData)
   , Currency(USD)
   )
@@ -143,10 +144,16 @@ instance ToJSON Acknowledgement where
 
 -- | getVoucher finds the metadata item with the key `"Voucher"` and returns
 -- the corresponding value, or Nothing.
-getVoucher :: MetaData -> Maybe Voucher
-getVoucher (MetaData []) = Nothing
-getVoucher (MetaData (("Voucher", value):xs)) = Just value
-getVoucher (MetaData (x:xs)) = getVoucher (MetaData xs)
+getVoucher :: Event -> Maybe Voucher
+getVoucher Event{eventData=(CheckoutSessionEvent checkoutSession)} =
+  checkoutSessionClientReferenceId checkoutSession
+getVoucher Event{eventData=(ChargeEvent charge)} =
+  voucherFromMetadata . chargeMetaData $ charge
+  where
+    voucherFromMetadata (MetaData []) = Nothing
+    voucherFromMetadata (MetaData (("Voucher", value):xs)) = Just value
+    voucherFromMetadata (MetaData (x:xs)) = voucherFromMetadata (MetaData xs)
+getVoucher _ = Nothing
 
 chargeServer :: VoucherDatabase d => StripeConfig -> d -> Server ChargesAPI
 chargeServer stripeConfig d =
@@ -162,10 +169,10 @@ instance Accept UnparsedJSON where
 instance MimeUnrender UnparsedJSON ByteString where
   mimeUnrender _ = Right . toStrict
 
-type WebhookAPI = "webhook" :> Header "HTTP_STRIPE_SIGNATURE" Text :> ReqBody '[UnparsedJSON] ByteString :> Post '[PlainText] Text
+type WebhookAPI = "webhook" :> Header "Stripe-Signature" Text :> ReqBody '[UnparsedJSON] ByteString :> Post '[JSON] Acknowledgement
 
 -- | Process charge succeeded
-webhookServer :: VoucherDatabase d => StripeConfig -> d -> Maybe Text -> ByteString -> Handler Text
+webhookServer :: VoucherDatabase d => StripeConfig -> d -> Maybe Text -> ByteString -> Handler Acknowledgement
 webhookServer _ _ Nothing _ = throwError $ jsonErr status400 "missing signature"
 webhookServer stripeConfig@StripeConfig { secretKey = (StripeKey stripeKey) } d (Just signatureText) payload =
   case parseSig signatureText of
@@ -178,21 +185,22 @@ webhookServer stripeConfig@StripeConfig { secretKey = (StripeKey stripeKey) } d 
     fundVoucher =
       case eitherDecode . fromStrict $ payload of
         Left s -> throwError $ jsonErr status400 (pack s)
-        Right Event{eventId=Just (EventId eventId), eventType=ChargeSucceededEvent, eventData=(ChargeEvent charge)} -> return "Ok"
-
---  case getVoucher $ chargeMetaData charge of
---    Nothing ->
---      -- TODO: Record the eventId somewhere.  In all cases where we don't
---      -- associate the value of the charge with something in our system, we
---      -- probably need enough information to issue a refund.  We're early
---      -- enough in the system here that refunds are possible and not even
---      -- particularly difficult.
---      return Ok
---    Just v  -> do
---      -- TODO: What if it is a duplicate payment?  payForVoucher should be
---      -- able to indicate error I guess.
---      _ <- liftIO $ payForVoucher d v (return $ Right $ chargeId charge)
---      return Ok
+        Right event ->
+          case getVoucher event of
+            Nothing ->
+              -- TODO: Record the eventId somewhere.  In all cases where we don't
+              -- associate the value of the charge with something in our system, we
+              -- probably need enough information to issue a refund.  We're early
+              -- enough in the system here that refunds are possible and not even
+              -- particularly difficult.
+              return Ok
+            Just v -> do
+              -- TODO: What if it is a duplicate payment?  payForVoucher
+              -- should be able to indicate error I guess.
+              _ <- liftIO . payForVoucher d v . return . Right $ mempty
+              return Ok
+        Right _ ->
+          return Ok
 
 -- | Browser facing API that takes token, voucher and a few other information
 -- and calls stripe charges API. If payment succeeds, then the voucher is stored

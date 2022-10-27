@@ -44,10 +44,12 @@ extra-deps:
     # https://input-output-hk.github.io/haskell.nix/tutorials/source-repository-hashes/#stack
     # nix-sha256: 39KhnnIG/UtvcUqELPfe5SAK8YgqA0UWjaILporkrCU=
   - "stripe-signature-1.0.0.14"
+  # - "/home/exarkun/Work/PrivateStorage/stripe-core/stripe-core"
   - github: "PrivateStorageio/stripe"
-    commit: "bbbe0d2"
+    commit: "45bb1e68ce84f3154b84d5a1343ec1a9d51c6b2d"
     subdirs:
       - "stripe-core"
+    # nix-sha256: FDtO2pm9jBw8NzwuGEki6XuUnC5+yEOQdpfcHFjRzwg=
 
 
 # Override default flag values for local packages and extra-deps

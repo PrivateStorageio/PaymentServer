@@ -41,7 +41,7 @@ library
                      , stripe-concepts
                      , stripe-haskell
                      , stripe-core
-		     , stripe-signature
+                     , stripe-signature
                      , text
                      , containers
                      , cryptonite

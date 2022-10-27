@@ -57,6 +57,7 @@ import Servant.Server
 
 import Data.Aeson
   ( decode
+  , encode
   )
 
 import Web.Stripe.Client
@@ -274,7 +275,7 @@ webhookTests =
         theRequest = (flip setPath) path defaultRequest
                      { requestMethod = "POST"
                      , requestHeaders = [ ("content-type", "application/json; charset=utf-8")
-                                        , ("HTTP_STRIPE_SIGNATURE", "Do you like my signature?")
+                                        , ("Stripe-Signature", "Do you like my signature?")
                                         ]
                      }
         theSRequest = SRequest theRequest body
@@ -290,7 +291,7 @@ webhookTests =
         theRequest = (flip setPath) path defaultRequest
                      { requestMethod = "POST"
                      , requestHeaders = [ ("content-type", "application/json; charset=utf-8")
-                                        , ("HTTP_STRIPE_SIGNATURE", stripeSignature (WebhookSecretKey "key") timestamp "Some other body")
+                                        , ("Stripe-Signature", stripeSignature (WebhookSecretKey "key") timestamp "Some other body")
                                         ]
                      }
         theSRequest = SRequest theRequest body
@@ -299,6 +300,25 @@ webhookTests =
       assertEqual "The body reflects the error" (Just $ Failure "invalid signature") (decode . simpleBody $ response)
       assertEqual "The response is 400" status400 (simpleStatus response)
 
+  , testCase "If the signature is correct and the body is not JSON then the response is Bad Request" $ do
+      db <- memory
+      let
+        nonJSONBody = "Some other body"
+        app = paymentServerApp origins stripeConfig redemptionConfig db
+        theRequest = (flip setPath) path defaultRequest
+                     { requestMethod = "POST"
+                     , requestHeaders = [ ("content-type", "application/json; charset=utf-8")
+                                        , ("Stripe-Signature", stripeSignature (WebhookSecretKey keyBytes) timestamp nonJSONBody)
+                                        ]
+                     }
+        theSRequest = SRequest theRequest (LBS.fromStrict nonJSONBody)
+
+      response <- (flip runSession) app $ srequest theSRequest
+
+      case decode . simpleBody $ response of
+        Just (Failure _) -> assertEqual "The response is 400" status400 (simpleStatus response)
+        Nothing -> fail "response body parse failed"
+
   , testCase "If the signature is correct then the response is OK" $ do
       db <- memory
       let
@@ -306,14 +326,15 @@ webhookTests =
         theRequest = (flip setPath) path defaultRequest
                      { requestMethod = "POST"
                      , requestHeaders = [ ("content-type", "application/json; charset=utf-8")
-                                        , ("HTTP_STRIPE_SIGNATURE", stripeSignature (WebhookSecretKey keyBytes) timestamp (LBS.toStrict body))
+                                        , ("Stripe-Signature", stripeSignature (WebhookSecretKey keyBytes) timestamp (LBS.toStrict body))
                                         ]
                      }
         theSRequest = SRequest theRequest body
 
       response <- (flip runSession) app $ srequest theSRequest
-      assertEqual "The body reflects the error" "Ok" (simpleBody response)
+      assertEqual "The body reflects success" (encode Ok) (simpleBody response)
       assertEqual "The response is 200" status200 (simpleStatus response)
+      assertEqual "The voucher is recorded as paid in the database"
   ]
   where
     stripeSignature key when what = BS.concat
