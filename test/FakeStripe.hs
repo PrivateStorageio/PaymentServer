@@ -11,6 +11,8 @@ module FakeStripe
   ) where
 
 import Text.RawString.QQ
+  ( r
+  )
 
 import Data.ByteString.Lazy
    ( ByteString
