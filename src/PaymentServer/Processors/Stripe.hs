@@ -179,6 +179,9 @@ webhookServer WebhookConfig { webhookConfigKey } d (Just signatureText) payload 
   case parseSig signatureText of
     Nothing -> throwError $ jsonErr status400 "malformed signature"
     Just sig ->
+      -- We check the signature but we don't otherwise interpret the timestamp
+      -- it carries.  In the future perhaps we should.
+      -- https://github.com/PrivateStorageio/PaymentServer/issues/129
       if isSigValid sig webhookConfigKey payload
       then fundVoucher
       else throwError $ jsonErr status400 "invalid signature"
