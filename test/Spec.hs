@@ -14,6 +14,7 @@ import qualified Persistence
 import qualified Metrics
 import qualified Stripe
 import qualified Redemption
+import qualified Ristretto
 
 tests :: TestTree
 tests = testGroup "Tests"
@@ -21,6 +22,7 @@ tests = testGroup "Tests"
   , Metrics.tests
   , Stripe.tests
   , Redemption.tests
+  , Ristretto.tests
   ]
 
 main = defaultMain tests

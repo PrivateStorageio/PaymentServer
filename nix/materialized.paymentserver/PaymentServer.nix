@@ -138,6 +138,7 @@
             "Metrics"
             "Stripe"
             "FakeStripe"
+            "Ristretto"
             ];
           hsSourceDirs = [ "test" ];
           mainPath = [ "Spec.hs" ];

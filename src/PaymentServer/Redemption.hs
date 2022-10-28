@@ -260,8 +260,9 @@ redeem (RedemptionConfig numGroups tokensPerVoucher issue) database (Redeem vouc
           throwError $ jsonErr err400 $ OtherFailure "fingerprint already used"
         Left DatabaseUnavailable -> do
           throwError $ jsonErr err500 $ OtherFailure "database temporarily unavailable"
-        Right fresh ->
-          case issue tokens of
+        Right fresh -> do
+          issuance <- liftIO $ issue tokens
+          case issuance of
             Left reason -> do
               throwError $ jsonErr err400 $ OtherFailure reason
             Right (ChallengeBypass key signatures proof) -> do
