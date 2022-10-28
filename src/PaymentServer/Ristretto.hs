@@ -67,6 +67,7 @@ foreign import ccall "signing_key_sign" signing_key_sign :: Ptr C_SigningKey -> 
 
 foreign import ccall "token_random" token_random :: IO (Ptr C_Token)
 foreign import ccall "token_blind" token_blind :: Ptr C_Token -> IO (Ptr C_BlindedToken)
+foreign import ccall "token_destroy" token_destroy :: Ptr C_Token -> IO ()
 foreign import ccall "token_encode_base64" token_encode_base64 :: Ptr C_Token -> IO CString
 foreign import ccall "token_decode_base64" token_decode_base64 :: CString -> IO (Ptr C_Token)
 
@@ -173,15 +174,12 @@ randomToken = do
 -- | blindToken takes a token encoded as base64 and returns the base64
 -- encoding of the blinding of the token.
 blindToken :: Text -> IO Text
-blindToken token = do
-  cString <- newCString . unpack $ token
-  cToken <- token_decode_base64 cString
-  cBlinded <- token_blind cToken
-  cBlindedString <- blinded_token_encode_base64 cBlinded
-  result <- peekCString cBlindedString
-  free cString
-  free cBlindedString
-  return $ pack result
+blindToken token =
+  withCAString (unpack token) $ \cString ->
+  bracket (token_decode_base64 cString) token_destroy $ \cToken ->
+  bracket (token_blind cToken) blinded_token_destroy $ \cBlinded ->
+  bracket (blinded_token_encode_base64 cBlinded) free $ \cBlindedString ->
+  pack <$> peekCAString cBlindedString
 
 -- | getPublicKey returns the base64 encoded public key corresponding to the
 -- base64 encoded signing key passed to it.
