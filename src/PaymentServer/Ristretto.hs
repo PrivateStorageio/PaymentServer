@@ -32,8 +32,7 @@ import Foreign.Ptr
   )
 import Foreign.C.String
   ( CString
-  , newCString
-  , peekCString
+  , newCAString
   , peekCAString
   , withCAString
   )
@@ -130,22 +129,22 @@ ristretto textSigningKey textTokens =
 
     newEncodedProof blindedTokens signedTokens signingKey =
       bracket (newProof blindedTokens signedTokens signingKey) batch_dleq_proof_destroy $ \proof ->
-      bracket (batch_dleq_proof_encode_base64 proof) free peekCString
+      bracket (batch_dleq_proof_encode_base64 proof) free peekCAString
 
     stringSigningKey = unpack textSigningKey
     stringTokens = map unpack textTokens
   in
     runExceptT $
-    nullIsError SigningKeyAllocation (newCString stringSigningKey) >>= \cStringSigningKey ->
+    nullIsError SigningKeyAllocation (newCAString stringSigningKey) >>= \cStringSigningKey ->
     nullIsError SigningKeyDecoding (signing_key_decode_base64 cStringSigningKey) >>= \signingKey ->
     nullIsError PublicKeyLookup (signing_key_get_public_key signingKey) >>= \publicKey ->
     nullIsError PublicKeyEncoding (public_key_encode_base64 publicKey) >>= \cStringEncodedPublicKey ->
-    liftIO (peekCString cStringEncodedPublicKey) >>= \encodedPublicKey ->
-    anyNullIsError BlindedTokenAllocation (mapM newCString stringTokens) >>= \cStringTokens ->
+    liftIO (peekCAString cStringEncodedPublicKey) >>= \encodedPublicKey ->
+    anyNullIsError BlindedTokenAllocation (mapM newCAString stringTokens) >>= \cStringTokens ->
     anyNullIsError BlindedTokenDecoding (mapM blinded_token_decode_base64 cStringTokens) >>= \blindedTokens ->
     anyNullIsError TokenSigning (mapM (signing_key_sign signingKey) blindedTokens) >>= \signedTokens ->
     anyNullIsError SignedTokenEncoding (mapM signed_token_encode_base64 signedTokens) >>= \encodedCStringSignedTokens ->
-    liftIO (mapM peekCString encodedCStringSignedTokens) >>= \encodedSignedTokens ->
+    liftIO (mapM peekCAString encodedCStringSignedTokens) >>= \encodedSignedTokens ->
     liftIO (newEncodedProof blindedTokens signedTokens signingKey) >>= \encodedProof ->
     return $ Issuance (pack encodedPublicKey) (map pack encodedSignedTokens) (pack encodedProof)
 
