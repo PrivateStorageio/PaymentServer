@@ -164,12 +164,10 @@ randomSigningKey = do
 -- | randomToken generates a new token at random and returns it encoded as a
 -- base64 string.
 randomToken :: IO Text
-randomToken = do
-  cToken <- token_random
-  cString <- token_encode_base64 cToken
-  result <- peekCString cString
-  free cString
-  return $ pack result
+randomToken =
+  bracket token_random token_destroy $ \cToken ->
+  bracket (token_encode_base64 cToken) free $ \cString ->
+  pack <$> peekCAString cString
 
 -- | blindToken takes a token encoded as base64 and returns the base64
 -- encoding of the blinding of the token.
