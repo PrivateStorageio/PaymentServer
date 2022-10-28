@@ -98,6 +98,7 @@
           depends = [
             (hsPkgs."base" or (errorHandler.buildDepError "base"))
             (hsPkgs."text" or (errorHandler.buildDepError "text"))
+            (hsPkgs."optparse-applicative" or (errorHandler.buildDepError "optparse-applicative"))
             (hsPkgs."PaymentServer" or (errorHandler.buildDepError "PaymentServer"))
             ];
           buildable = true;
