@@ -18,15 +18,9 @@ module PaymentServer.Processors.Stripe
   , charge
   ) where
 
-import Data.Aeson
-  ( eitherDecode
-  )
-
 import Prelude hiding
   ( concat
   )
-
-import Data.Data (Typeable)
 
 import Control.Exception
   ( catch
@@ -42,8 +36,6 @@ import Data.Text
   , concat
   , pack
   )
-import Text.Read()
-import Data.Maybe
 
 import qualified Network.HTTP.Media as M
 import Network.HTTP.Types
@@ -67,6 +59,7 @@ import Data.Aeson
   , Value(Object)
   , object
   , encode
+  , eitherDecode
   , (.:)
   , (.=)
   )
