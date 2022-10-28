@@ -257,11 +257,7 @@ webhookTests =
       db <- memory
 
       let
-        theRequest = (flip setPath) path defaultRequest
-                     { requestMethod = "POST"
-                     , requestHeaders = [("content-type", "application/json; charset=utf-8")]
-                     }
-        theSRequest = SRequest theRequest checkoutSessionCompleted
+        theSRequest = SRequest jsonRequest checkoutSessionCompleted
         app = makeApp db
 
       response <- (flip runSession) app $ srequest theSRequest
@@ -273,12 +269,7 @@ webhookTests =
       db <- memory
       let
         app = makeApp db
-        theRequest = (flip setPath) path defaultRequest
-                     { requestMethod = "POST"
-                     , requestHeaders = [ ("content-type", "application/json; charset=utf-8")
-                                        , ("Stripe-Signature", "Do you like my signature?")
-                                        ]
-                     }
+        theRequest = signedRequest "Do you like my signature?"
         theSRequest = SRequest theRequest checkoutSessionCompleted
 
       response <- (flip runSession) app $ srequest theSRequest
@@ -290,12 +281,7 @@ webhookTests =
       db <- memory
       let
         app = makeApp db
-        theRequest = (flip setPath) path defaultRequest
-                     { requestMethod = "POST"
-                     , requestHeaders = [ ("content-type", "application/json; charset=utf-8")
-                                        , ("Stripe-Signature", stripeSignature (WebhookSecretKey "key") timestamp "Some other body")
-                                        ]
-                     }
+        theRequest = signedRequest $ stripeSignature (WebhookSecretKey "key") timestamp "Some other body"
         theSRequest = SRequest theRequest checkoutSessionCompleted
 
       response <- (flip runSession) app $ srequest theSRequest
@@ -308,19 +294,14 @@ webhookTests =
       let
         nonJSONBody = "Some other body"
         app = makeApp db
-        theRequest = (flip setPath) path defaultRequest
-                     { requestMethod = "POST"
-                     , requestHeaders = [ ("content-type", "application/json; charset=utf-8")
-                                        , ("Stripe-Signature", stripeSignature webhookSecret timestamp nonJSONBody)
-                                        ]
-                     }
+        theRequest = signedRequest $ stripeSignature webhookSecret timestamp nonJSONBody
         theSRequest = SRequest theRequest (LBS.fromStrict nonJSONBody)
 
       response <- (flip runSession) app $ srequest theSRequest
 
-      case decode . simpleBody $ response of
-        Just (Failure _) -> assertEqual "The response is 400" status400 (simpleStatus response)
-        Nothing -> fail "response body parse failed"
+      -- It should fail but we don't really care what the message is.
+      let (Just (Failure _)) = decode . simpleBody $ response
+      assertEqual "The response is 400" status400 (simpleStatus response)
 
   , testCase "If the signature is correct then the response is OK" $ do
       db <- assertOkResponse checkoutSessionCompleted
@@ -402,7 +383,22 @@ webhookTests =
     webhookConfig = WebhookConfig webhookSecret
     origins = []
     redemptionConfig = RedemptionConfig 16 1024 trivialIssue
+
+    -- The path at which our server exposes the Stripe webhook handler.
     path = "/v1/stripe/webhook"
+
+    -- Some request values useful for the various cases we want to test.
+    postRequest = (flip setPath) path defaultRequest
+      { requestMethod = "POST"
+      }
+
+    jsonRequest = postRequest
+      { requestHeaders = [("content-type", "application/json; charset=utf-8")]
+      }
+
+    signedRequest sig = jsonRequest
+      { requestHeaders = ("Stripe-Signature", sig):requestHeaders jsonRequest
+      }
 
 chargeSucceeded :: LBS.ByteString
 chargeSucceeded = [r|
