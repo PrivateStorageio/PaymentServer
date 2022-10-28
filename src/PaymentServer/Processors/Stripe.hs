@@ -118,7 +118,6 @@ import Stripe.Concepts
   ( WebhookSecretKey
   )
 
-
 import qualified Prometheus as P
 
 import PaymentServer.Persistence
