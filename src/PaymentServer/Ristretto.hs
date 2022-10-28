@@ -104,9 +104,9 @@ data RistrettoFailure
 nullIsError :: b -> IO (Ptr a) -> ExceptT b IO (Ptr a)
 nullIsError fallback op =
   liftIO op >>= \r ->
-                  case r of
-                    nullPtr -> throwError fallback
-                    ptr -> return ptr
+                  if r == nullPtr
+                  then throwError fallback
+                  else return r
 
 anyNullIsError :: b -> IO [Ptr a] -> ExceptT b IO [Ptr a]
 anyNullIsError fallback op =
