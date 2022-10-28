@@ -34,6 +34,8 @@ import Foreign.C.String
   ( CString
   , newCString
   , peekCString
+  , peekCAString
+  , withCAString
   )
 import Foreign.Marshal.Alloc
   ( free
@@ -54,6 +56,7 @@ foreign import ccall "blinded_token_decode_base64" blinded_token_decode_base64 :
 foreign import ccall "blinded_token_destroy" blinded_token_destroy :: Ptr C_BlindedToken -> IO ()
 
 foreign import ccall "public_key_encode_base64" public_key_encode_base64 :: Ptr C_PublicKey -> IO CString
+foreign import ccall "public_key_destroy" public_key_destroy :: Ptr C_PublicKey -> IO ()
 
 foreign import ccall "signing_key_random" signing_key_random :: IO (Ptr C_SigningKey)
 foreign import ccall "signing_key_decode_base64" signing_key_decode_base64 :: CString -> IO (Ptr C_SigningKey)
@@ -183,10 +186,9 @@ blindToken token = do
 -- | getPublicKey returns the base64 encoded public key corresponding to the
 -- base64 encoded signing key passed to it.
 getPublicKey :: Text -> IO Text
-getPublicKey enc_skey = do
-  enc_cstr_skey <- newCString . unpack $ enc_skey
-  skey <- signing_key_decode_base64 $ enc_cstr_skey
-  pkey <- signing_key_get_public_key skey
-  enc_cstr_pkey <- public_key_encode_base64 pkey
-  enc_pkey <- peekCString enc_cstr_pkey
-  return $ pack enc_pkey
+getPublicKey enc_skey =
+  withCAString (unpack enc_skey) $ \enc_cstr_skey ->
+  bracket (signing_key_decode_base64 enc_cstr_skey) signing_key_destroy $ \skey ->
+  bracket (signing_key_get_public_key skey) public_key_destroy $ \pkey ->
+  bracket (public_key_encode_base64 pkey) free $ \enc_cstr_pkey ->
+  pack <$> peekCAString enc_cstr_pkey
