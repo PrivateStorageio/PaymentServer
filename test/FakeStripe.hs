@@ -52,6 +52,14 @@ import Web.Stripe.Types
   ( ChargeId(ChargeId)
   )
 
+import PaymentServer.Processors.Stripe
+  ( WebhookConfig(WebhookConfig)
+  )
+
+import Stripe.Concepts
+  ( WebhookSecretKey(WebhookSecretKey)
+  )
+
 cardError :: ByteString
 cardError = [r|
 {
@@ -184,9 +192,11 @@ chargeFailed stripeResponse req respond =
 
 -- Pass a Stripe-flavored configuration for a running Wai application to a
 -- function and evaluate the resulting IO action.
-withFakeStripe :: IO Application -> (StripeConfig -> IO a) -> IO a
+withFakeStripe :: IO Application -> (WebhookConfig -> StripeConfig -> IO a) -> IO a
 withFakeStripe app f =
-  testWithApplication app $ f . makeConfig
+  testWithApplication app $ f webhookConfig . makeConfig
   where
     makeConfig = StripeConfig stripeKey . Just . Endpoint "127.0.0.1" HTTP
     stripeKey = StripeKey "pk_test_aaaaaaaaaaaaaaaaaaaaaa"
+    webhookKey = WebhookSecretKey "whsec_bbbbbbbbbbbbbbbbbbbbbbb"
+    webhookConfig = WebhookConfig webhookKey

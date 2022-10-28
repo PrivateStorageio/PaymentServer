@@ -106,6 +106,7 @@ import PaymentServer.Processors.Stripe
   ( Charges(Charges)
   , Acknowledgement(Ok)
   , Failure(Failure)
+  , WebhookConfig(WebhookConfig)
   , charge
   , webhookServer
   )
@@ -176,10 +177,10 @@ corsTests =
 
     assertCORSHeader' db stripeResponse method headers body =
       withFakeStripe (return stripeResponse) $
-      \stripeConfig -> do
+      \webhookConfig stripeConfig -> do
         let origins = ["example.invalid"]
         let redemptionConfig = RedemptionConfig 16 1024 trivialIssue
-        let app = paymentServerApp origins stripeConfig redemptionConfig db
+        let app = paymentServerApp origins stripeConfig webhookConfig redemptionConfig db
 
         let path = "/v1/stripe/charge"
         let theRequest = setPath defaultRequest
@@ -196,7 +197,7 @@ chargeTests :: TestTree
 chargeTests =
   testGroup "Charges"
   [ testCase "non-USD currency is rejected" $
-    withFakeStripe (return chargeOkay) $ \stripeConfig -> do
+    withFakeStripe (return chargeOkay) $ \webhookConfig stripeConfig -> do
       let amount = 650
       let currency = AED
       db <- memory
@@ -206,7 +207,7 @@ chargeTests =
       assertEqual "The JSON body includes the reason" (Just $ Failure "Unsupported currency") (decode body)
 
   , testCase "incorrect USD amount is rejected" $
-    withFakeStripe (return chargeOkay) $ \stripeConfig -> do
+    withFakeStripe (return chargeOkay) $ \webhookConfig stripeConfig -> do
       let amount = 649
       let currency = USD
       db <- memory
@@ -216,7 +217,7 @@ chargeTests =
       assertEqual "The JSON body includes the reason" (Just $ Failure "Incorrect charge amount") (decode body)
 
   , testCase "a Stripe charge failure is propagated" $
-    withFakeStripe (return (chargeFailed cardError)) $ \stripeConfig -> do
+    withFakeStripe (return (chargeFailed cardError)) $ \webhookConfig stripeConfig -> do
       let amount = 650
       let currency = USD
       db <- memory
@@ -228,7 +229,7 @@ chargeTests =
         (Just $ Failure "Stripe charge didn't succeed: Your card is expired.") (decode body)
 
   , testCase "the HTTP error code is derived from the specific failure" $
-    withFakeStripe (return (chargeFailed apiError)) $ \stripeConfig -> do
+    withFakeStripe (return (chargeFailed apiError)) $ \webhookConfig stripeConfig -> do
       let amount = 650
       let currency = USD
       db <- memory
@@ -238,7 +239,7 @@ chargeTests =
       assertEqual "The HTTP phrase matches the code" "Service Unavailable" phrase
 
   , testCase "currect USD amount is accepted" $
-    withFakeStripe (return chargeOkay) $ \stripeConfig -> do
+    withFakeStripe (return chargeOkay) $ \webhookConfig stripeConfig -> do
       let amount = 650
       let currency = USD
       db <- memory
@@ -266,7 +267,7 @@ webhookTests =
                      , requestHeaders = [("content-type", "application/json; charset=utf-8")]
                      }
         theSRequest = SRequest theRequest checkoutSessionCompleted
-        app = paymentServerApp origins stripeConfig redemptionConfig db
+        app = makeApp db
 
       response <- (flip runSession) app $ srequest theSRequest
       assertEqual "The body reflects the error" (Just $ Failure "missing signature") (decode . simpleBody $ response)
@@ -276,7 +277,7 @@ webhookTests =
   , testCase "If the signature is misformatted then the response is Bad Request" $ do
       db <- memory
       let
-        app = paymentServerApp origins stripeConfig redemptionConfig db
+        app = makeApp db
         theRequest = (flip setPath) path defaultRequest
                      { requestMethod = "POST"
                      , requestHeaders = [ ("content-type", "application/json; charset=utf-8")
@@ -293,7 +294,7 @@ webhookTests =
   , testCase "If the signature is incorrect then no attempt is made to parse the request body and the response is Bad Request" $ do
       db <- memory
       let
-        app = paymentServerApp origins stripeConfig redemptionConfig db
+        app = makeApp db
         theRequest = (flip setPath) path defaultRequest
                      { requestMethod = "POST"
                      , requestHeaders = [ ("content-type", "application/json; charset=utf-8")
@@ -311,11 +312,11 @@ webhookTests =
       db <- memory
       let
         nonJSONBody = "Some other body"
-        app = paymentServerApp origins stripeConfig redemptionConfig db
+        app = makeApp db
         theRequest = (flip setPath) path defaultRequest
                      { requestMethod = "POST"
                      , requestHeaders = [ ("content-type", "application/json; charset=utf-8")
-                                        , ("Stripe-Signature", stripeSignature (WebhookSecretKey keyBytes) timestamp nonJSONBody)
+                                        , ("Stripe-Signature", stripeSignature webhookSecret timestamp nonJSONBody)
                                         ]
                      }
         theSRequest = SRequest theRequest (LBS.fromStrict nonJSONBody)
@@ -352,11 +353,11 @@ webhookTests =
     assertOkResponse body = do
       db <- memory
       let
-        app = paymentServerApp origins stripeConfig redemptionConfig db
+        app = makeApp db
         theRequest = (flip setPath) path defaultRequest
                      { requestMethod = "POST"
                      , requestHeaders = [ ("content-type", "application/json; charset=utf-8")
-                                        , ("Stripe-Signature", stripeSignature (WebhookSecretKey keyBytes) timestamp (LBS.toStrict body))
+                                        , ("Stripe-Signature", stripeSignature webhookSecret timestamp (LBS.toStrict body))
                                         ]
                      }
         theSRequest = SRequest theRequest body
@@ -377,6 +378,8 @@ webhookTests =
     assertNotRedeemable db voucher fingerprint = do
       redeemed <- redeemVoucher db voucher fingerprint
       assertEqual "The unpaid voucher is not redeemable." (Left NotPaid) redeemed
+
+    makeApp = paymentServerApp origins stripeConfig webhookConfig redemptionConfig
 
     -- Arbitrary strings that don't matter apart from how they compare to
     -- other values in the same range.  Maybe Voucher and Fingerprint should
@@ -399,6 +402,9 @@ webhookTests =
     keyBytes = "an extremely good key"
     stripeKey = StripeKey keyBytes
     stripeConfig = StripeConfig stripeKey Nothing
+    webhookSecretBytes = "very secret bytes"
+    webhookSecret = WebhookSecretKey webhookSecretBytes
+    webhookConfig = WebhookConfig webhookSecret
     origins = []
     redemptionConfig = RedemptionConfig 16 1024 trivialIssue
     path = "/v1/stripe/webhook"

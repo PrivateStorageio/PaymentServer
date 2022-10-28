@@ -103,7 +103,7 @@ serverTests =
   testCase "metrics endpoint" $
   let
     app :: Application
-    app = paymentServerApp mempty undefined undefined (undefined :: VoucherDatabaseState)
+    app = paymentServerApp mempty undefined undefined undefined (undefined :: VoucherDatabaseState)
   in
     flip runSession app $ do
       response <- readMetrics
