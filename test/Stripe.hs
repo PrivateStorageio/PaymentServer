@@ -251,7 +251,6 @@ chargeTests =
     voucher = "bar"
 
 -- TODO
--- Prevent replay attacks? https://stripe.com/docs/webhooks/signatures#replay-attacks
 -- Check network origin? https://stripe.com/docs/ips#webhook-notifications
 
 
