@@ -44,6 +44,9 @@ extra-deps:
     # https://input-output-hk.github.io/haskell.nix/tutorials/source-repository-hashes/#stack
     # nix-sha256: 39KhnnIG/UtvcUqELPfe5SAK8YgqA0UWjaILporkrCU=
   - "stripe-signature-1.0.0.14"
+
+  # Our fork of the stripe library supports *just* enough of Stripe's newer
+  # API version to get some extra information our webhook needs.
   - github: "PrivateStorageio/stripe"
     commit: "6c340eea6dc23c4245762b937b9701a40761a5c9"
     subdirs:
