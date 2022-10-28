@@ -77,6 +77,7 @@ executable PaymentServer-get-public-key
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wmissing-import-lists -Wunused-imports
   build-depends:       base
                      , text
+                     , optparse-applicative
                      , PaymentServer
   default-language:    Haskell2010
 
@@ -89,6 +90,7 @@ test-suite PaymentServer-tests
                      , Metrics
                      , Stripe
                      , FakeStripe
+                     , Ristretto
   build-depends:       aeson
                      , base
                      , bytestring
