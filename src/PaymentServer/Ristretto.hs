@@ -2,8 +2,10 @@
 {-# LANGUAGE EmptyDataDecls #-}
 
 module PaymentServer.Ristretto
-  ( Issuance(Issuance)
+  ( Issuance(Issuance, publicKey, signatures, proof)
   , randomSigningKey
+  , randomToken
+  , blindToken
   , getPublicKey
   , ristretto
   ) where
@@ -18,9 +20,6 @@ import Control.Monad.Except
   , liftIO
   )
 
-import System.IO.Unsafe
-  ( unsafePerformIO
-  )
 import Data.Text
   ( Text
   , unpack
@@ -43,12 +42,14 @@ import Foreign.Marshal.Array
   ( withArray
   )
 
+data C_Token
 data C_BlindedToken
 data C_SignedToken
 data C_SigningKey
 data C_PublicKey
 data C_BatchDLEQProof
 
+foreign import ccall "blinded_token_encode_base64" blinded_token_encode_base64 :: Ptr C_BlindedToken -> IO CString
 foreign import ccall "blinded_token_decode_base64" blinded_token_decode_base64 :: CString -> IO (Ptr C_BlindedToken)
 foreign import ccall "blinded_token_destroy" blinded_token_destroy :: Ptr C_BlindedToken -> IO ()
 
@@ -60,6 +61,11 @@ foreign import ccall "signing_key_encode_base64" signing_key_encode_base64 :: Pt
 foreign import ccall "signing_key_destroy" signing_key_destroy :: Ptr C_SigningKey -> IO ()
 foreign import ccall "signing_key_get_public_key" signing_key_get_public_key :: Ptr C_SigningKey -> IO (Ptr C_PublicKey)
 foreign import ccall "signing_key_sign" signing_key_sign :: Ptr C_SigningKey -> Ptr C_BlindedToken -> IO (Ptr C_SignedToken)
+
+foreign import ccall "token_random" token_random :: IO (Ptr C_Token)
+foreign import ccall "token_blind" token_blind :: Ptr C_Token -> IO (Ptr C_BlindedToken)
+foreign import ccall "token_encode_base64" token_encode_base64 :: Ptr C_Token -> IO CString
+foreign import ccall "token_decode_base64" token_decode_base64 :: CString -> IO (Ptr C_Token)
 
 foreign import ccall "signed_token_encode_base64" signed_token_encode_base64 :: Ptr C_SignedToken -> IO CString
 
@@ -109,7 +115,7 @@ anyNullIsError fallback op =
 ristretto
   :: Text                                  -- ^ The base64 encoded signing key.
   -> [Text]                                -- ^ A list of the base64 blinded tokens.
-  -> Either RistrettoFailure Issuance      -- ^ Left for an error, otherwise
+  -> IO (Either RistrettoFailure Issuance) -- ^ Left for an error, otherwise
                                            -- Right with the ristretto results
 ristretto textSigningKey textTokens =
   let
@@ -125,7 +131,7 @@ ristretto textSigningKey textTokens =
     stringSigningKey = unpack textSigningKey
     stringTokens = map unpack textTokens
   in
-    unsafePerformIO . runExceptT $
+    runExceptT $
     nullIsError SigningKeyAllocation (newCString stringSigningKey) >>= \cStringSigningKey ->
     nullIsError SigningKeyDecoding (signing_key_decode_base64 cStringSigningKey) >>= \signingKey ->
     nullIsError PublicKeyLookup (signing_key_get_public_key signingKey) >>= \publicKey ->
@@ -149,6 +155,29 @@ randomSigningKey = do
   signing_key_destroy cSigningKey
   result <- peekCString cString
   free cString
+  return $ pack result
+
+-- | randomToken generates a new token at random and returns it encoded as a
+-- base64 string.
+randomToken :: IO Text
+randomToken = do
+  cToken <- token_random
+  cString <- token_encode_base64 cToken
+  result <- peekCString cString
+  free cString
+  return $ pack result
+
+-- | blindToken takes a token encoded as base64 and returns the base64
+-- encoding of the blinding of the token.
+blindToken :: Text -> IO Text
+blindToken token = do
+  cString <- newCString . unpack $ token
+  cToken <- token_decode_base64 cString
+  cBlinded <- token_blind cToken
+  cBlindedString <- blinded_token_encode_base64 cBlinded
+  result <- peekCString cBlindedString
+  free cString
+  free cBlindedString
   return $ pack result
 
 -- | getPublicKey returns the base64 encoded public key corresponding to the

@@ -87,6 +87,7 @@ test-suite PaymentServer-tests
                      , Metrics
                      , Stripe
                      , FakeStripe
+                     , Ristretto
   build-depends:       aeson
                      , base
                      , bytestring
