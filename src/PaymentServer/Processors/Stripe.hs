@@ -8,6 +8,7 @@
 module PaymentServer.Processors.Stripe
   ( ChargesAPI
   , WebhookAPI
+  , WebhookConfig(WebhookConfig)
   , Charges(Charges)
   , Acknowledgement(Ok)
   , Failure(Failure)
@@ -121,7 +122,7 @@ import Web.Stripe
   )
 
 import Stripe.Concepts
-  ( WebhookSecretKey(WebhookSecretKey)
+  ( WebhookSecretKey
   )
 
 
@@ -142,6 +143,12 @@ instance ToJSON Acknowledgement where
   toJSON Ok = object
     [ "success" .= True
     ]
+
+-- Represent configuration options for setting up the webhook endpoint for
+-- receiving event notifications from Stripe.
+data WebhookConfig = WebhookConfig
+  { webhookConfigKey :: WebhookSecretKey
+  }
 
 -- | getVoucher finds the metadata item with the key `"Voucher"` and returns
 -- the corresponding value, or Nothing.
@@ -173,13 +180,13 @@ instance MimeUnrender UnparsedJSON ByteString where
 type WebhookAPI = "webhook" :> Header "Stripe-Signature" Text :> ReqBody '[UnparsedJSON] ByteString :> Post '[JSON] Acknowledgement
 
 -- | Process charge succeeded
-webhookServer :: VoucherDatabase d => StripeConfig -> d -> Maybe Text -> ByteString -> Handler Acknowledgement
+webhookServer :: VoucherDatabase d => WebhookConfig -> d -> Maybe Text -> ByteString -> Handler Acknowledgement
 webhookServer _ _ Nothing _ = throwError $ jsonErr status400 "missing signature"
-webhookServer stripeConfig@StripeConfig { secretKey = (StripeKey stripeKey) } d (Just signatureText) payload =
+webhookServer WebhookConfig { webhookConfigKey } d (Just signatureText) payload =
   case parseSig signatureText of
     Nothing -> throwError $ jsonErr status400 "malformed signature"
     Just sig ->
-      if isSigValid sig (WebhookSecretKey stripeKey) payload
+      if isSigValid sig webhookConfigKey payload
       then fundVoucher
       else throwError $ jsonErr status400 "invalid signature"
   where

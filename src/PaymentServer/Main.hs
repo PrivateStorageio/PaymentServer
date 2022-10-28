@@ -55,6 +55,10 @@ import Network.Wai.Middleware.RequestLogger
   , mkRequestLogger
   )
 
+import Stripe.Concepts
+  ( WebhookSecretKey(WebhookSecretKey)
+  )
+
 import Web.Stripe.Client
   ( Protocol(HTTPS)
   , StripeConfig(StripeConfig)
@@ -71,6 +75,10 @@ import PaymentServer.Issuer
   , trivialIssue
   , ristrettoIssue
   )
+import PaymentServer.Processors.Stripe
+  ( WebhookConfig(WebhookConfig)
+  )
+
 import PaymentServer.Server
   ( RedemptionConfig(RedemptionConfig)
   , paymentServerApp
@@ -105,6 +113,7 @@ import System.Exit
 import Data.Semigroup ((<>))
 import qualified Data.Text.IO as TIO
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as Char8
 import qualified Data.ByteString.Lazy.UTF8 as LBS
 
 data IssuerFlavor =
@@ -125,6 +134,7 @@ data ServerConfig = ServerConfig
   , databasePath           :: Maybe Text
   , endpoint               :: Endpoint
   , stripeKeyPath          :: FilePath
+  , stripeWebhookKeyPath   :: FilePath
   , stripeEndpointUrl      :: ByteString
   , stripeEndpointProtocol :: Protocol
   , stripeEndpointPort     :: Int
@@ -217,6 +227,9 @@ sample = ServerConfig
   <*> option str
   ( long "stripe-key-path"
     <> help "Path to Stripe Secret key" )
+  <*> option str
+  ( long "stripe-webhook-key-path"
+    <> help "Path to Stripe Webhook signing key" )
   <*> option str
   ( long "stripe-endpoint-domain"
     <> help "The domain name for the Stripe API HTTP endpoint."
@@ -311,11 +324,18 @@ getApp config =
       , stripeEndpointPort
       } =
       do
-        key <- B.readFile stripeKeyPath
+        key <- Char8.strip <$> B.readFile stripeKeyPath
         return $
           StripeConfig
           (StripeKey key)
           (Just $ Stripe.Endpoint stripeEndpointUrl stripeEndpointProtocol stripeEndpointPort)
+
+    webhookConfig ServerConfig
+      { stripeWebhookKeyPath
+      } =
+      do
+        webhookKey <- Char8.strip <$> B.readFile stripeWebhookKeyPath
+        return $ WebhookConfig (WebhookSecretKey webhookKey)
   in do
     issuer <- getIssuer config
     case issuer of
@@ -330,10 +350,11 @@ getApp config =
           Right getDB -> do
             db <- getDB
             stripeConfig' <- stripeConfig config
+            webhookConfig' <- webhookConfig config
             let
               origins = corsOrigins config
               redemptionConfig = getRedemptionConfig config issuer
-              app = paymentServerApp origins stripeConfig' redemptionConfig db
+              app = paymentServerApp origins stripeConfig' webhookConfig' redemptionConfig db
             metricsMiddleware <- makeMetricsMiddleware
             logger <- mkRequestLogger (def { outputFormat = Detailed True})
             return . logger . metricsMiddleware $ app
