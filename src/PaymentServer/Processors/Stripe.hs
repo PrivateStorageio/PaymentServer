@@ -262,9 +262,6 @@ withSuccessFailureMetrics attemptCount successCount op = do
 -- and if the Charge is okay, then set the voucher as "paid" in the database.
 charge :: VoucherDatabase d => StripeConfig -> d -> Charges -> Handler Acknowledgement
 charge stripeConfig d (Charges token voucher 650 USD) = do
-
-  -- TODO verify the webhook request as a first step
-
   result <- liftIO payForVoucher'
   case result of
     Left AlreadyPaid ->
