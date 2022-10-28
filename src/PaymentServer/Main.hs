@@ -67,7 +67,8 @@ import PaymentServer.Persistence
   , sqlite
   )
 import PaymentServer.Issuer
-  ( trivialIssue
+  ( Issuer
+  , trivialIssue
   , ristrettoIssue
   )
 import PaymentServer.Server
@@ -106,7 +107,7 @@ import qualified Data.Text.IO as TIO
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy.UTF8 as LBS
 
-data Issuer =
+data IssuerFlavor =
   Trivial
   | Ristretto
   deriving (Show, Eq, Ord, Read)
@@ -117,8 +118,9 @@ data Database =
   deriving (Show, Eq, Ord, Read)
 
 data ServerConfig = ServerConfig
-  { issuer                 :: Issuer
+  { issuer                 :: IssuerFlavor
   , signingKeyPath         :: Maybe FilePath
+  , getRedemptionConfig    :: Issuer -> RedemptionConfig
   , database               :: Database
   , databasePath           :: Maybe Text
   , endpoint               :: Endpoint
@@ -128,7 +130,6 @@ data ServerConfig = ServerConfig
   , stripeEndpointPort     :: Int
   , corsOrigins            :: [Origin]
   }
-  deriving (Show, Eq)
 
 -- | An Endpoint represents the configuration for a socket's IP address.
 -- There are some layering violations here.  I'm just copying Twisted
@@ -175,6 +176,22 @@ https = TLSEndpoint
     <> help "Filesystem path to the TLS private key to use for HTTPS." )
 
 
+redemption :: Parser (Issuer -> RedemptionConfig)
+redemption = RedemptionConfig
+  <$> option auto
+  ( long "num-redemption-groups"
+    <> help "The number of redemption groups a single redemption is divided into."
+    <> showDefault
+    <> value 16
+  )
+  <*> option auto
+  ( long "tokens-per-voucher"
+    <> help "The total number of tokens received in exchange for one voucher."
+    <> showDefault
+    <> value 50000
+  )
+
+
 sample :: Parser ServerConfig
 sample = ServerConfig
   <$> option auto
@@ -186,6 +203,7 @@ sample = ServerConfig
   ( long "signing-key-path"
     <> help "Path to base64 encoded signing key (ristretto only)"
     <> showDefault ) )
+  <*> redemption
   <*> option auto
   ( long "database"
     <> help "Which database to use: sqlite3 or memory"
@@ -314,7 +332,7 @@ getApp config =
             stripeConfig' <- stripeConfig config
             let
               origins = corsOrigins config
-              redemptionConfig = RedemptionConfig 16 50000 issuer
+              redemptionConfig = getRedemptionConfig config issuer
               app = paymentServerApp origins stripeConfig' redemptionConfig db
             metricsMiddleware <- makeMetricsMiddleware
             logger <- mkRequestLogger (def { outputFormat = Detailed True})
