@@ -250,10 +250,6 @@ chargeTests =
     token = "foo"
     voucher = "bar"
 
--- TODO
--- Check network origin? https://stripe.com/docs/ips#webhook-notifications
-
-
 webhookTests :: TestTree
 webhookTests =
   testGroup "The Stripe charge web hook"
