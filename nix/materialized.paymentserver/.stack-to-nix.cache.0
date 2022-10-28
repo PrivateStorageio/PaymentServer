@@ -76,5 +76,5 @@
         };
       };
     } // rec {
-    src = (pkgs.lib).mkDefault /nix/store/g62jlfm3vg9dld12fi12f5rkp9sjgbab-servant-prometheus-6c8430b;
+    src = (pkgs.lib).mkDefault /nix/store/r537z0w0swb6calr6vkk2ppnqd2bgv8z-servant-prometheus-622eb77;
     }
