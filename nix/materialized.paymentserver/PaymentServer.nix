@@ -56,6 +56,7 @@
           (hsPkgs."retry" or (errorHandler.buildDepError "retry"))
           (hsPkgs."prometheus-client" or (errorHandler.buildDepError "prometheus-client"))
           (hsPkgs."servant-prometheus" or (errorHandler.buildDepError "servant-prometheus"))
+          (hsPkgs."mtl" or (errorHandler.buildDepError "mtl"))
           ];
         pkgconfig = [
           (pkgconfPkgs."libchallenge_bypass_ristretto_ffi" or (errorHandler.pkgConfDepError "libchallenge_bypass_ristretto_ffi"))
