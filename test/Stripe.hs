@@ -303,30 +303,34 @@ webhookTests =
       let (Just (Failure _)) = decode . simpleBody $ response
       assertEqual "The response is 400" status400 (simpleStatus response)
 
-  , testCase "If the signature is correct then the response is OK" $ do
-      db <- assertOkResponse checkoutSessionCompleted
+  , testCase "If the request body contains a checkout.session.completed event and the signature is correct then the voucher is marked as paid and the response is OK" $ do
+      db <- runRequest checkoutSessionCompleted >>= assertOkResponse
       -- It has been paid so we should be allowed to redeem it.
       assertRedeemable db voucher fingerprint
 
   , testCase "The response to a charge.succeeded is OK" $ do
-      db <- assertOkResponse chargeSucceeded
-      -- It is only redeemable after checkout.session.completed.
+      db <- runRequest chargeSucceeded >>= assertOkResponse
+      -- The charge.succeeded event does not carry the voucher value so it is
+      -- impossible for us to record the voucher as paid in response to this
+      -- event.  Check that explicitly to confirm our reasoning...
       assertNotRedeemable db voucher fingerprint
 
   , testCase "The response to a payment_intent.created is OK" $ do
-      db <- assertOkResponse paymentIntentCreated
-      -- It is only redeemable after checkout.session.completed.
+      db <- runRequest paymentIntentCreated >>= assertOkResponse
+      -- A payment intent "acts as the single source of truth in the
+      -- lifecycle" (https://stripe.com/docs/payments/intents) of a payment
+      -- flow.  The mere *creation* of one implies nothing about payment
+      -- having been received so the voucher should not have been marked as
+      -- paid in response to this event.
       assertNotRedeemable db voucher fingerprint
 
   , testCase "The response to a customer.created is OK" $ do
-      db <- assertOkResponse customerCreated
+      db <- runRequest customerCreated >>= assertOkResponse
       -- It is only redeemable after checkout.session.completed.
       assertNotRedeemable db voucher fingerprint
   ]
   where
-    -- Assert that the response to a correctly signed applicaton/json request
-    -- with the given body is 200 OK.
-    assertOkResponse body = do
+    runRequest body = do
       db <- memory
       let
         app = makeApp db
@@ -339,9 +343,17 @@ webhookTests =
         theSRequest = SRequest theRequest body
 
       response <- (flip runSession) app $ srequest theSRequest
+      return (db, response)
+
+    -- Assert that the response to a correctly signed applicaton/json request
+    -- with the given body is 200 OK.
+    assertOkResponse (db, response) = do
       assertEqual "The body reflects success" (encode Ok) (simpleBody response)
-      assertEqual "The response is 200" status200 (simpleStatus response)
+      assertResponse status200 (db, response)
       return db
+
+    assertResponse status (db, response) =
+      assertEqual ("The response is " ++ (show status)) status (simpleStatus response)
 
     -- Assert that the database allows us to redeem a voucher, demonstrating
     -- that the voucher has persistent state consistent with payment having
