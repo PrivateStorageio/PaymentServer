@@ -38,6 +38,7 @@
           (hsPkgs."aeson" or (errorHandler.buildDepError "aeson"))
           (hsPkgs."bytestring" or (errorHandler.buildDepError "bytestring"))
           (hsPkgs."utf8-string" or (errorHandler.buildDepError "utf8-string"))
+          (hsPkgs."base16-bytestring" or (errorHandler.buildDepError "base16-bytestring"))
           (hsPkgs."servant" or (errorHandler.buildDepError "servant"))
           (hsPkgs."servant-server" or (errorHandler.buildDepError "servant-server"))
           (hsPkgs."http-types" or (errorHandler.buildDepError "http-types"))
@@ -108,6 +109,23 @@
           hsSourceDirs = [ "get-public-key" ];
           mainPath = [ "Main.hs" ];
           };
+        "PaymentServer-complete-payment" = {
+          depends = [
+            (hsPkgs."base" or (errorHandler.buildDepError "base"))
+            (hsPkgs."time" or (errorHandler.buildDepError "time"))
+            (hsPkgs."text" or (errorHandler.buildDepError "text"))
+            (hsPkgs."bytestring" or (errorHandler.buildDepError "bytestring"))
+            (hsPkgs."optparse-applicative" or (errorHandler.buildDepError "optparse-applicative"))
+            (hsPkgs."unix-compat" or (errorHandler.buildDepError "unix-compat"))
+            (hsPkgs."http-client" or (errorHandler.buildDepError "http-client"))
+            (hsPkgs."stripe-concepts" or (errorHandler.buildDepError "stripe-concepts"))
+            (hsPkgs."raw-strings-qq" or (errorHandler.buildDepError "raw-strings-qq"))
+            (hsPkgs."PaymentServer" or (errorHandler.buildDepError "PaymentServer"))
+            ];
+          buildable = true;
+          hsSourceDirs = [ "complete-payment" ];
+          mainPath = [ "Main.hs" ];
+          };
         };
       tests = {
         "PaymentServer-tests" = {
@@ -117,7 +135,6 @@
             (hsPkgs."bytestring" or (errorHandler.buildDepError "bytestring"))
             (hsPkgs."stripe-signature" or (errorHandler.buildDepError "stripe-signature"))
             (hsPkgs."stripe-concepts" or (errorHandler.buildDepError "stripe-concepts"))
-            (hsPkgs."base16-bytestring" or (errorHandler.buildDepError "base16-bytestring"))
             (hsPkgs."text" or (errorHandler.buildDepError "text"))
             (hsPkgs."transformers" or (errorHandler.buildDepError "transformers"))
             (hsPkgs."raw-strings-qq" or (errorHandler.buildDepError "raw-strings-qq"))

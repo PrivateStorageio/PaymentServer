@@ -48,13 +48,6 @@ import Stripe.Concepts
   ( WebhookSecretKey(WebhookSecretKey)
   )
 
-import Stripe.Signature
-  ( digest
-  , natBytes
-  )
-
-import qualified Data.ByteString.Base16 as Base16
-
 import Servant.Server
   ( Handler(runHandler')
   , ServerError(ServerError)
@@ -109,6 +102,7 @@ import PaymentServer.Processors.Stripe
   , WebhookConfig(WebhookConfig)
   , charge
   , webhookServer
+  , stripeSignature
   )
 
 import PaymentServer.Issuer
@@ -376,16 +370,7 @@ webhookTests =
     voucher = "abcdefghi"
     fingerprint = "rstuvwxyz"
 
-    stripeSignature key when what = BS.concat
-      [ "t="
-      , natBytes when
-      , ","
-      , "v1="
-      , encodeHex $ digest key when what
-      ]
-
     timestamp = 1234567890
-    encodeHex = Base16.encode
 
     keyBytes = "an extremely good key"
     stripeKey = StripeKey keyBytes

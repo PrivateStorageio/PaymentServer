@@ -16,10 +16,11 @@ module PaymentServer.Processors.Stripe
   , webhookServer
   , getVoucher
   , charge
+  , stripeSignature
   ) where
 
-import Prelude hiding
-  ( concat
+import GHC.Natural
+  ( Natural
   )
 
 import Control.Exception
@@ -45,13 +46,15 @@ import Network.HTTP.Types
   , status503
   )
 
-import Data.ByteString (ByteString)
+import Data.ByteString (ByteString, concat)
 
 import Data.ByteString.Lazy (toStrict, fromStrict)
 
 import Data.ByteString.UTF8
   ( toString
   )
+
+import qualified Data.ByteString.Base16 as Base16
 
 import Data.Aeson
   ( ToJSON(toJSON)
@@ -87,7 +90,7 @@ import Web.Stripe.Event
   , EventData(ChargeEvent, CheckoutSessionEvent)
   )
 
-import Stripe.Signature (parseSig, isSigValid)
+import Stripe.Signature (digest, natBytes, parseSig, isSigValid)
 
 import Web.Stripe.Error
   ( StripeError(StripeError, errorType, errorMsg)
@@ -142,7 +145,17 @@ data WebhookConfig = WebhookConfig
   { webhookConfigKey :: WebhookSecretKey
   }
 
--- | getVoucher finds the metadata item with the key `"Voucher"` and returns
+-- Create the value for the `Stripe-Signature` header item in a webhook request.
+stripeSignature :: WebhookSecretKey -> Natural -> ByteString -> ByteString
+stripeSignature key when what = Data.ByteString.concat
+  [ "t="
+  , natBytes when
+  , ","
+  , "v1="
+  , Base16.encode $ digest key when what
+  ]
+
+-- getVoucher finds the metadata item with the key `"Voucher"` and returns
 -- the corresponding value, or Nothing.
 getVoucher :: Event -> Maybe Voucher
 getVoucher Event{eventData=(CheckoutSessionEvent checkoutSession)} =
@@ -269,7 +282,7 @@ charge stripeConfig d (Charges token voucher 650 USD) = do
     Left (PaymentFailed (StripeError { errorType = errorType, errorMsg = msg })) -> do
       liftIO $ print "Stripe createCharge failed:"
       liftIO $ print msg
-      let err = errorForStripe errorType ( concat [ "Stripe charge didn't succeed: ", msg ])
+      let err = errorForStripe errorType ( Data.Text.concat [ "Stripe charge didn't succeed: ", msg ])
       throwError err
 
     Right _ -> return Ok
