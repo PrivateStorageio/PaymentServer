@@ -50,3 +50,21 @@ Then redeem the vouncher for tokens::
      -X POST \
      -H 'content-type: application/json' \
      --data '{ "redeemVoucher": "abcdefg", "redeemTokens":[]}'
+
+Stripe Integration
+------------------
+
+PaymentServer listens for Stripe events at a "webhook" endpoint.
+The endpoint is at ``/v1/stripe/webhook``.
+It handles only ``checkout.session.completed`` events.
+These events must include a voucher in the ``client_reference_id`` field.
+A voucher so referenced will be marked as paid when this event is processed.
+
+The webhook must be correctly configured in the associated Stripe account.
+One way to configure it is with a request like::
+
+  curl \
+    https://api.stripe.com/v1/webhook_endpoints \
+    -u sk_test_yourkey: \
+    -d url="https://serveraddress/v1/stripe/webhook" \
+    -d "enabled_events[]"="checkout.session.completed"
