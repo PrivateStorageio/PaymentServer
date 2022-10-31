@@ -86,7 +86,7 @@ import Servant.API
 import Web.Stripe.Event
   ( Event(Event, eventId, eventType, eventData)
   , EventId(EventId)
-  , EventType(ChargeSucceededEvent, CheckoutSessionCompleted)
+  , EventType(ChargeSucceededEvent, CheckoutSessionCompleted, PaymentIntentCreated)
   , EventData(ChargeEvent, CheckoutSessionEvent)
   )
 
@@ -201,7 +201,7 @@ webhookServer WebhookConfig { webhookConfigKey } d (Just signatureText) payload 
     fundVoucher =
       case eitherDecode . fromStrict $ payload of
         Left s -> throwError $ jsonErr status400 (pack s)
-        Right event ->
+        Right event@Event { eventType = CheckoutSessionCompleted } ->
           case getVoucher event of
             Nothing ->
               -- TODO: Record the eventId somewhere.  In all cases where we don't
@@ -215,8 +215,8 @@ webhookServer WebhookConfig { webhookConfigKey } d (Just signatureText) payload 
               -- should be able to indicate error I guess.
               _ <- liftIO . payForVoucher d v . return . Right $ ()
               return Ok
-        Right _ ->
-          return Ok
+        Right event@Event { eventType } ->
+          throwError . jsonErr status400 . pack $ "unsupported event type " ++ show eventType
 
 -- | Browser facing API that takes token, voucher and a few other information
 -- and calls stripe charges API. If payment succeeds, then the voucher is stored
