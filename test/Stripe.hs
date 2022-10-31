@@ -302,26 +302,9 @@ webhookTests =
       -- It has been paid so we should be allowed to redeem it.
       assertRedeemable db voucher fingerprint
 
-  , testCase "The response to a charge.succeeded is OK" $ do
-      db <- runRequest chargeSucceeded >>= assertOkResponse
-      -- The charge.succeeded event does not carry the voucher value so it is
-      -- impossible for us to record the voucher as paid in response to this
-      -- event.  Check that explicitly to confirm our reasoning...
-      assertNotRedeemable db voucher fingerprint
+  , testCase "The response to any other event is Bad Request" $
+      runRequest productCreated >>= assertResponse status400
 
-  , testCase "The response to a payment_intent.created is OK" $ do
-      db <- runRequest paymentIntentCreated >>= assertOkResponse
-      -- A payment intent "acts as the single source of truth in the
-      -- lifecycle" (https://stripe.com/docs/payments/intents) of a payment
-      -- flow.  The mere *creation* of one implies nothing about payment
-      -- having been received so the voucher should not have been marked as
-      -- paid in response to this event.
-      assertNotRedeemable db voucher fingerprint
-
-  , testCase "The response to a customer.created is OK" $ do
-      db <- runRequest customerCreated >>= assertOkResponse
-      -- It is only redeemable after checkout.session.completed.
-      assertNotRedeemable db voucher fingerprint
   ]
   where
     runRequest body = do
@@ -396,149 +379,6 @@ webhookTests =
     signedRequest sig = jsonRequest
       { requestHeaders = ("Stripe-Signature", sig):requestHeaders jsonRequest
       }
-
-chargeSucceeded :: LBS.ByteString
-chargeSucceeded = [r|
-{
-  "id": "evt_3LxcbqBHXBAMm9bP1XpbOJrq",
-  "object": "event",
-  "api_version": "2019-11-05",
-  "created": 1666902207,
-  "data": {
-    "object": {
-      "id": "ch_3LxcbqBHXBAMm9bP1QIFhXee",
-      "object": "charge",
-      "amount": 100,
-      "amount_captured": 100,
-      "amount_refunded": 0,
-      "application": null,
-      "application_fee": null,
-      "application_fee_amount": null,
-      "balance_transaction": "txn_3LxcbqBHXBAMm9bP1Q0skk4e",
-      "billing_details": {
-        "address": {
-          "city": null,
-          "country": null,
-          "line1": null,
-          "line2": null,
-          "postal_code": null,
-          "state": null
-        },
-        "email": null,
-        "name": null,
-        "phone": null
-      },
-      "calculated_statement_descriptor": "PRIVATESTORAGE.IO",
-      "captured": true,
-      "created": 1666902206,
-      "currency": "usd",
-      "customer": null,
-      "description": "(created by Stripe CLI)",
-      "destination": null,
-      "dispute": null,
-      "disputed": false,
-      "failure_balance_transaction": null,
-      "failure_code": null,
-      "failure_message": null,
-      "fraud_details": {
-      },
-      "invoice": null,
-      "livemode": false,
-      "metadata": {
-      },
-      "on_behalf_of": null,
-      "order": null,
-      "outcome": {
-        "network_status": "approved_by_network",
-        "reason": null,
-        "risk_level": "normal",
-        "risk_score": 35,
-        "seller_message": "Payment complete.",
-        "type": "authorized"
-      },
-      "paid": true,
-      "payment_intent": null,
-      "payment_method": "card_1LxcbqBHXBAMm9bPRIob1C1S",
-      "payment_method_details": {
-        "card": {
-          "brand": "visa",
-          "checks": {
-            "address_line1_check": null,
-            "address_postal_code_check": null,
-            "cvc_check": null
-          },
-          "country": "US",
-          "exp_month": 10,
-          "exp_year": 2023,
-          "fingerprint": "gLKhmoQYfsr1qGDi",
-          "funding": "credit",
-          "installments": null,
-          "last4": "4242",
-          "mandate": null,
-          "network": "visa",
-          "three_d_secure": null,
-          "wallet": null
-        },
-        "type": "card"
-      },
-      "receipt_email": null,
-      "receipt_number": null,
-      "receipt_url": "https://pay.stripe.com/receipts/payment/CAcaFwoVYWNjdF8xRmhoeFRCSFhCQU1tOWJQKL_R65oGMgalIgGPgQc6LBaD9Kdq4Rg0Iz82re-NgTxpvigBVa_0K9HB7KHKy2v5eLI-3zt8J7kJZeRs",
-      "refunded": false,
-      "refunds": {
-        "object": "list",
-        "data": [
-
-        ],
-        "has_more": false,
-        "total_count": 0,
-        "url": "/v1/charges/ch_3LxcbqBHXBAMm9bP1QIFhXee/refunds"
-      },
-      "review": null,
-      "shipping": null,
-      "source": {
-        "id": "card_1LxcbqBHXBAMm9bPRIob1C1S",
-        "object": "card",
-        "address_city": null,
-        "address_country": null,
-        "address_line1": null,
-        "address_line1_check": null,
-        "address_line2": null,
-        "address_state": null,
-        "address_zip": null,
-        "address_zip_check": null,
-        "brand": "Visa",
-        "country": "US",
-        "customer": null,
-        "cvc_check": null,
-        "dynamic_last4": null,
-        "exp_month": 10,
-        "exp_year": 2023,
-        "fingerprint": "gLKhmoQYfsr1qGDi",
-        "funding": "credit",
-        "last4": "4242",
-        "metadata": {
-        },
-        "name": null,
-        "tokenization_method": null
-      },
-      "source_transfer": null,
-      "statement_descriptor": null,
-      "statement_descriptor_suffix": null,
-      "status": "succeeded",
-      "transfer_data": null,
-      "transfer_group": null
-    }
-  },
-  "livemode": false,
-  "pending_webhooks": 2,
-  "request": {
-    "id": "req_u9SZdDchrHT1Iv",
-    "idempotency_key": "2591ca44-b3b5-463b-b3ad-128bf954acfb"
-  },
-  "type": "charge.succeeded"
-}
-|]
 
 -- Note the client_reference_id contained within matches the voucher defined
 -- above.
@@ -649,178 +489,48 @@ checkoutSessionCompleted = [r|
 }
 |]
 
-paymentIntentCreated :: LBS.ByteString
-paymentIntentCreated = [r|
+
+productCreated :: LBS.ByteString
+productCreated = [r|
 {
-  "id": "evt_3LxcZvBHXBAMm9bP1vttzzH9",
+  "id": "evt_1LyxesBHXBAMm9bPqekQW4Yj",
   "object": "event",
   "api_version": "2019-11-05",
-  "created": 1666902087,
+  "created": 1667221446,
   "data": {
     "object": {
-      "id": "pi_3LxcZvBHXBAMm9bP1eIHeoyO",
-      "object": "payment_intent",
-      "amount": 3000,
-      "amount_capturable": 0,
-      "amount_details": {
-        "tip": {
-        }
-      },
-      "amount_received": 0,
-      "application": null,
-      "application_fee_amount": null,
-      "automatic_payment_methods": null,
-      "canceled_at": null,
-      "cancellation_reason": null,
-      "capture_method": "automatic",
-      "charges": {
-        "object": "list",
-        "data": [
+      "id": "prod_MiOR6hX1zcaGfJ",
+      "object": "product",
+      "active": true,
+      "attributes": [
 
-        ],
-        "has_more": false,
-        "total_count": 0,
-        "url": "/v1/charges?payment_intent=pi_3LxcZvBHXBAMm9bP1eIHeoyO"
-      },
-      "client_secret": "pi_3LxcZvBHXBAMm9bP1eIHeoyO_secret_diVUyvF9D65M4h8Azbr2j4kEA",
-      "confirmation_method": "automatic",
-      "created": 1666902087,
-      "currency": "usd",
-      "customer": null,
-      "description": null,
-      "invoice": null,
-      "last_payment_error": null,
-      "livemode": false,
-      "metadata": {
-      },
-      "next_action": null,
-      "on_behalf_of": null,
-      "payment_method": null,
-      "payment_method_options": {
-        "card": {
-          "installments": null,
-          "mandate_options": null,
-          "network": null,
-          "request_three_d_secure": "automatic"
-        }
-      },
-      "payment_method_types": [
-        "card"
       ],
-      "processing": null,
-      "receipt_email": null,
-      "review": null,
-      "setup_future_usage": null,
-      "shipping": {
-        "address": {
-          "city": "townsville",
-          "country": "US",
-          "line1": "123 Street road",
-          "line2": null,
-          "postal_code": "11111",
-          "state": "CA"
-        },
-        "carrier": null,
-        "name": "example username",
-        "phone": null,
-        "tracking_number": null
-      },
-      "source": null,
-      "statement_descriptor": null,
-      "statement_descriptor_suffix": null,
-      "status": "requires_payment_method",
-      "transfer_data": null,
-      "transfer_group": null
-    }
-  },
-  "livemode": false,
-  "pending_webhooks": 2,
-  "request": {
-    "id": "req_iopIfwbaJIDNrU",
-    "idempotency_key": "95faad4b-7cdc-4271-b9eb-c70eae570a33"
-  },
-  "type": "payment_intent.created"
-}
-|]
-
-
-customerCreated :: LBS.ByteString
-customerCreated = [r|
-{
-  "id": "evt_1LxsEGBHXBAMm9bPNpMsfAwM",
-  "object": "event",
-  "api_version": "2019-11-05",
-  "created": 1666962248,
-  "data": {
-    "object": {
-      "id": "cus_MhGlMSuYwsznIR",
-      "object": "customer",
-      "address": null,
-      "balance": 0,
-      "created": 1666962248,
-      "currency": null,
-      "default_currency": null,
-      "default_source": null,
-      "delinquent": false,
+      "created": 1667221445,
+      "default_price": null,
       "description": "(created by Stripe CLI)",
-      "discount": null,
-      "email": null,
-      "invoice_prefix": "4DEA2542",
-      "invoice_settings": {
-        "custom_fields": null,
-        "default_payment_method": null,
-        "footer": null,
-        "rendering_options": null
-      },
+      "images": [
+
+      ],
       "livemode": false,
       "metadata": {
       },
-      "name": null,
-      "next_invoice_sequence": 1,
-      "phone": null,
-      "preferred_locales": [
-
-      ],
-      "shipping": null,
-      "sources": {
-        "object": "list",
-        "data": [
-
-        ],
-        "has_more": false,
-        "total_count": 0,
-        "url": "/v1/customers/cus_MhGlMSuYwsznIR/sources"
-      },
-      "subscriptions": {
-        "object": "list",
-        "data": [
-
-        ],
-        "has_more": false,
-        "total_count": 0,
-        "url": "/v1/customers/cus_MhGlMSuYwsznIR/subscriptions"
-      },
-      "tax_exempt": "none",
-      "tax_ids": {
-        "object": "list",
-        "data": [
-
-        ],
-        "has_more": false,
-        "total_count": 0,
-        "url": "/v1/customers/cus_MhGlMSuYwsznIR/tax_ids"
-      },
-      "tax_info": null,
-      "tax_info_verification": null,
-      "test_clock": null
+      "name": "myproduct",
+      "package_dimensions": null,
+      "shippable": null,
+      "statement_descriptor": null,
+      "tax_code": null,
+      "type": "service",
+      "unit_label": null,
+      "updated": 1667221446,
+      "url": null
     }
   },
   "livemode": false,
   "pending_webhooks": 2,
   "request": {
-    "id": "req_E1nCrCScXzp8ua",
-    "idempotency_key": "42b72b96-3fde-47a7-bf5d-02779bbbbd5d"
+    "id": "req_kvFraITogK8pZB",
+    "idempotency_key": "74150cd6-6ac5-4144-859f-4e6774adb09d"
   },
-  "type": "customer.created"
+  "type": "product.created"
 }
 |]
