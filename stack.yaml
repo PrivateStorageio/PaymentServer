@@ -38,10 +38,21 @@ packages:
 # using the same syntax as the packages field.
 # (e.g., acme-missiles-0.3)
 extra-deps:
+  - "network-3.1.2.7"
   - github: "PrivateStorageio/servant-prometheus"
     commit: "622eb77cb08c5f13729173b8feb123a6700ff91f"
     # https://input-output-hk.github.io/haskell.nix/tutorials/source-repository-hashes/#stack
-    # nix-sha256: 09dcwj5ac2x2ilb4a0rai3qhl875vvvjr12af5plpz86faga3lnz
+    # nix-sha256: 39KhnnIG/UtvcUqELPfe5SAK8YgqA0UWjaILporkrCU=
+  - "stripe-signature-1.0.0.14"
+
+  # Our fork of the stripe library supports *just* enough of Stripe's newer
+  # API version to get some extra information our webhook needs.
+  - github: "PrivateStorageio/stripe"
+    commit: "6c340eea6dc23c4245762b937b9701a40761a5c9"
+    subdirs:
+      - "stripe-core"
+    # nix-sha256: uVB4vVHgDxyCJpzURl0MPPvwOAaIyi07vNGJXFkLHK4=
+
 
 # Override default flag values for local packages and extra-deps
 # flags: {}

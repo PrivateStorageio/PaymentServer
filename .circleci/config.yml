@@ -83,7 +83,10 @@ jobs:
               --option extra-trusted-public-keys "${TRUSTED_PUBLIC_KEYS}" \
               -j 4 \
               ./nix/ \
-              -A PaymentServer.components.exes."PaymentServer-exe"
+              -A PaymentServer.components.exes."PaymentServer-exe" \
+              -A PaymentServer.components.exes."PaymentServer-generate-key" \
+              -A PaymentServer.components.exes."PaymentServer-get-public-key" \
+              -A PaymentServer.components.exes."PaymentServer-complete-payment"
 
       - run:
           name: "Building Tests"

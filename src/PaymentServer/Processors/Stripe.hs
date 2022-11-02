@@ -3,19 +3,24 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module PaymentServer.Processors.Stripe
-  ( StripeAPI
+  ( ChargesAPI
+  , WebhookAPI
+  , WebhookConfig(WebhookConfig)
   , Charges(Charges)
   , Acknowledgement(Ok)
   , Failure(Failure)
-  , stripeServer
+  , chargeServer
+  , webhookServer
   , getVoucher
   , charge
+  , stripeSignature
   ) where
 
-import Prelude hiding
-  ( concat
+import GHC.Natural
+  ( Natural
   )
 
 import Control.Exception
@@ -29,13 +34,11 @@ import Control.Monad
   )
 import Data.Text
   ( Text
-  , unpack
   , concat
-  )
-import Text.Read
-  ( readMaybe
+  , pack
   )
 
+import qualified Network.HTTP.Media as M
 import Network.HTTP.Types
   ( Status(Status)
   , status400
@@ -43,9 +46,15 @@ import Network.HTTP.Types
   , status503
   )
 
+import Data.ByteString (ByteString, concat)
+
+import Data.ByteString.Lazy (toStrict, fromStrict)
+
 import Data.ByteString.UTF8
   ( toString
   )
+
+import qualified Data.ByteString.Base16 as Base16
 
 import Data.Aeson
   ( ToJSON(toJSON)
@@ -53,6 +62,7 @@ import Data.Aeson
   , Value(Object)
   , object
   , encode
+  , eitherDecode
   , (.:)
   , (.=)
   )
@@ -63,17 +73,32 @@ import Servant
   , throwError
   )
 import Servant.API
-  ( ReqBody
+  ( Header
+  , ReqBody
   , JSON
+  , OctetStream
+  , PlainText
   , Post
+  , Accept(contentType)
+  , MimeUnrender(mimeUnrender)
   , (:>)
   )
+import Web.Stripe.Event
+  ( Event(Event, eventId, eventType, eventData)
+  , EventId(EventId)
+  , EventType(ChargeSucceededEvent, CheckoutSessionCompleted, PaymentIntentCreated)
+  , EventData(ChargeEvent, CheckoutSessionEvent)
+  )
+
+import Stripe.Signature (digest, natBytes, parseSig, isSigValid)
+
 import Web.Stripe.Error
   ( StripeError(StripeError, errorType, errorMsg)
   , StripeErrorType(InvalidRequest, APIError, ConnectionFailure, CardError)
   )
 import Web.Stripe.Types
-  ( Charge(Charge, chargeId)
+  ( Charge(Charge, chargeId, chargeMetaData)
+  , CheckoutSession(checkoutSessionClientReferenceId)
   , ChargeId
   , MetaData(MetaData)
   , Currency(USD)
@@ -84,11 +109,16 @@ import Web.Stripe.Charge
   , TokenId(TokenId)
   )
 import Web.Stripe.Client
-  ( StripeConfig
+  ( StripeConfig(StripeConfig, secretKey)
+  , StripeKey(StripeKey)
   )
 import Web.Stripe
   ( stripe
   , (-&-)
+  )
+
+import Stripe.Concepts
+  ( WebhookSecretKey
   )
 
 import qualified Prometheus as P
@@ -99,6 +129,8 @@ import PaymentServer.Persistence
   , PaymentError(AlreadyPaid, PaymentFailed)
   , ProcessorResult
   )
+import Data.Data (Typeable)
+import Servant.API.ContentTypes (AcceptHeader(AcceptHeader))
 
 data Acknowledgement = Ok deriving (Eq, Show)
 
@@ -107,18 +139,84 @@ instance ToJSON Acknowledgement where
     [ "success" .= True
     ]
 
-type StripeAPI = ChargesAPI
+-- Represent configuration options for setting up the webhook endpoint for
+-- receiving event notifications from Stripe.
+data WebhookConfig = WebhookConfig
+  { webhookConfigKey :: WebhookSecretKey
+  }
 
--- | getVoucher finds the metadata item with the key `"Voucher"` and returns
+-- Create the value for the `Stripe-Signature` header item in a webhook request.
+stripeSignature :: WebhookSecretKey -> Natural -> ByteString -> ByteString
+stripeSignature key when what = Data.ByteString.concat
+  [ "t="
+  , natBytes when
+  , ","
+  , "v1="
+  , Base16.encode $ digest key when what
+  ]
+
+-- getVoucher finds the metadata item with the key `"Voucher"` and returns
 -- the corresponding value, or Nothing.
-getVoucher :: MetaData -> Maybe Voucher
-getVoucher (MetaData []) = Nothing
-getVoucher (MetaData (("Voucher", value):xs)) = Just value
-getVoucher (MetaData (x:xs)) = getVoucher (MetaData xs)
+getVoucher :: Event -> Maybe Voucher
+getVoucher Event{eventData=(CheckoutSessionEvent checkoutSession)} =
+  checkoutSessionClientReferenceId checkoutSession
+getVoucher Event{eventData=(ChargeEvent charge)} =
+  voucherFromMetadata . chargeMetaData $ charge
+  where
+    voucherFromMetadata (MetaData []) = Nothing
+    voucherFromMetadata (MetaData (("Voucher", value):xs)) = Just value
+    voucherFromMetadata (MetaData (x:xs)) = voucherFromMetadata (MetaData xs)
+getVoucher _ = Nothing
 
-stripeServer :: VoucherDatabase d => StripeConfig -> d -> Server StripeAPI
-stripeServer stripeConfig d =
+chargeServer :: VoucherDatabase d => StripeConfig -> d -> Server ChargesAPI
+chargeServer stripeConfig d =
   withSuccessFailureMetrics chargeAttempts chargeSuccesses . charge stripeConfig d
+
+data UnparsedJSON deriving Typeable
+
+instance Accept UnparsedJSON where
+  -- We could also require charset=utf-8 on this but we think Stripe doesn't
+  -- actually include that in its requests.
+  contentType _ = "application" M.// "json"
+
+instance MimeUnrender UnparsedJSON ByteString where
+  mimeUnrender _ = Right . toStrict
+
+type WebhookAPI = "webhook" :> Header "Stripe-Signature" Text :> ReqBody '[UnparsedJSON] ByteString :> Post '[JSON] Acknowledgement
+
+-- | Process charge succeeded
+webhookServer :: VoucherDatabase d => WebhookConfig -> d -> Maybe Text -> ByteString -> Handler Acknowledgement
+webhookServer _ _ Nothing _ = throwError $ jsonErr status400 "missing signature"
+webhookServer WebhookConfig { webhookConfigKey } d (Just signatureText) payload =
+  case parseSig signatureText of
+    Nothing -> throwError $ jsonErr status400 "malformed signature"
+    Just sig ->
+      -- We check the signature but we don't otherwise interpret the timestamp
+      -- it carries.  In the future perhaps we should.
+      -- https://github.com/PrivateStorageio/PaymentServer/issues/129
+      if isSigValid sig webhookConfigKey payload
+      then fundVoucher
+      else throwError $ jsonErr status400 "invalid signature"
+  where
+    fundVoucher =
+      case eitherDecode . fromStrict $ payload of
+        Left s -> throwError $ jsonErr status400 (pack s)
+        Right event@Event { eventType = CheckoutSessionCompleted } ->
+          case getVoucher event of
+            Nothing ->
+              -- TODO: Record the eventId somewhere.  In all cases where we don't
+              -- associate the value of the charge with something in our system, we
+              -- probably need enough information to issue a refund.  We're early
+              -- enough in the system here that refunds are possible and not even
+              -- particularly difficult.
+              return Ok
+            Just v -> do
+              -- TODO: What if it is a duplicate payment?  payForVoucher
+              -- should be able to indicate error I guess.
+              _ <- liftIO . payForVoucher d v . return . Right $ ()
+              return Ok
+        Right event@Event { eventType } ->
+          throwError . jsonErr status400 . pack $ "unsupported event type " ++ show eventType
 
 -- | Browser facing API that takes token, voucher and a few other information
 -- and calls stripe charges API. If payment succeeds, then the voucher is stored
@@ -184,7 +282,7 @@ charge stripeConfig d (Charges token voucher 650 USD) = do
     Left (PaymentFailed (StripeError { errorType = errorType, errorMsg = msg })) -> do
       liftIO $ print "Stripe createCharge failed:"
       liftIO $ print msg
-      let err = errorForStripe errorType ( concat [ "Stripe charge didn't succeed: ", msg ])
+      let err = errorForStripe errorType ( Data.Text.concat [ "Stripe charge didn't succeed: ", msg ])
       throwError err
 
     Right _ -> return Ok

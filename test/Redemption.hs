@@ -129,13 +129,13 @@ redemptionTests =
     -- response with the given status.
     assertRedemptionStatus redemption expectedStatus =
       withFakeStripe (return chargeOkay) $
-      \stripeConfig -> do
+      \webhookConfig stripeConfig -> do
         db <- memory
         payForVoucher db aVoucher (return $ Right $ ChargeId "xyz")
 
         -- It would be nice if we exercised `getApp` here instead of doing it
         -- all ourselves.
-        let app = paymentServerApp origins stripeConfig redemptionConfig db
+        let app = paymentServerApp origins stripeConfig webhookConfig redemptionConfig db
 
         flip runSession app $ do
           response <- request redemption
