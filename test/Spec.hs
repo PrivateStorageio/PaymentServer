@@ -25,4 +25,5 @@ tests = testGroup "Tests"
   , Ristretto.tests
   ]
 
+main :: IO ()
 main = defaultMain tests

@@ -12,25 +12,17 @@ import Test.Tasty
   )
 
 import Test.Tasty.HUnit
-  ( testCase
-  , assertEqual
-  )
+  ( testCase )
 
 import Data.Aeson
   ( encode
   )
 
-import Network.Wai.Handler.Warp
-  ( testWithApplication
-  )
-
 import Network.Wai.Test
   ( SRequest(SRequest)
   , runSession
-  , request
   , srequest
   , defaultRequest
-  , assertHeader
   , assertStatus
   , setPath
   )
@@ -64,6 +56,8 @@ import FakeStripe
   , chargeOkay
   , ChargeId(ChargeId)
   )
+
+import Control.Monad ( void )
 
 tests :: TestTree
 tests = testGroup "Redemption"
@@ -131,7 +125,7 @@ redemptionTests =
       withFakeStripe (return chargeOkay) $
       \webhookConfig stripeConfig -> do
         db <- memory
-        payForVoucher db aVoucher (return $ Right $ ChargeId "xyz")
+        void $ payForVoucher db aVoucher (return $ Right $ ChargeId "xyz")
 
         -- It would be nice if we exercised `getApp` here instead of doing it
         -- all ourselves.

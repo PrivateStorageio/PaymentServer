@@ -71,7 +71,7 @@ instance Exception PaymentError
 instance Eq PaymentError where
   AlreadyPaid == AlreadyPaid = True
   PaymentFailed self == PaymentFailed other = show self == show other
-  self == other = False
+  _self == _other = False
 
 -- | Reasons that a voucher cannot be redeemed.
 data RedeemError =
@@ -181,7 +181,7 @@ data VoucherDatabaseState =
   | SQLiteDB { connect :: IO Sqlite.Connection }
 
 instance VoucherDatabase VoucherDatabaseState where
-  payForVoucher MemoryDB{ paid = paidRef, redeemed = redeemed } voucher pay = do
+  payForVoucher MemoryDB{ paid = paidRef } voucher pay = do
     -- Surely far from ideal...
     paid <- readIORef paidRef
     if Set.member voucher paid
@@ -237,6 +237,8 @@ instance VoucherDatabase VoucherDatabaseState where
 
       transformBusy (Sqlite.SQLError Sqlite.ErrorBusy _ _) =
         return . Left $ DatabaseUnavailable
+      -- XXX things went poorly, should we handle with more detail?
+      transformBusy panic = error $ "redeemVoucherHelper got bad input " <> show panic
 
 
 -- | Look up the voucher, counter tuple which previously performed a
@@ -369,7 +371,7 @@ insertVoucher dbConn voucher pay =
           Right _ -> do
             Sqlite.execute dbConn "INSERT INTO vouchers (name, charge_id) VALUES (?, ?)" (voucher, Nothing :: Maybe Text)
             return result
-          Left err ->
+          Left _err ->
             return result
 
 -- | Mark the given voucher as having been redeemed (with the given
@@ -392,6 +394,7 @@ sqlite path =
       let exec = Sqlite.execute_ dbConn
       exec "PRAGMA busy_timeout = 60000"
       exec "PRAGMA foreign_keys = ON"
+      -- XXX handle any upgrade failures here!
       Sqlite.withExclusiveTransaction dbConn (upgradeSchema latestVersion dbConn)
       return dbConn
 
@@ -494,7 +497,7 @@ upgradeSchema targetVersion conn = do
         oneStep :: [Sqlite.Query] -> IO [()]
         oneStep = mapM $ Sqlite.execute_ conn
       in do
-        mapM oneStep upgrades
+        mapM_ oneStep upgrades
         return $ Right ()
 
 

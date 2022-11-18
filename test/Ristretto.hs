@@ -19,7 +19,7 @@ import Test.Tasty.HUnit
   )
 
 import PaymentServer.Ristretto
-  ( Issuance(Issuance, publicKey, signatures, proof)
+  ( Issuance(Issuance, publicKey, signatures)
   , ristretto
   , randomSigningKey
   , randomToken
@@ -42,7 +42,7 @@ issueTests = testGroup "Issuance"
       let blindedTokens = [aBlindToken]
       result <- ristretto key blindedTokens
       case result of
-        (Right Issuance { publicKey, signatures, proof }) -> do
+        (Right Issuance { publicKey, signatures }) -> do
           assertEqual "The public key matches the signing key." expectedPublicKey publicKey
           assertEqual "The number of signatures equals the number of tokens." (length blindedTokens) (length signatures)
           -- XXX The proof checks out

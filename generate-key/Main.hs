@@ -3,17 +3,11 @@ module Main
   ( main
   ) where
 
-import Prelude hiding
-  ( putStrLn
-  )
-
-import Data.Text.IO
-  ( putStrLn
-  )
+import qualified Data.Text.IO as TIO
 
 import PaymentServer.Ristretto
   ( randomSigningKey
   )
 
 main :: IO ()
-main = randomSigningKey >>= putStrLn
+main = randomSigningKey >>= TIO.putStrLn
