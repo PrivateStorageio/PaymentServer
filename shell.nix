@@ -11,6 +11,7 @@ in
     withHoogle = false;
 
     buildInputs = [
-      pkgs.stack
+      project.pkgs.stack
+      project.pkgs.haskell-language-server
     ];
   }
