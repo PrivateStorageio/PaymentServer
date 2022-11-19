@@ -22,8 +22,8 @@ import Test.Tasty
 import Test.Tasty.HUnit
   ( testCase
   , assertEqual
+  , assertBool
   )
-
 
 import Data.Text.Lazy.Encoding
   ( encodeUtf8
@@ -34,11 +34,7 @@ import Data.Text.Lazy
   , concat
   )
 
-import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
-import Control.Monad.IO.Class
-  ( liftIO
-  )
 
 import Control.Monad.Trans.Except
   ( runExceptT
@@ -75,7 +71,6 @@ import Network.Wai.Test
   ( SRequest(SRequest)
   , SResponse(simpleStatus, simpleBody)
   , runSession
-  , request
   , srequest
   , defaultRequest
   , assertHeader
@@ -88,8 +83,7 @@ import Network.Wai
   )
 
 import PaymentServer.Persistence
-  ( Voucher
-  , RedeemError(NotPaid)
+  ( RedeemError(NotPaid)
   , memory
   , payForVoucher
   , redeemVoucher
@@ -101,7 +95,6 @@ import PaymentServer.Processors.Stripe
   , Failure(Failure)
   , WebhookConfig(WebhookConfig)
   , charge
-  , webhookServer
   , stripeSignature
   )
 
@@ -121,6 +114,8 @@ import FakeStripe
   , cardError
   , apiError
   )
+import Data.Maybe ( isJust )
+import Control.Monad ( void )
 
 tests :: TestTree
 tests = testGroup "Stripe"
@@ -150,7 +145,7 @@ corsTests =
   , testCase "a request with an already-paid voucher receives a CORS-enabled response" $ do
       let pay = return . Right . ChargeId $ "abc"
       db <- memory
-      payForVoucher db (toStrict alreadyPaidVoucher') pay
+      void $ payForVoucher db (toStrict alreadyPaidVoucher') pay
       assertCORSHeader' db chargeOkay "POST" applicationJSON (alreadyPaidVoucher alreadyPaidVoucher')
   ]
   where
@@ -191,7 +186,7 @@ chargeTests :: TestTree
 chargeTests =
   testGroup "Charges"
   [ testCase "non-USD currency is rejected" $
-    withFakeStripe (return chargeOkay) $ \webhookConfig stripeConfig -> do
+    withFakeStripe (return chargeOkay) $ \_webhookConfig stripeConfig -> do
       let amount = 650
       let currency = AED
       db <- memory
@@ -201,7 +196,7 @@ chargeTests =
       assertEqual "The JSON body includes the reason" (Just $ Failure "Unsupported currency") (decode body)
 
   , testCase "incorrect USD amount is rejected" $
-    withFakeStripe (return chargeOkay) $ \webhookConfig stripeConfig -> do
+    withFakeStripe (return chargeOkay) $ \_webhookConfig stripeConfig -> do
       let amount = 649
       let currency = USD
       db <- memory
@@ -211,7 +206,7 @@ chargeTests =
       assertEqual "The JSON body includes the reason" (Just $ Failure "Incorrect charge amount") (decode body)
 
   , testCase "a Stripe charge failure is propagated" $
-    withFakeStripe (return (chargeFailed cardError)) $ \webhookConfig stripeConfig -> do
+    withFakeStripe (return (chargeFailed cardError)) $ \_webhookConfig stripeConfig -> do
       let amount = 650
       let currency = USD
       db <- memory
@@ -223,17 +218,17 @@ chargeTests =
         (Just $ Failure "Stripe charge didn't succeed: Your card is expired.") (decode body)
 
   , testCase "the HTTP error code is derived from the specific failure" $
-    withFakeStripe (return (chargeFailed apiError)) $ \webhookConfig stripeConfig -> do
+    withFakeStripe (return (chargeFailed apiError)) $ \_webhookConfig stripeConfig -> do
       let amount = 650
       let currency = USD
       db <- memory
-      (Left (ServerError code phrase body _)) <- runExceptT . runHandler' $ charge stripeConfig db (Charges token voucher amount currency)
+      (Left (ServerError code phrase _body _)) <- runExceptT . runHandler' $ charge stripeConfig db (Charges token voucher amount currency)
       -- The `apiError` is for a Stripe API error.
       assertEqual "The result is an error" 503 code
       assertEqual "The HTTP phrase matches the code" "Service Unavailable" phrase
 
   , testCase "currect USD amount is accepted" $
-    withFakeStripe (return chargeOkay) $ \webhookConfig stripeConfig -> do
+    withFakeStripe (return chargeOkay) $ \_webhookConfig stripeConfig -> do
       let amount = 650
       let currency = USD
       db <- memory
@@ -294,7 +289,7 @@ webhookTests =
       response <- (flip runSession) app $ srequest theSRequest
 
       -- It should fail but we don't really care what the message is.
-      let (Just (Failure _)) = decode . simpleBody $ response
+      assertBool "pattern matches" $ isJust $ (decode . simpleBody $ response :: Maybe Failure)
       assertEqual "The response is 400" status400 (simpleStatus response)
 
   , testCase "If the request body contains a checkout.session.completed event and the signature is correct then the voucher is marked as paid and the response is OK" $ do
@@ -329,7 +324,7 @@ webhookTests =
       assertResponse status200 (db, response)
       return db
 
-    assertResponse status (db, response) =
+    assertResponse status (_, response) =
       assertEqual ("The response is " ++ (show status)) status (simpleStatus response)
 
     -- Assert that the database allows us to redeem a voucher, demonstrating

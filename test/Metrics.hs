@@ -16,9 +16,7 @@ import Test.Tasty
   )
 
 import Test.Tasty.HUnit
-  ( testCase
-  , assertEqual
-  )
+  ( testCase )
 
 import Network.HTTP.Types
   ( methodGet
@@ -48,6 +46,7 @@ import Prometheus
   , unsafeRegister
   , counter
   , incCounter
+  , Counter
   )
 
 import PaymentServer.Metrics
@@ -73,12 +72,13 @@ readMetrics = request $ setPath defaultRequest { requestMethod = methodGet } "/m
 -- Register a counter at the top-level because the registry is global and this
 -- lets us avoid thinking about collisions or unregistration.  unsafeRegister
 -- is (only) safe for defining a top-level symbol.
+aCounter :: Counter
 aCounter = unsafeRegister $ counter (Info "a_counter" "A test counter.")
 
+-- | A ``GET /metrics`` request receives a text/plain OK response containing
+-- current Prometheus-formatted metrics information.
 metricsTests :: TestTree
 metricsTests =
-  -- | A ``GET /metrics`` request receives a text/plain OK response containing
-  -- current Prometheus-formatted metrics information.
   testCase "plaintext metrics response" $
   let
     app :: Application

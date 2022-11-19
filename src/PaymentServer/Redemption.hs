@@ -17,10 +17,6 @@ module PaymentServer.Redemption
   , redemptionServer
   ) where
 
-import Prelude hiding
-  ( concat
-  )
-
 import GHC.Generics
   ( Generic
   )
@@ -39,8 +35,8 @@ import Control.Monad.IO.Class
 import Data.Text
   ( Text
   , pack
-  , concat
   )
+import qualified Data.Text as Text
 import Data.Text.Encoding
   ( encodeUtf8
   )
@@ -176,6 +172,7 @@ instance FromJSON Result where
 
 type RedemptionAPI = ReqBody '[JSON] Redeem :> Post '[JSON] Result
 
+jsonErr :: ToJSON a => ServerError -> a -> ServerError
 jsonErr err reason = err
   { errBody = encode reason
   , errHeaders = [ ("Content-Type", "application/json;charset=utf-8") ]
@@ -198,7 +195,7 @@ retry op =
     numRetries = totalRetryDuration `div` perRetryDelay
 
     policy = constantDelay (perRetryDelay * 1000) <> limitRetries numRetries
-    shouldRetry status value =
+    shouldRetry _status value =
       case value of
         Left NotPaid -> return True
         _ -> return False
@@ -290,4 +287,4 @@ signaturesIssued
 -- be used as an identifier for this exact sequence of tokens.
 fingerprintFromTokens :: [BlindedToken] -> Fingerprint
 fingerprintFromTokens =
-  pack . show . hashWith SHA3_512 . encodeUtf8 . concat
+  pack . show . hashWith SHA3_512 . encodeUtf8 . Text.concat

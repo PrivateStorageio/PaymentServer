@@ -76,17 +76,14 @@ import Servant.API
   ( Header
   , ReqBody
   , JSON
-  , OctetStream
-  , PlainText
   , Post
   , Accept(contentType)
   , MimeUnrender(mimeUnrender)
   , (:>)
   )
 import Web.Stripe.Event
-  ( Event(Event, eventId, eventType, eventData)
-  , EventId(EventId)
-  , EventType(ChargeSucceededEvent, CheckoutSessionCompleted, PaymentIntentCreated)
+  ( Event(Event, eventType, eventData)
+  , EventType(CheckoutSessionCompleted)
   , EventData(ChargeEvent, CheckoutSessionEvent)
   )
 
@@ -109,8 +106,7 @@ import Web.Stripe.Charge
   , TokenId(TokenId)
   )
 import Web.Stripe.Client
-  ( StripeConfig(StripeConfig, secretKey)
-  , StripeKey(StripeKey)
+  ( StripeConfig
   )
 import Web.Stripe
   ( stripe
@@ -130,7 +126,6 @@ import PaymentServer.Persistence
   , ProcessorResult
   )
 import Data.Data (Typeable)
-import Servant.API.ContentTypes (AcceptHeader(AcceptHeader))
 
 data Acknowledgement = Ok deriving (Eq, Show)
 
@@ -164,8 +159,8 @@ getVoucher Event{eventData=(ChargeEvent charge)} =
   voucherFromMetadata . chargeMetaData $ charge
   where
     voucherFromMetadata (MetaData []) = Nothing
-    voucherFromMetadata (MetaData (("Voucher", value):xs)) = Just value
-    voucherFromMetadata (MetaData (x:xs)) = voucherFromMetadata (MetaData xs)
+    voucherFromMetadata (MetaData (("Voucher", value):_)) = Just value
+    voucherFromMetadata (MetaData (_:xs)) = voucherFromMetadata (MetaData xs)
 getVoucher _ = Nothing
 
 chargeServer :: VoucherDatabase d => StripeConfig -> d -> Server ChargesAPI
@@ -215,7 +210,7 @@ webhookServer WebhookConfig { webhookConfigKey } d (Just signatureText) payload 
               -- should be able to indicate error I guess.
               _ <- liftIO . payForVoucher d v . return . Right $ ()
               return Ok
-        Right event@Event { eventType } ->
+        Right Event { eventType } ->
           throwError . jsonErr status400 . pack $ "unsupported event type " ++ show eventType
 
 -- | Browser facing API that takes token, voucher and a few other information
@@ -280,8 +275,7 @@ charge stripeConfig d (Charges token voucher 650 USD) = do
       throwError $ voucherAlreadyPaid "Payment for voucher already supplied"
 
     Left (PaymentFailed (StripeError { errorType = errorType, errorMsg = msg })) -> do
-      liftIO $ print "Stripe createCharge failed:"
-      liftIO $ print msg
+      liftIO $ print $ "Stripe createCharge failed: " <> msg
       let err = errorForStripe errorType ( Data.Text.concat [ "Stripe charge didn't succeed: ", msg ])
       throwError err
 
@@ -336,6 +330,7 @@ charge stripeConfig d (Charges token voucher 650 USD) = do
 charge _ _ (Charges _ _ 650 _) = throwError (jsonErr status400 "Unsupported currency")
 -- The wrong amount
 charge _ _ (Charges _ _ _ USD) = throwError (jsonErr status400 "Incorrect charge amount")
+charge badInput1 _badInput2 badInput3 = error $ mconcat ["charge got unexpected input : ", show badInput1, " ", "some VoucherDatabase value", " ", show badInput3]
 
 jsonErr :: Status -> Text -> ServerError
 jsonErr (Status statusCode statusMessage) detail = ServerError

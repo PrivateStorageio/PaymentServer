@@ -3,15 +3,7 @@ module Main
   ( main
   ) where
 
-import Prelude hiding
-  ( putStrLn
-  , getLine
-  )
-
-import Data.Text.IO
-  ( putStrLn
-  , getLine
-  )
+import qualified Data.Text.IO as TIO
 
 import Options.Applicative
   ( ParserInfo
@@ -37,4 +29,4 @@ opts = info (pure () <**> helper)
 
 main :: IO ()
 main =
-  execParser opts >> getLine >>= getPublicKey >>= putStrLn
+  execParser opts >> TIO.getLine >>= getPublicKey >>= TIO.putStrLn

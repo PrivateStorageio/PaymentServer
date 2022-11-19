@@ -40,8 +40,6 @@ import Options.Applicative
   ( Parser
   , ParserInfo
   , strOption
-  , option
-  , auto
   , long
   , help
   , showDefault

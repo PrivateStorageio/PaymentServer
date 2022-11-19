@@ -52,9 +52,6 @@ import PaymentServer.Metrics
   ( MetricsAPI
   , metricsServer
   )
-import PaymentServer.Issuer
-  ( Issuer
-  )
 import PaymentServer.Persistence
   ( VoucherDatabase
   )

@@ -18,15 +18,6 @@ import Data.ByteString.Lazy
    ( ByteString
    )
 
-import Data.Time.Clock
-  ( UTCTime(UTCTime)
-  , secondsToDiffTime
-  )
-
-import Data.Time.Calendar
-  ( Day(ModifiedJulianDay)
-  )
-
 import Network.HTTP.Types
   ( status200
   , status400
@@ -183,11 +174,11 @@ aCharge = [r|
 
 -- Accept a charge creation and respond in the affirmative.
 chargeOkay :: Application
-chargeOkay req respond =
+chargeOkay _req respond =
   respond . responseLBS status200 [] $ aCharge
 
 chargeFailed :: ByteString -> Application
-chargeFailed stripeResponse req respond =
+chargeFailed stripeResponse _req respond =
   respond . responseLBS status400 [] $ stripeResponse
 
 -- Pass a Stripe-flavored configuration for a running Wai application to a

@@ -110,7 +110,6 @@ import Options.Applicative
 import System.Exit
   ( exitFailure
   )
-import Data.Semigroup ((<>))
 import qualified Data.Text.IO as TIO
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as Char8
@@ -264,6 +263,7 @@ main = do
     logEndpoint (endpoint config)
     run app
 
+getPortNumber :: Endpoint -> Port
 getPortNumber (TCPEndpoint portNumber) = portNumber
 getPortNumber (TLSEndpoint portNumber _ _ _) = portNumber
 
@@ -272,7 +272,7 @@ getRunner endpoint =
   let
     onException :: Maybe Request -> SomeException -> IO ()
     onException _ exc = do
-      print "onException"
+      print ("onException" :: Text)
       print exc
       return ()
     onExceptionResponse :: SomeException -> Response
@@ -310,12 +310,12 @@ getApp config =
         (Ristretto, Just keyPath) -> do
           key <- TIO.readFile keyPath
           return $ Right $ ristrettoIssue key
-        _ -> return $ Left "invalid options"
+        _ -> return $ Left ("invalid options" :: Text)
     getDatabase ServerConfig{ database, databasePath } =
       case (database, databasePath) of
         (Memory, Nothing) -> Right memory
         (SQLite3, Just path) -> Right (sqlite path)
-        _ -> Left "invalid options"
+        _ -> Left ("invalid options" :: Text)
 
     stripeConfig ServerConfig
       { stripeKeyPath
@@ -339,7 +339,7 @@ getApp config =
   in do
     issuer <- getIssuer config
     case issuer of
-      Left err -> do
+      Left err -> do -- XXX shae turn this into a monad instead of a stairstep
         print err
         exitFailure
       Right issuer ->

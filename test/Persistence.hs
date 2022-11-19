@@ -61,6 +61,8 @@ import PaymentServer.Persistence
   , readVersion
   )
 
+import Control.Monad (void)
+
 data ArbitraryException = ArbitraryException
   deriving (Show, Eq)
 
@@ -74,9 +76,13 @@ tests = testGroup "Persistence"
   ]
 
 -- Some dummy values that should be replaced by the use of QuickCheck.
+voucher :: Voucher
 voucher = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+anotherVoucher :: Voucher
 anotherVoucher = "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+fingerprint :: Fingerprint
 fingerprint = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+anotherFingerprint :: Fingerprint
 anotherFingerprint = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 
 aChargeId :: ChargeId
@@ -228,7 +234,7 @@ sqlite3DatabaseVoucherPaymentTests =
   where
     makeDatabase = do
       tempdir <- getTemporaryDirectory
-      (path, handle) <- openTempFile tempdir "voucher-.db"
+      (path, _handle) <- openTempFile tempdir "voucher-.db"
       return . sqlite . Text.pack $ path
 
     genericTests = makeVoucherPaymentTests "sqlite3" makeDatabase
@@ -248,6 +254,7 @@ sqlite3DatabaseVoucherPaymentTests =
                 let expected = Left DatabaseUnavailable
                 result <- redeemVoucher fastBusyConn voucher fingerprint
                 assertEqual "Redeeming voucher while database busy" expected result
+            _ -> error "srsly, what?" -- XXX does this need explicit connection closing?
       ]
       where
         fastBusyConnection
@@ -270,7 +277,7 @@ sqlite3DatabaseSchemaTests =
     -- hurt to target every intermediate version specifically, though.  I
     -- think that's what SmallCheck is for?
     Sqlite.withConnection ":memory:" $ \conn -> do
-      upgradeSchema latestVersion conn
+      void $ upgradeSchema latestVersion conn
       let expected = Right latestVersion
       actual <- readVersion conn
       assertEqual "The recorded schema version should be the latest value" expected actual
@@ -285,7 +292,7 @@ sqlite3DatabaseSchemaTests =
   , testCase "identify version 1" $
     -- readVersion identifies schema version 1
     Sqlite.withConnection ":memory:" $ \conn -> do
-      upgradeSchema 1 conn
+      void $ upgradeSchema 1 conn
       let expected = Right 1
       actual <- readVersion conn
       assertEqual "readVersion identifies database schema version 1" expected actual
@@ -293,7 +300,7 @@ sqlite3DatabaseSchemaTests =
   , testCase "identify version 2" $
     -- readVersion identifies schema version 1
     Sqlite.withConnection ":memory:" $ \conn -> do
-      upgradeSchema 2 conn
+      void $ upgradeSchema 2 conn
       let expected = Right 2
       actual <- readVersion conn
       assertEqual "readVersion identifies database schema version 2" expected actual
