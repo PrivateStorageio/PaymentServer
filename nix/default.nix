@@ -16,6 +16,9 @@ let
   # provides one of our crypto dependencies, in a non-destructive way.
   allOverlays = moreOverlays ++ haskellNix.nixpkgsArgs.overlays;
 
+  # Remove runtime dependency on GCC
+  noGCC = { dontStrip = false; enableShared = false; };
+
   # Import nixpkgs and pass the haskell.nix provided nixpkgsArgs
   pkgs = import
     # haskell.nix provides access to the nixpkgs pins which are used by our CI,
@@ -33,12 +36,13 @@ in
       src = ../.;
     };
 
+    # Remove runtime dependency on GCC
     modules = [{
-      # Remove runtime dependency on GCC
-      packages.PaymentServer.components.exes.PaymentServer = {
-        dontStrip = false;
-        enableShared = false;
-      };
+      packages.PaymentServer.components.exes.PaymentServer-exe = noGCC;
+      packages.PaymentServer.components.exes.PaymentServer-generate-key = noGCC;
+      packages.PaymentServer.components.exes.PaymentServer-get-public-key = noGCC;
+      packages.PaymentServer.components.exes.PaymentServer-complete-payment = noGCC;
+      packages.PaymentServer.components.exes.PaymentServer-tests = noGCC;
     }];
 
     # Cause the expressions at this path to be used, rather than dynamically
