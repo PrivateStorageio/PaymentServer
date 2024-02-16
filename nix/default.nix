@@ -33,6 +33,14 @@ in
       src = ../.;
     };
 
+    modules = [{
+      # Remove runtime dependency on GCC
+      packages.PaymentServer.components.exes.PaymentServer = {
+        dontStrip = false;
+        enableShared = false;
+      };
+    }];
+
     # Cause the expressions at this path to be used, rather than dynamically
     # generating them all from other sources.  This is a great memory savings
     # (some half GB or so of VmPeak shaved).  For instructions about ongoing
