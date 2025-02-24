@@ -21,7 +21,7 @@
       synopsis = "Helpers for using prometheus with servant";
       description = "Helpers for using prometheus with servant. Each endpoint has its own metrics allowing more detailed monitoring than wai-middleware-prometheus allows";
       buildType = "Simple";
-      };
+    };
     components = {
       "library" = {
         depends = [
@@ -34,9 +34,9 @@
           (hsPkgs."unordered-containers" or (errorHandler.buildDepError "unordered-containers"))
           (hsPkgs."wai" or (errorHandler.buildDepError "wai"))
           (hsPkgs."bytestring" or (errorHandler.buildDepError "bytestring"))
-          ];
+        ];
         buildable = true;
-        };
+      };
       exes = {
         "bench" = {
           depends = [
@@ -49,10 +49,10 @@
             (hsPkgs."wai" or (errorHandler.buildDepError "wai"))
             (hsPkgs."warp" or (errorHandler.buildDepError "warp"))
             (hsPkgs."process" or (errorHandler.buildDepError "process"))
-            ];
+          ];
           buildable = true;
-          };
         };
+      };
       tests = {
         "spec" = {
           depends = [
@@ -70,11 +70,11 @@
             (hsPkgs."hspec" or (errorHandler.buildDepError "hspec"))
             (hsPkgs."unordered-containers" or (errorHandler.buildDepError "unordered-containers"))
             (hsPkgs."transformers" or (errorHandler.buildDepError "transformers"))
-            ];
+          ];
           buildable = true;
-          };
         };
       };
-    } // rec {
-    src = (pkgs.lib).mkDefault /nix/store/r537z0w0swb6calr6vkk2ppnqd2bgv8z-servant-prometheus-622eb77;
-    }
+    };
+  } // rec {
+    src = pkgs.lib.mkDefault /nix/store/r537z0w0swb6calr6vkk2ppnqd2bgv8z-servant-prometheus-622eb77;
+  }

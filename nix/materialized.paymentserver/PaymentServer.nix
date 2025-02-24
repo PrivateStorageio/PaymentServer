@@ -29,7 +29,7 @@
       extraSrcFiles = [ "README.rst" ];
       extraTmpFiles = [];
       extraDocFiles = [];
-      };
+    };
     components = {
       "library" = {
         depends = [
@@ -61,10 +61,10 @@
           (hsPkgs."prometheus-client" or (errorHandler.buildDepError "prometheus-client"))
           (hsPkgs."servant-prometheus" or (errorHandler.buildDepError "servant-prometheus"))
           (hsPkgs."mtl" or (errorHandler.buildDepError "mtl"))
-          ];
+        ];
         pkgconfig = [
           (pkgconfPkgs."libchallenge_bypass_ristretto_ffi" or (errorHandler.pkgConfDepError "libchallenge_bypass_ristretto_ffi"))
-          ];
+        ];
         buildable = true;
         modules = [
           "PaymentServer/Processors/Stripe"
@@ -75,40 +75,40 @@
           "PaymentServer/Metrics"
           "PaymentServer/Server"
           "PaymentServer/Main"
-          ];
+        ];
         hsSourceDirs = [ "src" ];
-        };
+      };
       exes = {
         "PaymentServer-exe" = {
           depends = [
             (hsPkgs."base" or (errorHandler.buildDepError "base"))
             (hsPkgs."PaymentServer" or (errorHandler.buildDepError "PaymentServer"))
-            ];
+          ];
           buildable = true;
           hsSourceDirs = [ "app" ];
           mainPath = [ "Main.hs" ];
-          };
+        };
         "PaymentServer-generate-key" = {
           depends = [
             (hsPkgs."base" or (errorHandler.buildDepError "base"))
             (hsPkgs."text" or (errorHandler.buildDepError "text"))
             (hsPkgs."PaymentServer" or (errorHandler.buildDepError "PaymentServer"))
-            ];
+          ];
           buildable = true;
           hsSourceDirs = [ "generate-key" ];
           mainPath = [ "Main.hs" ];
-          };
+        };
         "PaymentServer-get-public-key" = {
           depends = [
             (hsPkgs."base" or (errorHandler.buildDepError "base"))
             (hsPkgs."text" or (errorHandler.buildDepError "text"))
             (hsPkgs."optparse-applicative" or (errorHandler.buildDepError "optparse-applicative"))
             (hsPkgs."PaymentServer" or (errorHandler.buildDepError "PaymentServer"))
-            ];
+          ];
           buildable = true;
           hsSourceDirs = [ "get-public-key" ];
           mainPath = [ "Main.hs" ];
-          };
+        };
         "PaymentServer-complete-payment" = {
           depends = [
             (hsPkgs."base" or (errorHandler.buildDepError "base"))
@@ -121,12 +121,12 @@
             (hsPkgs."stripe-concepts" or (errorHandler.buildDepError "stripe-concepts"))
             (hsPkgs."raw-strings-qq" or (errorHandler.buildDepError "raw-strings-qq"))
             (hsPkgs."PaymentServer" or (errorHandler.buildDepError "PaymentServer"))
-            ];
+          ];
           buildable = true;
           hsSourceDirs = [ "complete-payment" ];
           mainPath = [ "Main.hs" ];
-          };
         };
+      };
       tests = {
         "PaymentServer-tests" = {
           depends = [
@@ -153,7 +153,7 @@
             (hsPkgs."prometheus-client" or (errorHandler.buildDepError "prometheus-client"))
             (hsPkgs."stripe-core" or (errorHandler.buildDepError "stripe-core"))
             (hsPkgs."PaymentServer" or (errorHandler.buildDepError "PaymentServer"))
-            ];
+          ];
           buildable = true;
           modules = [
             "Persistence"
@@ -162,10 +162,10 @@
             "Stripe"
             "FakeStripe"
             "Ristretto"
-            ];
+          ];
           hsSourceDirs = [ "test" ];
           mainPath = [ "Spec.hs" ];
-          };
         };
       };
-    } // rec { src = (pkgs.lib).mkDefault ./.; }
+    };
+  } // rec { src = pkgs.lib.mkDefault ./.; }

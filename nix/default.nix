@@ -14,7 +14,15 @@ let
 
   # Haskell.nix is delivery as an overlay.  Add our own overlay, which
   # provides one of our crypto dependencies, in a non-destructive way.
-  allOverlays = moreOverlays ++ haskellNix.nixpkgsArgs.overlays;
+  allOverlays = moreOverlays ++ haskellNix.nixpkgsArgs.overlays ++
+  # And provide a mapping for haskell-nix to make our library available to Cabal.
+    [(final: prev: {
+      haskell-nix = prev.haskell-nix // {
+        extraPkgconfigMappings = prev.haskell-nix.extraPkgconfigMappings or {} // {
+          "libchallenge_bypass_ristretto_ffi" = [ "libchallenge_bypass_ristretto_ffi" ];
+        };
+      };
+    })];
 
   # Remove runtime dependency on GCC
   noGCC = { dontStrip = false; enableShared = false; };
@@ -24,7 +32,7 @@ let
     # haskell.nix provides access to the nixpkgs pins which are used by our CI,
     # hence you will be more likely to get cache hits when using these.
     # But you can also just use your own, e.g. '<nixpkgs>'.
-    haskellNix.sources.nixpkgs-2205
+    haskellNix.sources.nixpkgs-2411
     # These arguments passed to nixpkgs, include some patches and also
     # the haskell.nix functionality itself as an overlay.
     (haskellNix.nixpkgsArgs // { overlays = allOverlays; });
