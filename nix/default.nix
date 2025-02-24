@@ -14,7 +14,14 @@ let
 
   # Haskell.nix is delivery as an overlay.  Add our own overlay, which
   # provides one of our crypto dependencies, in a non-destructive way.
-  allOverlays = moreOverlays ++ haskellNix.nixpkgsArgs.overlays;
+  allOverlays = moreOverlays ++ haskellNix.nixpkgsArgs.overlays ++
+    [(final: prev: {
+      haskell-nix = prev.haskell-nix // {
+        extraPkgconfigMappings = prev.haskell-nix.extraPkgconfigMappings or {} // {
+          "libchallenge_bypass_ristretto_ffi" = [ "libchallenge_bypass_ristretto_ffi" ];
+        };
+      };
+    })];
 
   # Remove runtime dependency on GCC
   noGCC = { dontStrip = false; enableShared = false; };
