@@ -15,6 +15,7 @@ let
   # Haskell.nix is delivery as an overlay.  Add our own overlay, which
   # provides one of our crypto dependencies, in a non-destructive way.
   allOverlays = moreOverlays ++ haskellNix.nixpkgsArgs.overlays ++
+  # And provide a mapping for haskell-nix to make our library available to Cabal.
     [(final: prev: {
       haskell-nix = prev.haskell-nix // {
         extraPkgconfigMappings = prev.haskell-nix.extraPkgconfigMappings or {} // {
